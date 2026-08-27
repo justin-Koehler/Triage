@@ -42,7 +42,7 @@ jobs:
           test "$user" != "root"
           test "$user" != "0"
       - name: Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ steps.meta.outputs.tag }}
           exit-code: "1"
