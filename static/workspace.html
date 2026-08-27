@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CRITR</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css?v=cal-size-v2" />
+  </head>
+  <body class="gated">
+    <header class="chrome">
+      <div class="top">
+        <a class="brand" href="/" id="brand">CRITR</a>
+        <div class="account" id="account" hidden></div>
+      </div>
+    </header>
+
+    <div class="shell shell-full">
+      <main class="ticket-view" id="ticket-view">
+        <article id="ticket" class="ticket-sheet" hidden aria-label="Change">
+          <header class="ticket-head">
+            <div class="ticket-head-top">
+              <p class="ticket-kicker" id="ticket-kind" data-kind="open">Typ offen</p>
+              <div class="ticket-aside">
+                <p class="ticket-jira" id="ticket-jira" hidden>
+                  <span class="ticket-jira-label">Ticket</span>
+                  <a class="ticket-jira-key" id="ticket-jira-key" target="_blank" rel="noopener"></a>
+                </p>
+                <p class="ticket-author ticket-priority" id="ticket-priority-cell" data-key="priority">
+                  <span class="ticket-author-label">Priorität</span>
+                  <span class="ticket-author-name" id="ticket-priority">Mittel</span>
+                </p>
+              </div>
+            </div>
+            <p class="ticket-edit-hint">Jedes Feld kann durch Anklicken bearbeitet werden</p>
+            <h2 class="ticket-headline" id="ticket-headline" hidden></h2>
+            <dl class="ticket-meta" id="ticket-meta" hidden></dl>
+          </header>
+          <section class="ticket-section" id="ticket-overview" hidden>
+            <h3 class="ticket-section-title">Übersicht</h3>
+            <dl class="ticket-fields ticket-overview-grid" id="ticket-overview-fields"></dl>
+          </section>
+          <div class="ticket-split">
+            <section class="ticket-section" id="ticket-costs" hidden>
+              <h3 class="ticket-section-title">Kosten</h3>
+              <p class="ticket-section-hint">Google Sheet öffnen, ausfüllen, Fenster schließen.</p>
+              <div class="effort-sheet" id="effort-sheet">
+                <button type="button" class="btn btn-primary" id="effort-sheet-open">Vorlage öffnen</button>
+                <p class="effort-sheet-link" id="effort-sheet-link" hidden>
+                  <a href="#" target="_blank" rel="noopener"></a>
+                </p>
+              </div>
+              <dl class="ticket-team ticket-costs" id="ticket-cost-fields"></dl>
+            </section>
+            <section class="ticket-section" id="ticket-team" hidden>
+              <h3 class="ticket-section-title">Team und Beteiligte</h3>
+              <dl class="ticket-team" id="ticket-team-fields"></dl>
+            </section>
+          </div>
+          <section class="ticket-section" id="ticket-files" hidden>
+            <h3 class="ticket-section-title">Anhang</h3>
+            <ul class="ticket-file-list" id="ticket-file-list"></ul>
+            <button type="button" class="file-add" id="ticket-file-add">Datei hinzufügen</button>
+            <input type="file" id="ticket-file-input" hidden multiple />
+          </section>
+          <button type="button" class="jira-create" id="jira-create" hidden>
+            In Jira Anlegen
+          </button>
+          <div class="ticket-finish" id="ticket-finish" hidden>
+            <a
+              class="jira-create ticket-finish-open"
+              id="ticket-open-jira"
+              href="#"
+              target="_blank"
+              rel="noopener"
+              >In Jira öffnen</a
+            >
+            <button type="button" class="ticket-finish-new" id="ticket-new-change">
+              Weiteren Change anlegen
+            </button>
+          </div>
+          <dl class="ticket-fields" id="ticket-fields" hidden></dl>
+        </article>
+      </main>
+
+      <section class="hub" id="hub" hidden>
+        <div class="table-wrap" id="table-wrap">
+          <table class="grid" id="grid">
+            <thead>
+              <tr>
+                <th data-sort="title"><button type="button">Change</button></th>
+                <th data-sort="status" class="col-status"><button type="button">Status</button></th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+          <div class="state" id="state" hidden></div>
+        </div>
+        <div class="hub-foot">
+          <span class="count" id="count"></span>
+        </div>
+      </section>
+
+      <footer class="dock">
+        <div class="dock-guide">
+          <p class="field-prompt" id="intro-prompt" hidden>
+            <span class="field-prompt-text" id="intro-prompt-text"></span>
+          </p>
+        </div>
+        <div class="dock-inner">
+          <div class="choice-row" id="choice-row" hidden></div>
+          <div class="choice-row jira-suggest" id="jira-suggest" hidden></div>
+          <div id="date-wrap" class="date-wrap" hidden>
+            <div id="date-cal" class="cal"></div>
+          </div>
+          <form id="form" class="composer composer-card">
+            <div class="composer-main">
+              <textarea
+                id="input"
+                rows="1"
+                autocomplete="off"
+                placeholder="Titel Change"
+                aria-label="Titel Change"
+              ></textarea>
+              <button type="submit" id="send" class="send" aria-label="Senden">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M5 12h14M13 6l6 6-6 6"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+            <button type="button" class="ai-enhance" id="ai-enhance" hidden>
+              mit KI aufwerten
+            </button>
+          </form>
+        </div>
+      </footer>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="/auth.js?v=login-search-v1"></script>
+    <script src="/app.js?v=owners-v1"></script>
+    <script src="/workspace.js?v=review-fix-v1"></script>
+  </body>
+</html>

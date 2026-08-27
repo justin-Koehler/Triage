@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Einstellungen — CRITR</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css?v=ui-scale-v1" />
+  </head>
+  <body class="gated">
+    <header class="chrome">
+      <div class="top">
+        <a class="brand" href="/">CRITR</a>
+        <div class="account" id="account" hidden></div>
+      </div>
+    </header>
+
+    <div class="shell shell-wide">
+      <section class="settings" id="settings">
+        <p class="empty-title">Einstellungen</p>
+        <p class="empty-sub">LLM und Jira. Secrets bleiben verschlüsselt in der eigenen DB.</p>
+
+        <form id="form" class="settings-form">
+          <fieldset>
+            <legend>LLM</legend>
+            <p class="hint">
+              STACKIT / OpenAI-kompatibel: nur Base-URL und API-Key. Modell wird automatisch
+              vom Endpunkt geholt.
+            </p>
+            <label>
+              Provider
+              <select id="llm-provider" name="provider"></select>
+            </label>
+            <label>
+              Base-URL
+              <input
+                id="llm-base"
+                name="baseUrl"
+                placeholder="https://llm.stackit.rocks/v1"
+                autocomplete="off"
+              />
+            </label>
+            <label>
+              API-Key
+              <input
+                id="llm-key"
+                name="apiKey"
+                type="password"
+                placeholder="unverändert lassen = leer lassen"
+                autocomplete="new-password"
+              />
+              <span class="hint" id="llm-key-hint"></span>
+            </label>
+            <label>
+              Modell
+              <input
+                id="llm-model"
+                name="model"
+                placeholder="leer = automatisch"
+                autocomplete="off"
+              />
+              <span class="hint">Optional. Leer lassen — wird von /v1/models gesetzt.</span>
+            </label>
+            <label>
+              Timeout (Sekunden)
+              <input id="llm-timeout" name="timeout" type="number" min="5" max="600" />
+            </label>
+            <div class="actions">
+              <button type="button" class="btn btn-ghost" id="test-llm">Verbindung testen</button>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Jira</legend>
+            <label class="check">
+              <input id="jira-enabled" type="checkbox" />
+              Sync nach Jira aktiv
+            </label>
+            <label>
+              Base-URL
+              <input
+                id="jira-base"
+                placeholder="https://firma.atlassian.net"
+                autocomplete="off"
+              />
+            </label>
+            <label>
+              Search-Endpoint
+              <input
+                id="jira-search"
+                placeholder="https://.../jira/v1/api/2/search"
+                autocomplete="off"
+              />
+            </label>
+            <label>
+              Jira-User (E-Mail oder Username)
+              <input id="jira-email" type="text" autocomplete="username" />
+            </label>
+            <label>
+              API-Token des Users
+              <input
+                id="jira-token"
+                type="password"
+                placeholder="unverändert lassen = leer lassen"
+                autocomplete="new-password"
+              />
+              <span class="hint" id="jira-token-hint">Jira-Token dieses Accounts, nicht der Gateway-x-apikey.</span>
+            </label>
+            <label>
+              x-apikey
+              <input
+                id="jira-key"
+                type="password"
+                placeholder="unverändert lassen = leer lassen"
+                autocomplete="new-password"
+              />
+              <span class="hint" id="jira-key-hint"></span>
+            </label>
+            <label>
+              Projekt-Key
+              <input id="jira-project" placeholder="CHANGE" autocomplete="off" />
+            </label>
+            <label>
+              Sheets-Vorlage (URL)
+              <input
+                id="jira-sheet-template"
+                placeholder="https://docs.google.com/spreadsheets/d/…/edit"
+                autocomplete="off"
+              />
+              <span class="hint">Dummy ist hinterlegt. Echte Vorlage: CSV importieren, „Jeder mit dem Link kann bearbeiten“, URL hier ersetzen.</span>
+            </label>
+            <label>
+              Jira-Feld für Sheet-URL
+              <input id="jira-sheet-field" placeholder="customfield_12345" autocomplete="off" />
+            </label>
+            <div class="actions">
+              <button type="button" class="btn btn-ghost" id="test-jira">Verbindung testen</button>
+            </div>
+          </fieldset>
+
+          <p class="runtime" id="runtime"></p>
+          <p class="status" id="status" role="status"></p>
+
+          <div class="actions">
+            <button type="submit" class="btn btn-primary">Speichern</button>
+          </div>
+        </form>
+      </section>
+    </div>
+    <script src="/auth.js?v=login-search-v1"></script>
+    <script src="/settings.js"></script>
+  </body>
+</html>

@@ -1,0 +1,29 @@
+# Host und TLS an die eigene Plattform anpassen.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: critr
+  namespace: critr
+  labels:
+    app.kubernetes.io/name: critr
+  annotations:
+    # Beispiel-Annotations — je nach Ingress-Controller ersetzen:
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  # ingressClassName: nginx
+  rules:
+    - host: critr.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: critr
+                port:
+                  number: 8000
+  # tls:
+  #   - hosts:
+  #       - critr.example.com
+  #     secretName: critr-tls

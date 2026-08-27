@@ -1,0 +1,5 @@
+# Tagessaetze und Zuschlaege. Werte lokal anpassen.
+scs_daily: 750
+cit_daily: 665
+overhead_pct: 15.44
+margin_pct: 5

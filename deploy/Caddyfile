@@ -1,0 +1,5 @@
+# Lokal / Compose: HTTP. TLS und Domain später am Ingress oder hier ergänzen.
+:80 {
+	encode gzip
+	reverse_proxy app:8000
+}

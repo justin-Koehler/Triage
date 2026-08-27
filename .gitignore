@@ -1,0 +1,21 @@
+node_modules
+.next
+__pycache__/
+*.pyc
+.DS_Store
+.cursor/
+.env*
+!.env.example
+deploy/compose.env
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Interne Konzepte, echte Fälle, Pilotdaten — nicht ins Git
+Fachkonzept.md
+knowledge/DEPLOY_STATUS.md
+knowledge/pilot/
+knowledge/tickets/KB-*.md
+knowledge/**/*.xlsx
+knowledge/**/*.xls

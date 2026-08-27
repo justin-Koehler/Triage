@@ -1,0 +1,241 @@
+# Mapping eigenes Domain-Modell -> Jira. Nur der Adapter liest diese Datei.
+# jira_type: string|date|user|option|number|components|text (nur description)
+
+project_key: CHANGE
+kinds:
+  change_request:
+    issue_type: Change request
+  it_request:
+    issue_type: IT Request
+priorities:
+  low: Low
+  medium: Medium
+  high: High
+  critical: Highest
+fields:
+  summary:
+    jira: summary
+    label: Zusammenfassung
+    required: true
+    jira_type: text
+  description:
+    jira: description
+    label: Beschreibung
+    required: true
+    jira_type: text
+  change_lead:
+    jira: customfield_17440
+    label: Change-Leitung SCS
+    required: true
+    jira_type: user
+  steckbrief_name:
+    jira: customfield_19753
+    label: Steckbrief-Name
+    required: true
+    jira_type: string
+  start_date:
+    jira: customfield_10503
+    label: Start
+    required: true
+    jira_type: date
+  end_date:
+    jira: customfield_13102
+    label: Ende
+    required: false
+    jira_type: date
+  sponsor:
+    jira: customfield_19319
+    label: Auftraggeber
+    required: true
+    jira_type: option
+  assignee:
+    jira: assignee
+    label: Bearbeiter
+    required: false
+    jira_type: user
+  approver:
+    jira: customfield_13013
+    label: Genehmigende Person
+    required: false
+    jira_type: user
+  components:
+    jira: components
+    label: Stichwörter / Tags
+    required: false
+    jira_type: components
+  current_status:
+    jira: null
+    label: Was gerade los ist
+    required: false
+  status_summary:
+    jira: null
+    label: KI-Zusammenfassung
+    required: false
+  problem:
+    jira: customfield_10157
+    label: Problem / Reason
+    required: false
+    jira_type: string
+  solution_goals:
+    jira: customfield_28809
+    label: Lösung und Ziele
+    required: false
+    jira_type: string
+  risks_obstacles:
+    jira: customfield_10160
+    label: Risiken & Hindernisse
+    required: false
+    jira_type: string
+  similar_solution:
+    jira: null
+    label: Ähnliche Lösung
+    required: false
+  benefit_savings:
+    jira: customfield_17459
+    label: Einsparungen / zus. Umsatz
+    required: false
+    jira_type: string
+  benefit_risk:
+    jira: null
+    label: Risikoreduktion
+    required: false
+  company:
+    jira: customfield_16211
+    label: Gesellschaft
+    required: false
+    jira_type: option
+  status_ablauf:
+    jira: null
+    label: Ablauf
+    required: false
+  responsible_sit:
+    jira: customfield_17203
+    label: Ist die verantwortliche Person aus der IT
+    required: false
+    jira_type: user
+    kinds: [it_request]
+  change_team:
+    jira: customfield_19652
+    label: Change-Team
+    required: false
+    jira_type: option
+    create: false
+  stakeholder:
+    jira: customfield_14203
+    label: Stakeholder
+    required: false
+    jira_type: string
+  fb_owner:
+    jira: customfield_17204
+    label: FB-Verantwortung
+    required: false
+    jira_type: user
+  process_owner:
+    jira: customfield_11443
+    label: Process Owner
+    required: false
+    jira_type: user
+  solution_owner:
+    jira: null
+    label: Solution Owner
+    required: false
+    jira_type: user
+    kinds: [it_request]
+  nonprofit_dss:
+    jira: null
+    label: Ist das Projekt gemeinnützig
+    required: false
+  dss_signed:
+    jira: null
+    label: DSS-Steckbrief unterzeichnet
+    required: false
+  solution_exists:
+    jira: null
+    label: Gibt es bereits eine Solution?
+    required: false
+    kinds: [it_request]
+  solution_type:
+    jira: null
+    label: Art der Solution
+    required: false
+    kinds: [it_request]
+  solution_category:
+    jira: customfield_13401
+    label: Solution Category
+    required: false
+    jira_type: option
+    kinds: [it_request]
+  solution_name:
+    jira: customfield_11437
+    label: Solution
+    required: false
+    jira_type: option
+    kinds: [it_request]
+  project_id:
+    jira: customfield_16255
+    label: Projekt-ID
+    required: false
+    jira_type: string
+  ordering_company:
+    jira: null
+    label: Beauftragende Gesellschaft
+    required: false
+  cost_unit:
+    jira: null
+    label: Kostenträger
+    required: false
+  cost_center:
+    jira: customfield_15514
+    label: Kostenstelle
+    required: false
+    jira_type: string
+  costs:
+    jira: customfield_19930
+    label: Kosten
+    required: false
+    jira_type: number
+  extra_account:
+    jira: null
+    label: Zusatzkontierung
+    required: false
+  effort_container:
+    jira: null
+    label: Aufwandscontainer
+    required: false
+  effort_tshirt:
+    jira: customfield_28203
+    label: Effort Project
+    required: false
+    jira_type: option
+  concept_scs_pt:
+    jira: customfield_17201
+    label: Konzeption PT Plan SCS
+    required: false
+    jira_type: number
+  concept_cit_pt:
+    jira: customfield_17200
+    label: Konzeption PT Plan CIT
+    required: false
+    jira_type: number
+    kinds: [it_request]
+  operate_scs_pt:
+    jira: null
+    label: Betrieb PT Plan SCS
+    required: false
+  operate_cit_pt:
+    jira: null
+    label: Betrieb PT Plan CIT
+    required: false
+  effort_sheet_url:
+    jira: null
+    label: Aufwand Sheet
+    required: false
+    jira_type: string
+  other:
+    jira: null
+    label: Sonstiges
+    required: false
+labels:
+  intake: triage-intake
+  incomplete: triage-unvollständig
+  triage_failed: triage-fehlgeschlagen

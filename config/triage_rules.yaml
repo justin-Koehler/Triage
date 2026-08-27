@@ -1,0 +1,469 @@
+# Steckbrief laut Vorlage Budgetplanung. Eine Art, keine Weiche.
+# fill:
+#   dialog     — Chat-Luecken, gebuendelt (Zeitraum, Wer, Rollen, Aufwand, Kontierung)
+#   draft      — KI schlaegt Beschreibung und Ist/Soll vor, Review
+#   workspace  — Hub (SCS/CIT Detail), nie Chat
+#   controlling — nur noch wo wirklich Hub-only
+#   computed   — Formel in app/domain/calc.py
+
+max_questions: 8
+confidence_threshold: 0.45
+
+common_fields:
+  - key: start_date
+    label: Start
+    question: Wann soll der Change starten, und wann soll er fertig sein?
+    hard: true
+    type: date
+    group: kopf
+    fill: dialog
+    required_on_confirm: true
+  - key: end_date
+    label: Ende
+    question: Wann soll der Change fertig sein?
+    hard: true
+    type: date
+    group: kopf
+    fill: draft
+  - key: sponsor
+    label: Auftraggeber
+    question: Wer beauftragt diesen Change?
+    hard: true
+    group: kopf
+    fill: dialog
+    type: person
+    required_on_confirm: true
+  - key: components
+    label: Stichwörter / Tags
+    question: Welche Stichwörter / Tags passen? z. B. SAP, Schul-App
+    hard: true
+    group: kopf
+    fill: dialog
+
+  - key: description
+    label: Beschreibung
+    question: Beschreib den Change in eigenen Worten — was läuft schief, was soll anders werden?
+    hard: true
+    group: uebersicht
+    fill: draft
+    type: longtext
+    required_on_confirm: true
+  - key: current_status
+    label: Was gerade los ist
+    question: Wo steht der Change gerade?
+    hard: true
+    group: uebersicht
+    fill: draft
+    type: longtext
+  - key: status_summary
+    label: KI-Zusammenfassung
+    question: ""
+    hard: false
+    group: status
+    fill: workspace
+    type: longtext
+  - key: benefit_savings
+    label: Einsparungen / zus. Umsatz
+    question: Welcher Nutzen entsteht bei Einsparungen oder Umsatz?
+    hard: true
+    group: uebersicht
+    fill: dialog
+    type: longtext
+  - key: benefit_risk
+    label: Risikoreduktion
+    question: Welches Risiko sinkt durch den Change?
+    hard: true
+    group: uebersicht
+    fill: dialog
+    type: longtext
+  - key: problem
+    label: Problem / Reason
+    question: Welches Problem löst der Change? Beschreib es in ein paar Sätzen.
+    hard: true
+    group: uebersicht
+    fill: draft
+    type: longtext
+  - key: solution_goals
+    label: Lösung und Ziele
+    question: Was ist die Lösung, und was sind die Ziele? Ein paar Sätze reichen.
+    hard: true
+    group: uebersicht
+    fill: draft
+    type: longtext
+  - key: risks_obstacles
+    label: Risiken & Hindernisse
+    question: Welche Risiken und Hindernisse siehst du?
+    hard: true
+    group: uebersicht
+    fill: dialog
+    type: longtext
+  - key: similar_solution
+    label: Ähnliche Lösung
+    question: Gibt es schon etwas Ähnliches?
+    hard: true
+    group: uebersicht
+    fill: dialog
+    type: longtext
+
+  - key: approver
+    label: Genehmigende Person
+    question: Wer genehmigt den Change (nach Freigabematrix)?
+    hard: true
+    group: team
+    fill: dialog
+    type: person
+    values_from: responsibles
+  - key: change_lead
+    label: Change-Leitung SCS
+    question: Wer ist die Change-Leitung SCS?
+    hard: true
+    group: team
+    fill: dialog
+    type: person
+    values_from: responsibles
+    required_on_confirm: true
+  - key: fb_owner
+    label: FB-Verantwortung
+    question: Wer ist im Fachbereich verantwortlich?
+    hard: true
+    group: team
+    fill: dialog
+    type: person
+    values_from: responsibles
+  - key: process_owner
+    label: Process Owner
+    question: Welche Person aus der SCS übernimmt die Verantwortung, wenn der Change in den Betrieb übergegangen ist?
+    hard: true
+    group: team
+    fill: dialog
+    type: person
+    values_from: responsibles
+  - key: solution_owner
+    label: Solution Owner
+    question: Welche Person aus der IT übernimmt die Verantwortung, wenn der Change in den Betrieb übergegangen ist?
+    hard: true
+    group: team
+    fill: dialog
+    type: person
+    values_from: responsibles
+  - key: responsible_sit
+    label: Ist die verantwortliche Person aus der IT
+    question: Wer ist die verantwortliche Person aus der IT?
+    hard: false
+    group: team
+    fill: workspace
+    type: person
+  - key: change_team
+    label: Change-Team
+    question: Welche Personen unterstützen bei diesem Projekt?
+    hard: true
+    group: team
+    fill: dialog
+    type: text
+  - key: stakeholder
+    label: Stakeholder
+    question: Wer sind die Stakeholder?
+    hard: true
+    group: team
+    fill: dialog
+  - key: company
+    label: Gesellschaft
+    question: Für welche Gesellschaft läuft der Change?
+    hard: true
+    group: team
+    fill: dialog
+    type: choice
+    values:
+      - SCS Gesamt
+      - SIT
+      - CIT
+      - andere
+  - key: status_ablauf
+    label: Ablauf
+    question: ""
+    hard: false
+    group: team
+    fill: computed
+    type: longtext
+
+  - key: nonprofit_dss
+    label: Ist das Projekt gemeinnützig
+    question: Ist das Projekt gemeinnützig?
+    hard: false
+    group: kopf
+    fill: dialog
+    type: choice
+    values:
+      - Ja
+      - Nein
+      - Weiß ich noch nicht
+  - key: dss_signed
+    label: DSS-Steckbrief unterzeichnet
+    question: Liegt der unterzeichnete DSS-Steckbrief vor?
+    hard: false
+    group: finanzen
+    fill: workspace
+    type: choice
+    values:
+      - ja
+      - nein
+    only_if:
+      nonprofit_dss: true
+  - key: solution_exists
+    label: Gibt es bereits eine Solution?
+    question: Läuft das schon in einer Solution oder einem AP?
+    hard: true
+    group: finanzen
+    fill: dialog
+    type: choice
+    values:
+      - ja
+      - nein
+  - key: solution_type
+    label: Art der Solution
+    question: Welche Solution oder welcher AP ist das?
+    hard: false
+    group: finanzen
+    fill: dialog
+    only_if:
+      solution_exists: true
+  - key: solution_category
+    label: Solution Category
+    question: ""
+    hard: false
+    group: finanzen
+    fill: workspace
+  - key: solution_name
+    label: Solution
+    question: ""
+    hard: false
+    group: finanzen
+    fill: workspace
+  - key: project_id
+    label: Projekt-ID
+    question: Gibt es eine Projektnummer?
+    hard: true
+    group: finanzen
+    fill: dialog
+  - key: ordering_company
+    label: Beauftragende Gesellschaft
+    question: Welche Gesellschaft beauftragt?
+    hard: true
+    group: finanzen
+    fill: dialog
+  - key: cost_unit
+    label: Kostenträger
+    question: Auf welchen Kostenträger läuft der Change?
+    hard: true
+    group: finanzen
+    fill: dialog
+  - key: cost_center
+    label: Kostenstelle
+    question: Welche Kostenstelle?
+    hard: true
+    group: finanzen
+    fill: dialog
+  - key: costs
+    label: Kosten
+    question: ""
+    hard: false
+    type: money
+    group: kalkulation
+    fill: workspace
+  - key: extra_account
+    label: Zusatzkontierung
+    question: Welche Zusatzkontierung?
+    hard: true
+    group: finanzen
+    fill: dialog
+  - key: effort_container
+    label: Aufwandscontainer
+    question: Welcher Aufwandscontainer?
+    hard: true
+    group: finanzen
+    fill: dialog
+
+  - key: effort_tshirt
+    label: Effort Project
+    question: Wie groß ist der Aufwand — XS, S, M, L oder XL?
+    hard: false
+    type: choice
+    group: kalkulation
+    fill: workspace
+    values:
+      - XS
+      - S
+      - M
+      - L
+      - XL
+  - key: effort_sheet_url
+    label: Aufwand Sheet
+    question: Link zur ausgefüllten Aufwandstabelle?
+    hard: false
+    type: text
+    group: kalkulation
+    fill: workspace
+  - key: concept_scs_pt
+    label: Konzeption PT Plan SCS
+    question: Wie viele Personentage fallen in der Konzeption auf SCS-Seite an?
+    hard: true
+    type: number
+    group: kalkulation
+    fill: workspace
+  - key: concept_scs_pt_detail
+    label: Konzeption PT SCS Aufschlüsselung
+    question: Wie verteilen sich die SCS-Personentage in der Konzeption?
+    hard: false
+    type: longtext
+    group: kalkulation
+    fill: workspace
+  - key: concept_scs_material
+    label: Konzeption Sach-/Lizenzkosten SCS
+    question: Welche Sach- oder Lizenzkosten fallen in der Konzeption bei SCS an?
+    hard: false
+    type: money
+    group: kalkulation
+    fill: workspace
+  - key: concept_cit_pt
+    label: Konzeption PT Plan CIT
+    question: Wie viele Personentage fallen in der Konzeption auf CIT-Seite an?
+    hard: false
+    type: number
+    group: kalkulation
+    fill: workspace
+  - key: concept_cit_pt_detail
+    label: Konzeption PT CIT Aufschlüsselung
+    question: Wie verteilen sich die CIT-Personentage in der Konzeption?
+    hard: false
+    type: longtext
+    group: kalkulation
+    fill: workspace
+  - key: concept_cit_material
+    label: Konzeption Sach-/Lizenzkosten CIT
+    question: Welche Sach- oder Lizenzkosten fallen in der Konzeption bei CIT an?
+    hard: false
+    type: money
+    group: kalkulation
+    fill: workspace
+  - key: concept_cit_released_pt
+    label: Konzeption freigegebene PT CIT
+    question: Wie viele CIT-Personentage sind für die Konzeption freigegeben?
+    hard: false
+    type: number
+    group: kalkulation
+    fill: workspace
+  - key: operate_scs_pt
+    label: Betrieb PT Plan SCS
+    question: Wie viele Personentage fallen im Betrieb auf SCS-Seite an?
+    hard: true
+    type: number
+    group: kalkulation
+    fill: workspace
+  - key: operate_scs_pt_detail
+    label: Betrieb PT SCS Aufschlüsselung
+    question: Wie verteilen sich die SCS-Personentage im Betrieb?
+    hard: false
+    type: longtext
+    group: kalkulation
+    fill: workspace
+  - key: operate_scs_material
+    label: Betrieb Sach-/Lizenzkosten SCS
+    question: Welche Sach- oder Lizenzkosten fallen im Betrieb bei SCS an?
+    hard: false
+    type: money
+    group: kalkulation
+    fill: workspace
+  - key: operate_cit_pt
+    label: Betrieb PT Plan CIT
+    question: Wie viele Personentage fallen im Betrieb auf CIT-Seite an?
+    hard: false
+    type: number
+    group: kalkulation
+    fill: workspace
+  - key: operate_cit_pt_detail
+    label: Betrieb PT CIT Aufschlüsselung
+    question: Wie verteilen sich die CIT-Personentage im Betrieb?
+    hard: false
+    type: longtext
+    group: kalkulation
+    fill: workspace
+  - key: operate_cit_material
+    label: Betrieb Sach-/Lizenzkosten CIT
+    question: Welche Sach- oder Lizenzkosten fallen im Betrieb bei CIT an?
+    hard: false
+    type: money
+    group: kalkulation
+    fill: workspace
+  - key: operate_cit_released_pt
+    label: Betrieb freigegebene PT CIT
+    question: Wie viele CIT-Personentage sind für den Betrieb freigegeben?
+    hard: false
+    type: number
+    group: kalkulation
+    fill: workspace
+
+  - key: other
+    label: Sonstiges
+    question: Was gehört sonst noch in den Steckbrief?
+    hard: false
+    type: longtext
+    group: sonstiges
+    fill: workspace
+
+kinds:
+  change_request:
+    default_priority: medium
+    max_questions: 8
+    signals:
+      - change
+      - digitalisieren
+      - prozess
+      - ablauf
+      - einführen
+      - umstellung
+      - kommunikation
+      - schulung
+      - widerstand
+      - stakeholder
+    exclude_fields:
+      - effort_tshirt
+      - concept_scs_pt
+      - concept_scs_pt_detail
+      - concept_scs_material
+      - concept_cit_pt
+      - concept_cit_pt_detail
+      - concept_cit_material
+      - concept_cit_released_pt
+      - operate_scs_pt
+      - operate_scs_pt_detail
+      - operate_scs_material
+      - operate_cit_pt
+      - operate_cit_pt_detail
+      - operate_cit_material
+      - operate_cit_released_pt
+      - solution_exists
+      - solution_type
+      - solution_category
+      - solution_name
+      - responsible_sit
+      - solution_owner
+    fields: []
+  it_request:
+    default_priority: medium
+    max_questions: 8
+    signals:
+      - sap
+      - schnittstelle
+      - api
+      - server
+      - client
+      - browser
+      - login
+      - zugang
+      - software
+      - applikation
+      - lizenz
+      - berechtigung
+      - cit
+      - sit
+    fields: []

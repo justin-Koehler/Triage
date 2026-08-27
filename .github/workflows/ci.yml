@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - name: lint
+        run: ruff check .
+      - name: unit
+        run: pytest tests/unit tests/eval -m "not eval"
+      - name: contract
+        run: pytest tests/contract
+      - name: pip audit
+        run: pip-audit -r requirements.txt --strict
+
+  image:
+    runs-on: ubuntu-latest
+    needs: backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set image tag
+        id: meta
+        run: echo "tag=critr:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      - name: Build image
+        run: docker build -t "${{ steps.meta.outputs.tag }}" .
+      - name: Non-root user check
+        run: |
+          user="$(docker image inspect "${{ steps.meta.outputs.tag }}" --format '{{.Config.User}}')"
+          echo "User=$user"
+          test -n "$user"
+          test "$user" != "root"
+          test "$user" != "0"
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: ${{ steps.meta.outputs.tag }}
+          exit-code: "1"
+          severity: CRITICAL
+          ignore-unfixed: true
