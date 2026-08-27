@@ -78,3 +78,5 @@ Caddy ist der einzige Host-Port (80/443). App und Postgres bleiben intern. Schem
 Vorlagen unter [`k8s/`](k8s/). Secret aus `k8s/secret.example.yaml` anlegen, Image-Tag setzen, `kubectl apply -k k8s/`. Host/TLS an die eigene Plattform anpassen.
 
 Auth ist Dev-Login über Jira-Assignable-User; SSO ist nicht Teil dieses Stands.
+
+Doku: [Wiki](https://github.com/justin-Koehler/Triage/wiki) · [docs/](docs/Home.md). Nächste Schritte: [Project](https://github.com/users/justin-Koehler/projects/9).
