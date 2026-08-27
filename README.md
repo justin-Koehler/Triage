@@ -79,4 +79,4 @@ Vorlagen unter [`k8s/`](k8s/). Secret aus `k8s/secret.example.yaml` anlegen, Ima
 
 Auth ist Dev-Login über Jira-Assignable-User; SSO ist nicht Teil dieses Stands.
 
-Doku: [Wiki](https://github.com/justin-Koehler/Triage/wiki) · [docs/](docs/Home.md). Nächste Schritte: [Project](https://github.com/users/justin-Koehler/projects/9).
+Doku: [docs/Home.md](docs/Home.md). Nächste Schritte: [Project](https://github.com/users/justin-Koehler/projects/9).
