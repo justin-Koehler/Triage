@@ -1,14 +1,16 @@
 # CRITR — Change-Request Intake & Triage
 
-CRITR nimmt einen Change oder IT-Request im Gespräch auf, schreibt den Steckbrief und legt ihn zuerst **lokal** an. Jira ist nur Sync-Ziel (Outbox, asynchron). Die eigene Datenbank bleibt die Quelle der Wahrheit.
+## About
 
-Die KI formuliert Beschreibung, Nutzen, Problem, Lösung und Risiken aus dem Freitext — ohne Zahlen, Systeme oder Namen zu erfinden. Nachgefragt werden höchstens wenige Pflichtfakten (z. B. Zeitraum, Auftraggeber, Gesellschaft).
+CRITR ist der Intake für Change- und IT-Requests: ein kurzer Satz im Chat wird zum Steckbrief (Beschreibung, Nutzen, Problem, Lösung, Risiken). Die eigene Datenbank ist die Quelle der Wahrheit; Jira bekommt den Vorgang erst nach Review, asynchron über eine Outbox. Die KI schreibt Prosa aus dem genannten Text und erfindet keine Zahlen, Systeme oder Namen.
+
+Zielgruppe: Change-Leitung und Fachbereiche, die Vorgänge anlegen wollen, ohne Jira-Formulare. Zwei Arten: **Change Request** (Organisation, Prozess, Kommunikation) und **IT Request** (Systeme, Software, Zugänge, Betrieb).
 
 ```
 Idee → kurzer Satz → KI-Steckbrief → Review → lokal anlegen → Jira-Sync
 ```
 
-Zwei Arten: **Change Request** (Organisation, Prozess, Kommunikation) und **IT Request** (Systeme, Software, Zugänge, Betrieb).
+Nachgefragt werden höchstens wenige Pflichtfakten (z. B. Zeitraum, Auftraggeber, Gesellschaft).
 
 ## Voraussetzungen
 
