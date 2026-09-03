@@ -1,7 +1,7 @@
 # CRITR — Multi-Stage, non-root, gepinntes Base Image (kein latest).
 # Ein Image für alle Umgebungen; Secrets nur zur Laufzeit.
 
-FROM python:3.13.7-slim-bookworm AS builder
+FROM python:3.14.7-slim-bookworm AS builder
 
 WORKDIR /build
 RUN python -m venv /opt/venv
@@ -10,7 +10,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-FROM python:3.13.7-slim-bookworm AS runner
+FROM python:3.14.7-slim-bookworm AS runner
 
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
