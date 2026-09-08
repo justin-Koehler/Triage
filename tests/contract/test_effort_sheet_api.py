@@ -101,6 +101,11 @@ def test_template_download(client):
     assert r.status_code == 200
     assert "Tätigkeit" in r.text
     assert "text/csv" in r.headers.get("content-type", "")
+    dummy = client.get("/api/sessions/effort-sheet/template?dummy=1")
+    assert dummy.status_code == 200
+    assert "Aufwand FB" in dummy.text
+    assert "Aufwand IT" in dummy.text
+    assert "Summe" in dummy.text
 
 
 def test_commit_creates_share_link(client):
@@ -115,3 +120,19 @@ def test_commit_creates_share_link(client):
     assert page.status_code == 200
     assert "Workshops" in page.text
     assert client.get("/aufwand/not-a-uuid").status_code == 404
+
+
+def test_commit_zeit_sum_and_link(client):
+    r = client.post(
+        "/api/sessions/effort-sheet/commit",
+        json={"csv": "Aufwand FB,Aufwand IT,Summe\n2,3,5\n"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["summe"] == "5"
+    assert body["effort_fb"] == "2 PT"
+    assert body["effort_it"] == "3 PT"
+    assert "/aufwand/" in body["effort_sheet_url"]
+    page = client.get(f"/aufwand/{body['share_id']}")
+    assert page.status_code == 200
+    assert "Aufwand FB" in page.text

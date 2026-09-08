@@ -73,6 +73,63 @@ def test_create_issue_builds_adf_and_parses_key(runtime, monkeypatch):
     assert fields.get("customfield_19753") == "Change Request: Kommunikation zentralisieren"
 
 
+def test_create_issue_sends_customfield_19753_for_change_request(runtime, monkeypatch):
+    captured = {}
+
+    def fake_request(self, method, path, **kwargs):
+        captured["json"] = kwargs.get("json")
+        request = httpx.Request(method, "https://example.atlassian.net" + path)
+        return httpx.Response(201, json={"key": "TRI-1", "id": "1"}, request=request)
+
+    monkeypatch.setattr(JiraRestV3, "_request", fake_request)
+    JiraRestV3(runtime=runtime).create_issue(
+        _payload(steckbrief_name="", title="Nur Titel")
+    )
+    fields = captured["json"]["fields"]
+    assert fields["customfield_19753"] == "Nur Titel"
+    JiraRestV3(runtime=runtime).create_issue(
+        _payload(steckbrief_name="   ", title="  ")
+    )
+    assert captured["json"]["fields"]["customfield_19753"] == "AN-1001"
+
+
+def test_create_issue_omits_customfield_19753_for_it_request(runtime, monkeypatch):
+    captured = {}
+
+    def fake_request(self, method, path, **kwargs):
+        captured["json"] = kwargs.get("json")
+        request = httpx.Request(method, "https://example.atlassian.net" + path)
+        return httpx.Response(201, json={"key": "TRI-2", "id": "2"}, request=request)
+
+    monkeypatch.setattr(JiraRestV3, "_request", fake_request)
+    JiraRestV3(runtime=runtime).create_issue(
+        _payload(kind=RequestKind.IT_REQUEST, steckbrief_name="TEST KI Avatar")
+    )
+    assert "customfield_19753" not in captured["json"]["fields"]
+    assert captured["json"]["fields"]["summary"] == "Kommunikation zentralisieren"
+
+
+def test_create_issue_retries_without_19753_when_not_on_screen(runtime, monkeypatch):
+    calls = []
+
+    def fake_request(self, method, path, **kwargs):
+        fields = (kwargs.get("json") or {}).get("fields") or {}
+        calls.append(sorted(fields.keys()))
+        request = httpx.Request(method, "https://example.atlassian.net" + path)
+        if "customfield_19753" in fields:
+            raise TicketPortError(
+                "cannot be set",
+                rejected_fields=["customfield_19753"],
+            )
+        return httpx.Response(201, json={"key": "TRI-3", "id": "3"}, request=request)
+
+    monkeypatch.setattr(JiraRestV3, "_request", fake_request)
+    ref = JiraRestV3(runtime=runtime).create_issue(_payload())
+    assert ref.key == "TRI-3"
+    assert "customfield_19753" in calls[0]
+    assert "customfield_19753" not in calls[1]
+
+
 def _payload(**extra):
     data = dict(
         request_id="r1",

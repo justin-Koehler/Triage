@@ -6,10 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.db import get_db
+from app.db import SessionLocal, get_db
 from app.models import AppSetting, User
+from app.ports.fake import FakeTicketSystem
 from app.ports.jira_v3 import JiraRestV3
-from app.ports.ticket_port import TicketPortError
+from app.ports.ticket_port import TicketPort, TicketPortError
 from app.security import current_actor
 from app.services.settings_service import decrypt_secret, get_runtime_config
 
@@ -29,6 +30,13 @@ def _port(db: Session) -> JiraRestV3:
     if not runtime.jira_enabled or runtime.ticket_port != "jira":
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Jira ist nicht aktiv")
     return JiraRestV3(runtime=runtime)
+
+
+def _inbox_port(db: Session) -> TicketPort:
+    runtime = get_runtime_config(db)
+    if runtime.ticket_port == "jira":
+        return JiraRestV3(runtime=runtime)
+    return FakeTicketSystem(SessionLocal, project=runtime.jira_project_key or "TRI")
 
 
 @router.get("/users")
@@ -66,12 +74,22 @@ def search_components(
 ) -> dict:
     token, email = _user_jira_credentials(db, user)
     try:
-        names = _port(db).search_components(
-            q, limit=limit, user_token=token, user_email=email
-        )
+        from app.services.component_tree import build_component_tree, flatten_tree
+
+        records = _port(db).list_component_records(user_token=token, user_email=email)
+        tree = build_component_tree(records)
+        items = flatten_tree(tree)
+        needle = (q or "").strip().casefold()
+        if needle:
+            items = [
+                row
+                for row in items
+                if needle in row["name"].casefold() or needle in (row.get("description") or "").casefold()
+            ]
+        items = items[: max(1, min(limit, 200))]
     except TicketPortError as err:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(err)) from err
-    return {"items": [{"name": name, "label": name} for name in names]}
+    return {"items": items, "tree": tree}
 
 
 @router.get("/options")
@@ -156,3 +174,51 @@ def resolve_value(
         return {"resolved": joined, "label": joined, "value": joined}
     except TicketPortError as err:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(err)) from err
+
+
+@router.get("/issues")
+def list_issues(
+    q: str = Query(default="", max_length=80),
+    limit: int = Query(default=50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    user: User = Depends(current_actor),
+) -> dict:
+    from app.services.jira_inbox import list_inbox
+
+    token, email = _user_jira_credentials(db, user)
+    try:
+        return list_inbox(
+            db,
+            _inbox_port(db),
+            query=q,
+            limit=limit,
+            user_token=token,
+            user_email=email,
+        )
+    except TicketPortError as err:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(err)) from err
+
+
+@router.post("/issues/{key}/import")
+def import_issue(
+    key: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_actor),
+) -> dict:
+    from app.services.jira_inbox import import_issue_view
+
+    token, email = _user_jira_credentials(db, user)
+    try:
+        body = import_issue_view(
+            db,
+            _inbox_port(db),
+            key,
+            user=user,
+            user_token=token,
+            user_email=email,
+        )
+    except LookupError as err:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(err)) from err
+    except TicketPortError as err:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(err)) from err
+    return body

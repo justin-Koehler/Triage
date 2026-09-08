@@ -25,7 +25,8 @@
     out.type = "button";
     out.onclick = async () => {
       await fetch("/api/auth/logout", { method: "POST" });
-      location.reload();
+      const cfg = await fetch("/api/auth/config").then((r) => r.json()).catch(() => ({}));
+      location.href = cfg.cidaas ? "/login" : "/";
     };
     box.appendChild(out);
   }
@@ -36,7 +37,10 @@
       const overlay = el("div", "gate");
       const box = el("form", "gate-box");
       box.appendChild(el("p", "empty-title", "Anmelden"));
-      box.appendChild(el("p", "empty-sub", "Jira-Account wählen."));
+      const cidaasBtn = el("a", "btn btn-primary", "Cidaas anmelden");
+      cidaasBtn.href = `/api/auth/cidaas/start?next=${encodeURIComponent(location.pathname + location.search)}`;
+      box.appendChild(cidaasBtn);
+      box.appendChild(el("p", "empty-sub", "Oder Jira-Account wählen."));
       const filterLabel = el("label", null, "Suchen");
       const filter = el("input");
       filter.type = "search";
@@ -162,6 +166,12 @@
         document.body.classList.remove("gated");
         showAccount(d.user);
         return d.user;
+      }
+      const cfg = await fetch("/api/auth/config").then((res) => res.json()).catch(() => ({}));
+      if (cfg.cidaas) {
+        const next = location.pathname + location.search;
+        location.replace(`/login?next=${encodeURIComponent(next)}`);
+        return new Promise(() => {});
       }
     } catch {
       /* Gate öffnen — kein Blank-Screen */

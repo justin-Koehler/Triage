@@ -98,8 +98,8 @@ common_fields:
     fill: dialog
     type: longtext
   - key: similar_solution
-    label: Ähnliche Lösung
-    question: Gibt es schon etwas Ähnliches?
+    label: Bezug
+    question: Sind dir ähnliche Lösungen bei Schwarz bekannt?
     hard: true
     group: uebersicht
     fill: dialog
@@ -122,6 +122,13 @@ common_fields:
     type: person
     values_from: responsibles
     required_on_confirm: true
+  - key: responsible_sit
+    label: Ist die verantwortliche Person aus der IT
+    question: Wer ist die verantwortliche Person aus der IT?
+    hard: false
+    group: team
+    fill: workspace
+    type: person
   - key: fb_owner
     label: FB-Verantwortung
     question: Wer ist im Fachbereich verantwortlich?
@@ -146,17 +153,10 @@ common_fields:
     fill: dialog
     type: person
     values_from: responsibles
-  - key: responsible_sit
-    label: Ist die verantwortliche Person aus der IT
-    question: Wer ist die verantwortliche Person aus der IT?
-    hard: false
-    group: team
-    fill: workspace
-    type: person
   - key: change_team
     label: Change-Team
     question: Welche Personen unterstützen bei diesem Projekt?
-    hard: true
+    hard: false
     group: team
     fill: dialog
     type: text
@@ -270,6 +270,13 @@ common_fields:
     type: money
     group: kalkulation
     fill: workspace
+  - key: cost_savings
+    label: Kostenersparnis
+    question: Welche Kostenersparnis erwartest du?
+    hard: false
+    type: number
+    group: kalkulation
+    fill: dialog
   - key: extra_account
     label: Zusatzkontierung
     question: Welche Zusatzkontierung?

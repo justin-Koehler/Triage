@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -31,6 +31,28 @@ def enqueue(
     job = OutboxJob(request_id=request_id, operation=operation, payload=payload or {})
     db.add(job)
     return job
+
+
+def _claim_job(job: OutboxJob) -> bool:
+    """Nur ein Worker führt den Job aus (HTTP-Background und Outbox-Loop)."""
+    from app.db import SessionLocal
+
+    now = datetime.now(UTC)
+    with SessionLocal() as other:
+        visible = other.get(OutboxJob, job.id)
+        if visible is None:
+            return True
+        result = other.execute(
+            update(OutboxJob)
+            .where(
+                OutboxJob.id == job.id,
+                OutboxJob.state == SyncState.PENDING,
+                OutboxJob.next_attempt_at <= now,
+            )
+            .values(next_attempt_at=now + timedelta(minutes=15))
+        )
+        other.commit()
+        return (result.rowcount or 0) == 1
 
 
 def external_ref(db: Session, request_id: str, system: str) -> ExternalRef | None:
@@ -214,6 +236,8 @@ def process_request(db: Session, port: TicketPort, request_id: str) -> dict[str,
     ).all()
     stats = {"done": 0, "failed": 0, "dead": 0}
     for job in jobs:
+        if not _claim_job(job):
+            continue
         stats[_apply_job(db, port, job, settings)] += 1
     return stats
 
@@ -230,6 +254,8 @@ def process_pending(db: Session, port: TicketPort, limit: int = 20) -> dict[str,
 
     stats = {"done": 0, "failed": 0, "dead": 0}
     for job in jobs:
+        if not _claim_job(job):
+            continue
         stats[_apply_job(db, port, job, settings)] += 1
         db.commit()
     return stats

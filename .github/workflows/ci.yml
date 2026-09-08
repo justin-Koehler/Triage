@@ -48,3 +48,15 @@ jobs:
           exit-code: "1"
           severity: CRITICAL
           ignore-unfixed: true
+      - name: SBOM
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          scan-type: image
+          image-ref: ${{ steps.meta.outputs.tag }}
+          format: cyclonedx
+          output: sbom.cdx.json
+          exit-code: "0"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom.cdx.json

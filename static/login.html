@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Anmelden — CRITR</title>
+    <link rel="stylesheet" href="/styles.css?v=scos-ci-v1" />
+  </head>
+  <body class="login-page">
+    <main class="login-stage">
+      <form class="login-card" action="/api/auth/cidaas/start" method="get">
+        <p class="login-kicker">CRITR</p>
+        <h1 class="login-title">Anmelden</h1>
+        <p class="login-lead">Nach der Anmeldung kannst du einen Change-Steckbrief anlegen.</p>
+        <p class="login-error" id="login-error" hidden></p>
+        <input type="hidden" name="next" id="next" value="/" />
+        <button type="submit" class="btn btn-primary login-submit" id="cidaas-btn">
+          Cidaas anmelden
+        </button>
+      </form>
+    </main>
+    <script>
+      (function () {
+        const params = new URLSearchParams(location.search);
+        const next = params.get("next") || "/";
+        document.getElementById("next").value = next.startsWith("/") && !next.startsWith("//") ? next : "/";
+        const err = params.get("error");
+        if (err) {
+          const box = document.getElementById("login-error");
+          box.hidden = false;
+          box.textContent = err;
+        }
+        fetch("/api/auth/me")
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.authenticated) location.replace(document.getElementById("next").value || "/");
+          })
+          .catch(() => {});
+      })();
+    </script>
+  </body>
+</html>

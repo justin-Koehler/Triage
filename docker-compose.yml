@@ -18,6 +18,8 @@ networks:
 
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:
 
 services:
   caddy:
@@ -28,6 +30,8 @@ services:
       - "443:443"
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     networks:
       - proxy_network
     depends_on:
@@ -42,8 +46,6 @@ services:
     read_only: true
     tmpfs:
       - /tmp
-      - /config
-      - /data
 
   app:
     image: critr:${IMAGE_TAG:-local}
@@ -51,6 +53,7 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    stop_grace_period: 30s
     env_file:
       - deploy/compose.env
     # Secrets (SESSION_SECRET, SETTINGS_ENCRYPTION_KEY, …) kommen aus env_file —

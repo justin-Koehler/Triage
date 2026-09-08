@@ -39,7 +39,16 @@ def sign_session(user_id: str, settings: Settings | None = None) -> str:
     return f"{body}.{_b64(mac)}"
 
 
-def read_session(token: str, settings: Settings | None = None) -> str | None:
+def sign_blob(data: dict, settings: Settings | None = None) -> str:
+    settings = settings or get_settings()
+    payload = dict(data)
+    payload.setdefault("iat", int(time.time()))
+    body = _b64(json.dumps(payload, separators=(",", ":")).encode())
+    mac = hmac.new(settings.session_secret.encode(), body.encode(), hashlib.sha256).digest()
+    return f"{body}.{_b64(mac)}"
+
+
+def read_blob(token: str, *, max_age: int, settings: Settings | None = None) -> dict | None:
     settings = settings or get_settings()
     try:
         body, signature = token.split(".", 1)
@@ -52,7 +61,25 @@ def read_session(token: str, settings: Settings | None = None) -> str | None:
         payload = json.loads(_unb64(body))
     except (ValueError, json.JSONDecodeError):
         return None
-    if int(time.time()) - int(payload.get("iat", 0)) > MAX_AGE_SECONDS:
+    if int(time.time()) - int(payload.get("iat", 0)) > max_age:
+        return None
+    return payload
+
+
+def cookie_kwargs(settings: Settings | None = None, *, max_age: int = MAX_AGE_SECONDS) -> dict:
+    settings = settings or get_settings()
+    return {
+        "httponly": True,
+        "samesite": "lax",
+        "path": "/",
+        "secure": settings.cookie_secure,
+        "max_age": max_age,
+    }
+
+
+def read_session(token: str, settings: Settings | None = None) -> str | None:
+    payload = read_blob(token, max_age=MAX_AGE_SECONDS, settings=settings)
+    if not payload:
         return None
     return payload.get("sub")
 

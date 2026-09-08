@@ -73,7 +73,7 @@ LABELS = {
     "solution_type": "",
     "benefit_savings": "",
     "risks_obstacles": "Risiko",
-    "similar_solution": "Ähnlich",
+    "similar_solution": "Bezug",
 }
 
 

@@ -43,6 +43,7 @@ class Settings(BaseSettings):
 
     triage_rules_path: Path = ROOT / "config" / "triage_rules.yaml"
     field_map_path: Path = ROOT / "config" / "field_map.yaml"
+    component_tree_path: Path = ROOT / "config" / "component_tree.yaml"
     rates_path: Path = ROOT / "config" / "rates.yaml"
     # Zustaendigkeit und Dringlichkeit als Markdown, austauschbar ohne Deploy.
     responsibles_dir: Path = ROOT / "config" / "responsibles"
@@ -58,13 +59,20 @@ class Settings(BaseSettings):
     session_secret: str = "dev-only-change-me"
     session_cookie: str = "triage_session"
     dev_login_enabled: bool = True
+    cidaas_discovery_url: str = (
+        "https://account.bildungscampus.life/.well-known/openid-configuration"
+    )
+    cidaas_client_id: str = ""
+    cidaas_client_secret: str = ""
+    cidaas_redirect_url: str = "https://scscm.stackit.gg/api/auth/cidaas/callback"
+    cidaas_post_login_path: str = "/"
     # Bis SSO da ist: alle Anliegen und Kommentare laufen unter diesem Stub.
     default_actor_email: str = "dev@localhost"
     default_actor_name: str = "Dev"
     settings_encryption_key: str = ""
 
     outbox_max_attempts: int = 6
-    outbox_poll_seconds: int = 15
+    outbox_poll_seconds: int = 3
 
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-5"
@@ -87,6 +95,14 @@ class Settings(BaseSettings):
     @property
     def is_sqlite(self) -> bool:
         return self.database_url.startswith("sqlite")
+
+    @property
+    def cidaas_enabled(self) -> bool:
+        return bool(self.cidaas_client_id.strip() and self.cidaas_client_secret.strip())
+
+    @property
+    def cookie_secure(self) -> bool:
+        return self.app_env != "dev"
 
 
 @lru_cache

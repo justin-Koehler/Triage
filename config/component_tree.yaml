@@ -1,0 +1,14 @@
+# Virtuelle Ordner existieren nicht in Jira — nur Gruppierung wie im Treeview.
+# Namen werden ohne Extra-Leerzeichen verglichen.
+
+SCS - VS:
+  Nachhaltigkeit:
+    - Mobilität
+    - Mensch
+    - Kreislauffähigkeit & Sharing-Ökonomie
+    - Klimaresilienz & Biodiversität
+    - Klimaneutralität & Energieautarkie
+  Smart Campus:
+    - Collaborative Innovation
+    - Seamless Experience
+    - Smart Operations

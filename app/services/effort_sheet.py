@@ -17,10 +17,11 @@ from app.domain.calc import parse_number
 from app.models import AppSetting
 
 TEMPLATE_PATH = ROOT / "config" / "effort_sheet_template.csv"
+DUMMY_TEMPLATE_PATH = ROOT / "config" / "effort_sheet_dummy.csv"
 DUMMY_TEMPLATE_URL = (
     "https://docs.google.com/spreadsheets/d/dummyCRITRaufwandTemplate/edit"
 )
-DUMMY_OPEN_URL = "https://docs.google.com/spreadsheets/create"
+DUMMY_OPEN_URL = "/effort-sheet"
 _SHEET_ID = re.compile(r"/spreadsheets/d/([a-zA-Z0-9_-]+)")
 _ALLOWED_HOSTS = {"docs.google.com"}
 _NOT_SHARED = "Sheet nicht freigegeben. Unter Freigabe: Jeder mit dem Link (Lesen)."
@@ -56,8 +57,15 @@ def copy_url(template_url: str) -> str:
     return f"https://docs.google.com/spreadsheets/d/{sheet_id}/copy"
 
 
+def dummy_template_bytes() -> bytes:
+    path = Path(DUMMY_TEMPLATE_PATH)
+    if path.exists():
+        return path.read_bytes()
+    return b"Aufwand FB,Aufwand IT,Summe\n,,\n"
+
+
 def parse_dummy_template(url: str = "") -> dict[str, str]:
-    parsed = parse_effort_csv(TEMPLATE_PATH.read_text(encoding="utf-8"))
+    parsed = parse_effort_csv(dummy_template_bytes().decode("utf-8"))
     parsed["effort_sheet_url"] = (url or DUMMY_TEMPLATE_URL).strip()
     return parsed
 
@@ -105,11 +113,60 @@ def _party(raw: str) -> str:
     return "scs"
 
 
+def _zeit_key(name: str) -> str:
+    return " ".join(_norm(name).replace("_", " ").split())
+
+
+def _parse_fb_it_csv(rows: list[dict], index: dict[str, str]) -> dict[str, str] | None:
+    fb_col = next(
+        (
+            index[k]
+            for k in index
+            if _zeit_key(k) in {"aufwand fb", "aufwandfb", "zeit 1", "zeit1"}
+        ),
+        None,
+    )
+    it_col = next(
+        (
+            index[k]
+            for k in index
+            if _zeit_key(k) in {"aufwand it", "aufwandit", "zeit 2", "zeit2"}
+        ),
+        None,
+    )
+    if not fb_col and not it_col:
+        return None
+    fb = 0.0
+    it = 0.0
+    for row in rows:
+        if not any(str(value or "").strip() for value in row.values()):
+            continue
+        if fb_col:
+            fb += parse_number(row.get(fb_col))
+        if it_col:
+            it += parse_number(row.get(it_col))
+    total = fb + it
+    return {
+        "effort_fb": _format_pt(fb),
+        "effort_it": _format_pt(it),
+        "concept_scs_pt": _qty(fb),
+        "concept_cit_pt": _qty(it),
+        "operate_scs_pt": "",
+        "operate_cit_pt": "",
+        "summe": _qty(total),
+        "costs": "",
+    }
+
+
 def parse_effort_csv(text: str) -> dict[str, str]:
     reader = csv.DictReader(io.StringIO(text or ""))
     if not reader.fieldnames:
         raise EffortSheetError("Tabelle ohne Kopfzeile.")
     index = {_norm(name): name for name in reader.fieldnames if name}
+    rows = list(reader)
+    zeit = _parse_fb_it_csv(rows, index)
+    if zeit:
+        return zeit
     phase_col = next((index[k] for k in index if k in {"phase", "abschnitt"}), None)
     party_col = next((index[k] for k in index if k in {"bereich", "partei", "team"}), None)
     pt_col = next((index[k] for k in index if k in {"pt", "personentage", "tage"}), None)
@@ -126,7 +183,7 @@ def parse_effort_csv(text: str) -> dict[str, str]:
         "operate_cit": 0.0,
         "costs": 0.0,
     }
-    for row in reader:
+    for row in rows:
         if not any(str(value or "").strip() for value in row.values()):
             continue
         phase = _phase(row.get(phase_col) if phase_col else "")

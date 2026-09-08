@@ -33,6 +33,7 @@ fields:
     label: Steckbrief-Name
     required: true
     jira_type: string
+    kinds: [change_request]
   start_date:
     jira: customfield_10503
     label: Start
@@ -88,13 +89,18 @@ fields:
     jira_type: string
   similar_solution:
     jira: null
-    label: Ähnliche Lösung
+    label: Bezug
     required: false
   benefit_savings:
     jira: customfield_17459
     label: Einsparungen / zus. Umsatz
     required: false
     jira_type: string
+  cost_savings:
+    jira: customfield_18202
+    label: Kostenersparnis
+    required: false
+    jira_type: number
   benefit_risk:
     jira: null
     label: Risikoreduktion

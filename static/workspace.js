@@ -5,6 +5,8 @@
   const ticketFinish = document.getElementById("ticket-finish");
   const openJiraLink = document.getElementById("ticket-open-jira");
   const newChangeBtn = document.getElementById("ticket-new-change");
+  const startChangeBtn = document.getElementById("start-change");
+  const aiReviewOk = document.getElementById("ai-review-ok");
   const ticket = document.getElementById("ticket");
   const headline = document.getElementById("ticket-headline");
   const metaRoot = document.getElementById("ticket-meta");
@@ -13,6 +15,8 @@
   const kindEl = document.getElementById("ticket-kind");
   const overview = document.getElementById("ticket-overview");
   const overviewFields = document.getElementById("ticket-overview-fields");
+  const overviewAiHint = document.getElementById("overview-ai-hint");
+  const AI_REVIEW_HINT = "Bitte alles nochmal überprüfen. KI kann Fehler machen.";
   const costs = document.getElementById("ticket-costs");
   const costFields = document.getElementById("ticket-cost-fields");
   const effortSheetOpen = document.getElementById("effort-sheet-open");
@@ -120,6 +124,26 @@
       enhance: true,
     },
     {
+      key: "similar_solution",
+      prompt: "Sind dir ähnliche Lösungen bei Schwarz bekannt?",
+      placeholder: "Ähnliche Lösung nennen…",
+      label: "Bezug",
+      kind: "overview",
+      choices: ["Nein"],
+      keepForm: true,
+    },
+    {
+      key: "cost_savings",
+      prompt: "Welche Kostenersparnis erwartest du?",
+      placeholder: "Zahl, z. B. 12000",
+      label: "Kostenersparnis",
+      kind: "cost",
+      optional: true,
+      number: true,
+      choices: ["Keine"],
+      keepForm: true,
+    },
+    {
       key: "approver",
       prompt: "Wer genehmigt den Change (nach Freigabematrix)?",
       placeholder: "Name suchen…",
@@ -138,11 +162,23 @@
       jiraLookup: "user",
     },
     {
+      key: "it_owner",
+      prompt: "Wer ist die verantwortliche Person aus der IT?",
+      placeholder: "Ist die verantwortliche Person aus der IT",
+      label: "Ist die verantwortliche Person aus der IT",
+      kind: "team",
+      onlyKind: "it_request",
+      jiraLookup: "user",
+    },
+    {
       key: "change_team",
       prompt: "Welche Personen unterstützen bei diesem Projekt?",
       placeholder: "Namen, durch Komma getrennt",
       label: "Change-Team",
       kind: "team",
+      optional: true,
+      choices: ["Keine"],
+      keepForm: true,
     },
     {
       key: "stakeholder",
@@ -173,15 +209,6 @@
       jiraLookup: "user",
       choices: ["Ich weiß es noch nicht"],
       keepForm: true,
-    },
-    {
-      key: "it_owner",
-      prompt: "Wer ist die verantwortliche Person aus der IT?",
-      placeholder: "Ist die verantwortliche Person aus der IT",
-      label: "Ist die verantwortliche Person aus der IT",
-      kind: "team",
-      onlyKind: "it_request",
-      jiraLookup: "user",
     },
   ];
 
@@ -236,9 +263,6 @@
     key: "effort_it",
     label: "Aufwand IT",
     kind: "cost",
-    onlyKind: "it_request",
-    prompt: "Wie viele Personentage braucht die IT?",
-    placeholder: "z. B. 5 PT",
   };
 
   const COST_MONEY_STEP = {
@@ -261,6 +285,7 @@
       .toLowerCase()
       .replace(/[.!?]+$/g, "");
     if (!raw) return false;
+    if (raw === "keine" || raw === "niemand" || raw === "keiner") return true;
     const phrases = [
       "keine ahnung",
       "keine idee",
@@ -288,6 +313,24 @@
   const CLARIFY_PROMPT =
     "Noch etwas konkreter: Was ist heute das Problem — und was soll danach besser laufen?";
 
+  function showAiReviewHint() {
+    aiReviewPending = true;
+    if (overviewAiHint) {
+      overview.hidden = false;
+      overviewAiHint.hidden = false;
+    }
+    setIntro(AI_REVIEW_HINT);
+    intro.classList.add("field-prompt-in");
+    if (aiReviewOk) aiReviewOk.hidden = false;
+    window.syncTicketInput?.();
+  }
+
+  function confirmAiReview() {
+    aiReviewPending = false;
+    if (aiReviewOk) aiReviewOk.hidden = true;
+    syncPrompt();
+  }
+
   function setIntro(text) {
     const raw = String(text || "").trim();
     if (!raw) {
@@ -300,16 +343,49 @@
   }
 
   let stepIndex = 0;
+  let intakeStarted = false;
+  window.aiReviewPending = function () {
+    return aiReviewPending;
+  };
+  window.intakeIdle = function () {
+    return !intakeStarted && !document.body.classList.contains("ticket-active");
+  };
+  window.startNewChange = function () {
+    intakeStarted = true;
+    if (startChangeBtn) startChangeBtn.hidden = true;
+    const hub = document.getElementById("hub");
+    if (hub) hub.hidden = true;
+    syncPrompt();
+  };
+  let syncedRequestId = null;
   const values = {};
   const labels = {};
+  const UI_TO_DOMAIN = {
+    start: "start_date",
+    end: "end_date",
+    lead: "change_lead",
+    nonprofit: "nonprofit_dss",
+    reason: "problem",
+    solution: "solution_goals",
+    risks: "risks_obstacles",
+    benefit: "benefit_savings",
+    it_owner: "responsible_sit",
+    effort_fb: "concept_scs_pt",
+    effort_it: "concept_cit_pt",
+  };
+  const DOMAIN_TO_UI = Object.fromEntries(
+    Object.entries(UI_TO_DOMAIN).map(([ui, domain]) => [domain, ui])
+  );
   let editingKey = null;
   let kindLocked = false;
   let autoFillBusy = false;
+  let aiReviewPending = false;
   let overviewGen = 0;
   let clarifyDescription = false;
   let forceThinOk = false;
   const jiraUserCache = [];
   const jiraComponentCache = [];
+  window.jiraComponentTree = [];
   const jiraOptionCache = {};
   let jiraComponentsPrefetch = null;
   const jiraOptionsPrefetch = {};
@@ -339,7 +415,14 @@
       };
     }
     const name = row.name || row.label || "";
-    return { name, label: row.label || name };
+    return {
+      name,
+      label: row.label || name,
+      description: row.description || "",
+      virtual: Boolean(row.virtual),
+      selectable: row.selectable !== false && !row.virtual,
+      children: row.children || [],
+    };
   }
 
   function lookupCache(kind) {
@@ -378,6 +461,7 @@
         for (const row of body.items || []) {
           jiraComponentCache.push(toLookupItem(row, "components"));
         }
+        window.jiraComponentTree = Array.isArray(body.tree) ? body.tree : [];
       } catch {
         jiraComponentsPrefetch = null;
       }
@@ -412,6 +496,129 @@
   }
 
   void prefetchJiraComponents();
+
+  function filterComponentTree(nodes, query) {
+    const needle = String(query || "").trim().toLowerCase();
+    if (!needle) return Array.isArray(nodes) ? nodes : [];
+    const out = [];
+    for (const node of nodes || []) {
+      const kids = filterComponentTree(node.children || [], query);
+      const blob = `${node.name || ""} ${node.description || ""}`.toLowerCase();
+      if (blob.includes(needle) || kids.length) {
+        out.push(Object.assign({}, node, { children: kids, open: true }));
+      }
+    }
+    return out;
+  }
+
+  window.filterComponentTree = filterComponentTree;
+  window.renderComponentTree = function (host, nodes, opts) {
+    const options = opts || {};
+    const pickedNames = (options.selected || [])
+      .map((part) => String(part || "").trim())
+      .filter(Boolean);
+    const selected = new Set(pickedNames.map((part) => part.toLowerCase()));
+    const onToggle = options.onToggle;
+    host.classList.add("comp-tree");
+    host.replaceChildren();
+    if (pickedNames.length) {
+      const bar = document.createElement("div");
+      bar.className = "comp-tree-picked";
+      pickedNames.forEach((name) => {
+        const chip = document.createElement("span");
+        chip.className = "comp-tree-chip";
+        chip.textContent = name;
+        bar.appendChild(chip);
+      });
+      host.appendChild(bar);
+    }
+    const list = document.createElement("div");
+    list.className = "comp-tree-list";
+    host.appendChild(list);
+
+    function paint() {
+      list.replaceChildren();
+      walk(nodes, 0, list, false);
+    }
+
+    function walk(items, depth, parent, ancestorOpen) {
+      (items || []).forEach((node) => {
+        const hasKids = (node.children || []).length > 0;
+        if (node.open == null && (ancestorOpen || (depth === 0 && node.name === "SCS - VS"))) {
+          node.open = true;
+        }
+        const open = Boolean(node.open);
+        const on = selected.has(String(node.name || "").toLowerCase());
+        const line = document.createElement("div");
+        line.className =
+          "comp-tree-row" +
+          (depth === 0 ? " is-root" : "") +
+          (hasKids ? " is-folder" : " is-leaf") +
+          (on ? " is-on" : "");
+        line.style.setProperty("--d", String(depth));
+        const chev = document.createElement("button");
+        chev.type = "button";
+        chev.className = "comp-tree-chev" + (hasKids ? (open ? " is-open" : "") : " is-leaf");
+        chev.tabIndex = hasKids ? 0 : -1;
+        chev.setAttribute("aria-hidden", hasKids ? "false" : "true");
+        if (hasKids) {
+          chev.onclick = (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            node.open = !open;
+            paint();
+          };
+        }
+        line.appendChild(chev);
+        const selectable = node.selectable !== false && !node.virtual;
+        if (selectable) {
+          const box = document.createElement("button");
+          box.type = "button";
+          box.className = "comp-tree-check" + (on ? " is-on" : "");
+          box.setAttribute("aria-pressed", on ? "true" : "false");
+          box.onclick = (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            onToggle?.(node);
+          };
+          line.appendChild(box);
+        } else {
+          const skip = document.createElement("span");
+          skip.className = "comp-tree-check is-folder";
+          line.appendChild(skip);
+        }
+        const copy = document.createElement("span");
+        copy.className = "comp-tree-copy";
+        const title = document.createElement("span");
+        title.className = "comp-tree-name";
+        title.textContent = node.name || "";
+        copy.appendChild(title);
+        if (node.description) {
+          const desc = document.createElement("span");
+          desc.className = "comp-tree-desc";
+          desc.textContent = node.description;
+          copy.appendChild(desc);
+        }
+        line.appendChild(copy);
+        if (selectable) {
+          line.classList.add("is-pick");
+          line.onclick = (ev) => {
+            if (ev.target.closest(".comp-tree-chev")) return;
+            onToggle?.(node);
+          };
+        } else if (hasKids) {
+          line.onclick = () => {
+            node.open = !open;
+            paint();
+          };
+        }
+        parent.appendChild(line);
+        if (hasKids && open) walk(node.children, depth + 1, parent, false);
+      });
+    }
+
+    walk(nodes, 0, list, Boolean(options.query));
+  };
 
   window.jiraSuggest = async function (kind, query) {
     const needle = String(query || "").trim();
@@ -641,7 +848,7 @@
     while (stepIndex < STEPS.length && !stepVisible(STEPS[stepIndex])) {
       stepIndex += 1;
     }
-    if (autoFillBusy) return null;
+    if (autoFillBusy || aiReviewPending) return null;
     const step = STEPS[stepIndex] || null;
     if (!step) return null;
     if (step.key === "description" && clarifyDescription) {
@@ -673,13 +880,13 @@
 
   function fieldFilled(step) {
     const raw = String(values[step.key] || "").trim();
-    if (!raw) return false;
+    if (!raw) return Boolean(step.optional);
     if (isUnknownFieldValue(raw)) return true;
     return !/konnte nicht ermittelt werden\.?$/i.test(raw);
   }
 
   function ticketComplete() {
-    if (autoFillBusy) return false;
+    if (autoFillBusy || aiReviewPending) return false;
     if (currentStep()) return false;
     return requiredSteps().every(fieldFilled);
   }
@@ -870,17 +1077,17 @@
 
     // Solution Category + Solution entfallen
 
-    // IT-Aufwand
     const itCell = costFields.querySelector('[data-key="effort_it"]');
-    if (itCell) itCell.hidden = !showIt;
-    else if (showIt && !costs.hidden) {
-      ensureFieldShell(COST_IT_STEP);
-      armEdit(COST_IT_STEP);
-    }
+    if (itCell) itCell.hidden = true;
   }
 
   function displayFor(key) {
     return labels[key] || values[key] || "";
+  }
+
+  function writeFieldValue(el, step, raw) {
+    if (!el) return;
+    el.textContent = raw || "";
   }
 
   function setLookupValue(key, name, label) {
@@ -929,12 +1136,37 @@
     valueEl.hidden = false;
   }
 
+  function persistField(uiKey, raw) {
+    if (!syncedRequestId) return;
+    const step = stepByKey(uiKey);
+    const domain = UI_TO_DOMAIN[uiKey] || uiKey;
+    let value = String(raw ?? "").trim();
+    if (step?.date) value = deToIso(value) || value;
+    if (uiKey === "priority") return;
+    const payload =
+      domain === "title" || domain === "description" || domain === "change_lead"
+        ? { [domain]: value }
+        : { fields: { [domain]: value } };
+    void fetch(`/api/requests/${syncedRequestId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).then(async (r) => {
+      if (r.ok) return;
+      const body = await r.json().catch(() => ({}));
+      flash(
+        typeof body.detail === "string" ? body.detail : "Änderung nicht nach Jira geschrieben",
+        true
+      );
+    });
+  }
+
   function cancelEdit() {
     if (!editingKey) return;
     const step = stepByKey(editingKey);
     const valueEl = fieldHost(step);
     if (valueEl) {
-      valueEl.textContent = displayFor(editingKey);
+      writeFieldValue(valueEl, step, displayFor(editingKey));
       valueEl.contentEditable = "false";
       valueEl.classList.remove("is-editing");
       clearFieldExtras(valueEl);
@@ -969,17 +1201,17 @@
       const prevName = values[key] || "";
       const prevLabel = labels[key] || "";
       if (text && (text === prevLabel || text === prevName)) {
-        valueEl.textContent = prevLabel || prevName || text;
+        writeFieldValue(valueEl, step, prevLabel || prevName || text);
       } else if (text) {
         setLookupValue(key, text, text);
-        valueEl.textContent = text;
+        writeFieldValue(valueEl, step, text);
       } else {
         delete values[key];
         delete labels[key];
-        valueEl.textContent = "";
+        writeFieldValue(valueEl, step, "");
       }
     } else {
-      valueEl.textContent = text;
+      writeFieldValue(valueEl, step, text);
       if (text) values[key] = text;
       else delete values[key];
     }
@@ -990,6 +1222,7 @@
     void refreshPriority();
     void refreshKind();
     syncJiraButton();
+    persistField(key, values[key] || text);
   }
 
   const resolveCache = new Map();
@@ -1046,6 +1279,7 @@
         void refreshPriority();
         void refreshKind();
         syncJiraButton();
+        persistField(step.key, value);
       };
       row.appendChild(chip);
     });
@@ -1062,7 +1296,7 @@
       valueEl.contentEditable = "false";
       valueEl.classList.remove("is-editing");
       if (!readValue(valueEl) && displayFor(step.key)) {
-        valueEl.textContent = displayFor(step.key);
+        writeFieldValue(valueEl, step, displayFor(step.key));
       }
       const wrap = document.createElement("div");
       wrap.className = "field-edit-lookup";
@@ -1096,11 +1330,11 @@
         const joined = next.join(", ");
         if (joined) {
           setLookupValue(step.key, joined, joined);
-          valueEl.textContent = joined;
+          writeFieldValue(valueEl, step, joined);
         } else {
           delete values[step.key];
           delete labels[step.key];
-          valueEl.textContent = "";
+          writeFieldValue(valueEl, step, "");
         }
         void loadSuggestions("").then((items) => {
           if (editingKey !== step.key) return;
@@ -1122,6 +1356,15 @@
 
       function renderList(items) {
         list.innerHTML = "";
+        const tree = window.filterComponentTree?.(window.jiraComponentTree, "") || [];
+        if (tree.length && window.renderComponentTree) {
+          list.classList.add("is-tree");
+          window.renderComponentTree(list, tree, {
+            selected: selectedComponents(),
+            onToggle: (node) => pick(node),
+          });
+          return;
+        }
         if (!items.length) {
           const empty = document.createElement("span");
           empty.className = "field-lookup-empty";
@@ -1397,6 +1640,8 @@
       btn.textContent = "Überarbeitet";
       if (key === "description") {
         await fillAutoOverview(true);
+      } else if (["benefit", "reason", "solution", "risks"].includes(key)) {
+        showAiReviewHint();
       }
       void refreshPriority();
       void refreshKind();
@@ -1411,6 +1656,19 @@
   }
 
   function syncPrompt() {
+    if (window.intakeIdle?.()) {
+      setIntro("");
+      if (startChangeBtn) startChangeBtn.hidden = false;
+      if (aiReviewOk) aiReviewOk.hidden = true;
+      window.syncTicketInput?.();
+      return;
+    }
+    if (startChangeBtn) startChangeBtn.hidden = true;
+    if (aiReviewPending) {
+      showAiReviewHint();
+      return;
+    }
+    if (aiReviewOk) aiReviewOk.hidden = true;
     const step = currentStep();
     document.body.classList.toggle(
       "field-flow",
@@ -1466,6 +1724,16 @@
     const valueEl = ensureFieldShell(step);
     if (!valueEl) return null;
 
+    if (step.number) {
+      const raw = String(text || "").trim();
+      if (
+        !raw ||
+        (typeof isUnknownFieldValue === "function" && isUnknownFieldValue(raw))
+      ) {
+        text = "";
+      }
+    }
+
     // Skip-Chip: dünne Beschreibung belassen, trotzdem weiter.
     if (
       step.key === "description" &&
@@ -1489,7 +1757,7 @@
       headline.classList.add("is-pending");
     }
 
-    valueEl.textContent = text;
+    writeFieldValue(valueEl, step, text);
     valueEl.classList.remove("ticket-row-value-in");
     valueEl.classList.add("ticket-row-value-pending");
     values[step.key] = text;
@@ -1544,7 +1812,7 @@
         .catch(() => {})
         .finally(() => {
           autoFillBusy = false;
-          syncPrompt();
+          showAiReviewHint();
         });
       return;
     }
@@ -1625,6 +1893,7 @@
     cell?.classList.remove("is-pending");
     cell?.classList.add("is-done");
     armEdit(shell);
+    persistField(shell.key, value);
   }
 
   async function fillAutoOverview(forceOverwrite = false) {
@@ -1657,9 +1926,7 @@
     prepareCostFields();
     if (gen !== overviewGen) return;
     await refreshPriority();
-    if (!autoFillBusy) {
-      syncPrompt();
-    }
+    showAiReviewHint();
   }
 
   function parsePt(text) {
@@ -1698,17 +1965,14 @@
   /** Aufwand kommt aus der Sheets-Vorlage, nicht per Zahlentippen. */
   function prepareCostFields() {
     ensureFieldShell(COST_FB_STEP);
-    const fbCell = fieldCell(COST_FB_STEP);
-    fbCell?.classList.add("is-readonly");
-    if (ticketKind() === "it_request") {
-      ensureFieldShell(COST_IT_STEP);
-      fieldCell(COST_IT_STEP)?.classList.add("is-readonly");
-    }
+    fieldCell(COST_FB_STEP)?.classList.add("is-readonly");
+    const itCost = fieldCell(COST_IT_STEP);
+    if (itCost) itCost.hidden = true;
     ensureFieldShell(COST_MONEY_STEP);
     fieldCell(COST_MONEY_STEP)?.classList.add("is-readonly");
     const hintEl = costHintEl();
-    if (hintEl && !parsePt(values.effort_fb) && !parsePt(values.effort_it)) {
-      hintEl.textContent = "Google Sheet öffnen, ausfüllen, Fenster schließen — Aufwand wird übernommen.";
+    if (hintEl && !parsePt(values.effort_fb)) {
+      hintEl.textContent = "Vorlage öffnen, Aufwand FB eintragen, Fenster schließen.";
     }
     showEffortSheetLink(values.effort_sheet_url);
     syncKindFields();
@@ -1723,17 +1987,14 @@
       return;
     }
     anchor.href = href;
-    anchor.textContent = href;
+    anchor.textContent = "Ausgefülltes Dokument öffnen";
     effortSheetLink.hidden = false;
   }
 
   function applyEffortSheet(body) {
     writeCostField(COST_FB_STEP, body.effort_fb || "", true);
-    if (ticketKind() === "it_request") {
-      writeCostField(COST_IT_STEP, body.effort_it || "", true);
-    }
     if (body.costs) writeCostField(COST_MONEY_STEP, body.costs, true);
-    ["effort_sheet_url", "concept_scs_pt", "concept_cit_pt", "operate_scs_pt", "operate_cit_pt"].forEach(
+    ["effort_sheet_url", "concept_scs_pt", "operate_scs_pt", "summe"].forEach(
       (key) => {
         const val = String(body[key] || "").trim();
         if (val) values[key] = val;
@@ -1743,9 +2004,10 @@
     showEffortSheetLink(values.effort_sheet_url);
     const hintEl = costHintEl();
     if (hintEl) {
-      hintEl.textContent = body.effort_fb
-        ? `Übernommen: ${body.effort_fb}${ticketKind() === "it_request" && body.effort_it ? ` / ${body.effort_it}` : ""}.`
-        : "Tabelle gelesen — keine PT-Summen gefunden.";
+      const fb = body.effort_fb || "0 PT";
+      hintEl.textContent = body.summe
+        ? `Übernommen: Aufwand FB ${fb}, Summe ${body.summe}.`
+        : `Übernommen: Aufwand FB ${fb}.`;
     }
     void reviewEffort();
     syncJiraButton();
@@ -1777,8 +2039,28 @@
     }
   }
 
+  function isDummyEffortSheet(url) {
+    const href = String(url || "").trim();
+    return /dummycritraufwand/i.test(href) || href === "/effort-sheet" || href.endsWith("/effort-sheet");
+  }
+
+  async function commitEffortCsv(csv) {
+    const hintEl = costHintEl();
+    if (hintEl) hintEl.textContent = "Übernehme Aufwand…";
+    const r = await fetch("/api/sessions/effort-sheet/commit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ csv }),
+    });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.detail || "Übernahme fehlgeschlagen");
+    applyEffortSheet(body);
+  }
+
   function openEffortTemplate() {
-    const url = effortSheetOpenUrl || effortSheetTemplateUrl;
+    const settingsUrl = effortSheetOpenUrl || effortSheetTemplateUrl;
+    const dummy = isDummyEffortSheet(effortSheetTemplateUrl) || isDummyEffortSheet(settingsUrl) || !settingsUrl;
+    const url = dummy ? "/effort-sheet" : settingsUrl;
     if (!url) {
       const hintEl = costHintEl();
       if (hintEl) {
@@ -1786,16 +2068,29 @@
       }
       return;
     }
-    const popup = window.open(url, "critrEffortSheet", "popup=yes,width=1280,height=800");
+    const popup = window.open(url, "critrEffortSheet", "popup=yes,width=920,height=640");
     if (!popup) {
       const hintEl = costHintEl();
       if (hintEl) hintEl.textContent = "Popup blockiert — bitte Popups erlauben.";
       return;
     }
+    let pendingCsv = "";
+    const onMsg = (event) => {
+      if (event.origin !== location.origin) return;
+      if (event.data?.type !== "critr-effort-sheet-v1") return;
+      pendingCsv = String(event.data.csv || "");
+    };
+    window.addEventListener("message", onMsg);
     const timer = setInterval(() => {
       if (popup && !popup.closed) return;
       clearInterval(timer);
-      importEffortSheet(effortSheetTemplateUrl || url).catch((err) => {
+      window.removeEventListener("message", onMsg);
+      const run = pendingCsv.trim()
+        ? commitEffortCsv(pendingCsv)
+        : dummy
+          ? Promise.resolve()
+          : importEffortSheet(effortSheetTemplateUrl || url);
+      run.catch((err) => {
         const hintEl = costHintEl();
         if (hintEl) hintEl.textContent = err.message || "Sheet konnte nicht übernommen werden.";
       });
@@ -2148,10 +2443,161 @@
     }
   });
 
+  aiReviewOk?.addEventListener("click", () => {
+    confirmAiReview();
+  });
+
   newChangeBtn?.addEventListener("click", () => {
     location.assign("/workspace");
   });
 
+  function applyRequest(detail) {
+    syncedRequestId = detail.id || null;
+    const fieldMap = {};
+    for (const row of detail.fields || []) {
+      if (row?.key) fieldMap[row.key] = row.value || "";
+    }
+    values.title = detail.title || fieldMap.title || "";
+    values.description = detail.description || fieldMap.description || "";
+    values.priority = detail.priority || "medium";
+    for (const [key, raw] of Object.entries(fieldMap)) {
+      if (!raw) continue;
+      values[key] = raw;
+      labels[key] = raw;
+      const ui = DOMAIN_TO_UI[key];
+      if (ui) {
+        values[ui] = raw;
+        labels[ui] = raw;
+      }
+    }
+    kindLocked = true;
+    setKind(detail.kindLabel || "Change Request", detail.kind || "change_request");
+    stepIndex = STEPS.length;
+    ticket.hidden = false;
+    document.body.classList.add("ticket-active");
+    const hub = document.getElementById("hub");
+    if (hub) hub.hidden = true;
+
+    for (const step of requiredSteps()) {
+      const shown = step.date
+        ? isoToDe(values[step.key]) || displayFor(step.key)
+        : displayFor(step.key);
+      const el = ensureFieldShell(step);
+      if (step.kind === "headline") {
+        headline.hidden = false;
+        headline.textContent = shown;
+        headline.classList.add("is-done");
+      } else if (el) {
+        writeFieldValue(el, step, shown || "");
+        el.classList.add("ticket-row-value-in");
+      }
+      fieldCell(step)?.classList.add("is-done");
+      armEdit(step);
+    }
+    setPriority(detail.priorityLabel || "Mittel", detail.priority || "medium");
+    showAuthor();
+    showFiles();
+    const sync = detail.sync || {};
+    if (sync.externalKey) {
+      showJiraBadge(sync.externalKey, sync.externalUrl || "");
+      showFinishActions(sync.externalKey, sync.externalUrl || "");
+    }
+    jiraBtn.hidden = true;
+    window.syncTicketInput?.();
+  }
+
+  async function loadHub() {
+    const hub = document.getElementById("hub");
+    const rows = document.getElementById("rows");
+    const state = document.getElementById("state");
+    const count = document.getElementById("count");
+    if (!hub || !rows) return;
+    if (intakeStarted || document.body.classList.contains("ticket-active")) return;
+    hub.hidden = false;
+    if (state) {
+      state.hidden = false;
+      state.textContent = "Lade Tickets aus Jira…";
+    }
+    try {
+      const r = await fetch("/api/jira/issues?limit=50");
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        throw new Error(
+          typeof body.detail === "string" ? body.detail : "Jira nicht erreichbar"
+        );
+      }
+      const items = body.items || [];
+      rows.replaceChildren();
+      for (const item of items) {
+        const tr = document.createElement("tr");
+        const title = document.createElement("td");
+        const name = document.createElement("span");
+        name.className = "row-title";
+        name.textContent = item.title || item.key;
+        title.appendChild(name);
+        const status = document.createElement("td");
+        status.className = "col-status";
+        status.textContent = [item.key, item.status].filter(Boolean).join(" · ");
+        tr.append(title, status);
+        tr.addEventListener("click", () => {
+          void openJiraTicket(item.key);
+        });
+        rows.appendChild(tr);
+      }
+      if (state) {
+        state.hidden = items.length > 0;
+        state.textContent = items.length ? "" : "Keine Tickets in Jira.";
+      }
+      if (count) count.textContent = items.length ? `${items.length} Tickets` : "";
+      if (intakeStarted || document.body.classList.contains("ticket-active")) {
+        hub.hidden = true;
+      }
+    } catch (err) {
+      if (state) {
+        state.hidden = false;
+        state.textContent = String(err.message || err);
+      }
+    }
+  }
+
+  async function openJiraTicket(key) {
+    const r = await fetch(`/api/jira/issues/${encodeURIComponent(key)}/import`, {
+      method: "POST",
+    });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      flash(
+        typeof body.detail === "string" ? body.detail : "Import fehlgeschlagen",
+        true
+      );
+      return;
+    }
+    history.replaceState({}, "", `/workspace/${body.id}`);
+    applyRequest(body);
+  }
+
+  async function openExisting(slug) {
+    const hub = document.getElementById("hub");
+    if (hub) hub.hidden = true;
+    const local = await fetch(`/api/requests/${encodeURIComponent(slug)}`);
+    if (local.ok) {
+      applyRequest(await local.json());
+      return;
+    }
+    await openJiraTicket(slug);
+  }
+
+  function bootWorkspace() {
+    const parts = location.pathname.split("/").filter(Boolean);
+    const slug = parts[0] === "workspace" ? parts[1] : null;
+    if (slug) {
+      void openExisting(slug);
+      return;
+    }
+    void loadHub();
+  }
+
+  bootWorkspace();
   effortSheetOpen?.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();

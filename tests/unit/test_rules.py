@@ -75,7 +75,7 @@ def test_change_request_dialog_fields_skip_it_effort_bundle():
     assert "fb_owner" in asked
     assert "process_owner" in asked
     assert "solution_owner" not in asked
-    assert "change_team" in asked
+    assert "change_team" not in asked
     assert "stakeholder" in asked
     assert "cost_unit" in asked
     assert spec.field_map()["sponsor"].auto is False

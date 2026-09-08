@@ -104,6 +104,32 @@ def jira_auth(
     return headers, auth
 
 
+def adf_to_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (int, float)):
+        return str(value)
+    parts: list[str] = []
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            if node.get("type") == "text":
+                parts.append(str(node.get("text") or ""))
+            for child in node.get("content") or []:
+                walk(child)
+            if node.get("type") in {"paragraph", "heading", "listItem"}:
+                parts.append("\n")
+        elif isinstance(node, list):
+            for child in node:
+                walk(child)
+
+    walk(value)
+    text = "".join(parts)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
 def _adf_paragraph(text: str) -> dict:
     lines = (text or "").split("\n")
     content = [
@@ -224,6 +250,11 @@ def _format_jira_error(status: int, body: str) -> str:
         )
     if "issue type is required" in low or "issuetype" in low and "invalid" in low:
         return "Jira kennt den Vorgangstyp nicht. In field_map.yaml den Issue-Type prüfen."
+    if "cannot be set" in low and "customfield_19753" in low:
+        return (
+            "Jira: Steckbrief-Name (customfield_19753) steht nicht auf dem Create-Screen "
+            "dieses Vorgangstyps und wird weggelassen."
+        )
     if "customfield_19753" in low or "summary is required" in low:
         return (
             "Jira verlangt das Pflichtfeld Zusammenfassung (customfield_19753). "
@@ -268,7 +299,7 @@ class JiraRestV3:
         self._runtime = runtime
         self._field_map = _load_field_map(self._settings)
         self._option_cache: dict[str, dict[str, dict[str, str]]] = {}
-        self._component_cache: list[str] | None = None
+        self._component_cache: list[dict[str, str]] | None = None
         self._validate()
 
     def _project_key(self) -> str:
@@ -344,14 +375,14 @@ class JiraRestV3:
                 break
         return out
 
-    def list_components(
+    def list_component_records(
         self,
         *,
         user_token: str | None = None,
         user_email: str | None = None,
-    ) -> list[str]:
+    ) -> list[dict[str, str]]:
         if self._component_cache is not None:
-            return list(self._component_cache)
+            return [dict(row) for row in self._component_cache]
         try:
             response = self._request(
                 "GET",
@@ -363,13 +394,33 @@ class JiraRestV3:
             return []
         data = response.json()
         rows = data if isinstance(data, list) else (data.get("components") if isinstance(data, dict) else []) or []
-        names = [
-            str(row.get("name") or "").strip()
-            for row in rows
-            if isinstance(row, dict) and str(row.get("name") or "").strip()
-        ]
-        self._component_cache = names
-        return list(names)
+        records = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            name = str(row.get("name") or "").strip()
+            if not name:
+                continue
+            records.append(
+                {
+                    "id": str(row.get("id") or ""),
+                    "name": name,
+                    "description": str(row.get("description") or "").strip(),
+                }
+            )
+        self._component_cache = records
+        return [dict(row) for row in records]
+
+    def list_components(
+        self,
+        *,
+        user_token: str | None = None,
+        user_email: str | None = None,
+    ) -> list[str]:
+        records = self.list_component_records(
+            user_token=user_token, user_email=user_email
+        )
+        return [row["name"] for row in records]
 
     def search_components(
         self,
@@ -725,9 +776,16 @@ class JiraRestV3:
     def create_issue(self, payload: IssuePayload) -> ExternalIssueRef:
         project = self._runtime.jira_project_key or self._field_map.get("project_key") or "TRI"
         field_defs = self._field_map.get("fields") or {}
+        steckbrief_value = (
+            (payload.steckbrief_name or "").strip()
+            or (payload.title or "").strip()
+            or (payload.reference or "").strip()
+            or "Ohne Titel"
+        )[:255]
+        title_value = (payload.title or "").strip()[:255] or steckbrief_value
         jira_fields: dict[str, Any] = {
             "project": {"key": project},
-            "summary": payload.title[:255],
+            "summary": title_value,
             "issuetype": {"name": self._issue_type(payload.kind)},
             "priority": {"name": self._priority_name(payload.priority)},
         }
@@ -738,6 +796,12 @@ class JiraRestV3:
             if key == "effort_sheet_url" and self._runtime.jira_effort_sheet_field:
                 meta["jira"] = self._runtime.jira_effort_sheet_field
             return meta
+
+        def field_applies(key: str) -> bool:
+            allowed_kinds = meta_for(key).get("kinds")
+            if not allowed_kinds:
+                return True
+            return payload.kind.value in set(allowed_kinds)
 
         def assign_domain_field(key: str, value: object) -> None:
             meta = meta_for(key)
@@ -764,12 +828,10 @@ class JiraRestV3:
         for key, value in payload.fields.items():
             assign_domain_field(key, value)
 
-        steckbrief_value = (payload.steckbrief_name or payload.title or "").strip()[:255]
-        if steckbrief_value:
+        if field_applies("steckbrief_name"):
             assign_domain_field("steckbrief_name", steckbrief_value)
-            if "steckbrief_name" not in mapped_keys and "customfield_19753" not in jira_fields:
-                jira_fields["customfield_19753"] = steckbrief_value
-                mapped_keys.add("steckbrief_name")
+            jira_fields["customfield_19753"] = steckbrief_value
+            mapped_keys.add("steckbrief_name")
 
         if "description" not in jira_fields:
             jira_fields["description"] = self._description_body(payload.description or "")
@@ -820,7 +882,6 @@ class JiraRestV3:
             "issuetype",
             "description",
             "priority",
-            "customfield_19753",
         }
         response: httpx.Response | None = None
         last_error: TicketPortError | None = None
@@ -905,27 +966,31 @@ class JiraRestV3:
             return
         self._request("PUT", self._issue_path(f"/{key}"), json={"fields": jira_fields})
 
-    def search_similar(self, text: str, limit: int = 5) -> list[dict[str, str]]:
-        needle = text.replace('"', " ").strip()[:80]
-        if not needle:
-            return []
-        project = self._runtime.jira_project_key or "TRI"
-        jql = f'project = {project} AND text ~ "{needle}" ORDER BY updated DESC'
+    def _search_raw(
+        self,
+        jql: str,
+        fields: str,
+        limit: int,
+        *,
+        user_token: str | None = None,
+        user_email: str | None = None,
+    ) -> dict[str, Any]:
+        params = {"jql": jql, "maxResults": limit, "fields": fields}
         if self._rest_root():
             response = self._request(
                 "GET",
                 "/search",
-                params={"jql": jql, "maxResults": limit, "fields": "key,summary"},
+                params=params,
+                user_token=user_token,
+                user_email=user_email,
             )
         elif self._runtime.jira_search_url:
-            extra, auth = jira_auth(self._runtime)
+            extra, auth = jira_auth(
+                self._runtime, user_token=user_token, user_email=user_email
+            )
             headers = {"accept": "*/*", **extra}
             kwargs: dict[str, Any] = {
-                "params": {
-                    "jql": jql,
-                    "maxResults": limit,
-                    "fields": "key,summary",
-                },
+                "params": params,
                 "headers": headers,
                 "timeout": 30,
                 "follow_redirects": False,
@@ -947,20 +1012,180 @@ class JiraRestV3:
             response = self._request(
                 "GET",
                 "/rest/api/3/search",
-                params={"jql": jql, "maxResults": limit, "fields": "summary"},
+                params=params,
+                user_token=user_token,
+                user_email=user_email,
             )
-        issues = _parse_json(response).get("issues") or []
+        return _parse_json(response)
+
+    def _mapped_jira_ids(self) -> list[str]:
+        ids = ["summary", "description", "status", "priority", "issuetype", "updated"]
+        for meta in (self._field_map.get("fields") or {}).values():
+            jira_id = str((meta or {}).get("jira") or "").strip()
+            if jira_id and jira_id not in ids:
+                ids.append(jira_id)
+        return ids
+
+    def _jira_field_text(self, raw: Any) -> str:
+        if raw is None:
+            return ""
+        if isinstance(raw, (str, int, float)):
+            return str(raw).strip()
+        if isinstance(raw, list):
+            parts = [self._jira_field_text(item) for item in raw]
+            return ", ".join(part for part in parts if part)
+        if isinstance(raw, dict):
+            if raw.get("type") == "doc" or "content" in raw:
+                text = adf_to_text(raw)
+                if text:
+                    return text
+            for key in ("displayName", "value", "name", "emailAddress"):
+                val = raw.get(key)
+                if val:
+                    return str(val).strip()
+        return ""
+
+    def _inbox_from_issue(self, issue: dict[str, Any]) -> dict[str, Any]:
+        key = str(issue.get("key") or "").strip()
+        fields = issue.get("fields") or {}
+        aliases = {
+            "summary": "title",
+            "start_date": "start",
+            "end_date": "end",
+            "change_lead": "lead",
+            "nonprofit_dss": "nonprofit",
+            "problem": "reason",
+            "solution_goals": "solution",
+            "risks_obstacles": "risks",
+            "benefit_savings": "benefit",
+            "responsible_sit": "it_owner",
+            "concept_scs_pt": "effort_fb",
+            "concept_cit_pt": "effort_it",
+        }
+        values: dict[str, str] = {}
+        values["title"] = self._jira_field_text(fields.get("summary"))
+        values["description"] = adf_to_text(fields.get("description"))
+        for domain_key, meta in (self._field_map.get("fields") or {}).items():
+            jira_id = str((meta or {}).get("jira") or "").strip()
+            if not jira_id:
+                continue
+            text = self._jira_field_text(fields.get(jira_id))
+            if not text:
+                continue
+            values[domain_key] = text
+            alias = aliases.get(domain_key)
+            if alias:
+                values[alias] = text
+        type_name = ""
+        issuetype = fields.get("issuetype")
+        if isinstance(issuetype, dict):
+            type_name = str(issuetype.get("name") or "")
+        elif issuetype:
+            type_name = str(issuetype)
+        prio_name = ""
+        priority = fields.get("priority")
+        if isinstance(priority, dict):
+            prio_name = str(priority.get("name") or "")
+        elif priority:
+            prio_name = str(priority)
+        status_name = ""
+        status = fields.get("status")
+        if isinstance(status, dict):
+            status_name = str(status.get("name") or "")
+        elif status:
+            status_name = str(status)
+        low = prio_name.lower()
+        if low in {"highest", "critical", "blocker"}:
+            prio = "critical"
+        elif low in {"high"}:
+            prio = "high"
+        elif low in {"low", "lowest", "trivial"}:
+            prio = "low"
+        else:
+            prio = "medium"
+        kind = (
+            "it_request"
+            if "it request" in type_name.lower() or type_name.lower().startswith("it ")
+            else "change_request"
+        )
+        base = (self._runtime.jira_base_url or "").rstrip("/")
+        return {
+            "key": key,
+            "title": values.get("title") or key,
+            "status": status_name or "Offen",
+            "priority": prio,
+            "kind": kind,
+            "updatedAt": str(fields.get("updated") or ""),
+            "url": f"{base}/browse/{key}" if base and key else "",
+            "values": values,
+        }
+
+    def list_issues(
+        self,
+        *,
+        query: str = "",
+        limit: int = 50,
+        user_token: str | None = None,
+        user_email: str | None = None,
+    ) -> list[dict[str, Any]]:
+        project = self._project_key()
+        jql = f"project = {project} ORDER BY updated DESC"
+        needle = (query or "").replace('"', " ").strip()[:80]
+        if needle:
+            jql = f'project = {project} AND text ~ "{needle}" ORDER BY updated DESC'
+        data = self._search_raw(
+            jql,
+            ",".join(self._mapped_jira_ids()),
+            limit,
+            user_token=user_token,
+            user_email=user_email,
+        )
+        return [self._inbox_from_issue(row) for row in (data.get("issues") or [])]
+
+    def inbox_issue(
+        self,
+        key: str,
+        *,
+        user_token: str | None = None,
+        user_email: str | None = None,
+    ) -> dict[str, Any] | None:
+        raw = self.get_issue(key, user_token=user_token, user_email=user_email)
+        if not raw:
+            return None
+        if "fields" not in raw and raw.get("summary"):
+            return raw
+        return self._inbox_from_issue(raw)
+
+    def search_similar(self, text: str, limit: int = 5) -> list[dict[str, str]]:
+        needle = text.replace('"', " ").strip()[:80]
+        if not needle:
+            return []
+        project = self._project_key()
+        jql = f'project = {project} AND text ~ "{needle}" ORDER BY updated DESC'
+        data = self._search_raw(
+            jql,
+            "key,summary",
+            limit,
+        )
+        issues = data.get("issues") or []
         return [
             {"key": i["key"], "summary": (i.get("fields") or {}).get("summary", "")}
             for i in issues
         ]
 
-    def get_issue(self, key: str) -> dict[str, Any] | None:
+    def get_issue(
+        self,
+        key: str,
+        user_token: str | None = None,
+        user_email: str | None = None,
+    ) -> dict[str, Any] | None:
         try:
             response = self._request(
                 "GET",
                 self._issue_path(f"/{key}"),
-                params={"fields": "summary,description,status,priority,issuetype,labels"},
+                params={"fields": ",".join(self._mapped_jira_ids())},
+                user_token=user_token,
+                user_email=user_email,
             )
         except TicketPortError:
             return None

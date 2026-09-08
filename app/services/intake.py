@@ -102,6 +102,7 @@ UI_FIELDS = {
     "process_owner": "process_owner",
     "solution_owner": "solution_owner",
     "costs": "costs",
+    "cost_savings": "cost_savings",
     "effort_fb": "concept_scs_pt",
     "effort_it": "concept_cit_pt",
     "effort_tshirt": "effort_tshirt",
@@ -109,7 +110,7 @@ UI_FIELDS = {
 }
 DATE_KEYS = {"start_date", "end_date"}
 PT_KEYS = {"concept_scs_pt", "concept_cit_pt", "operate_scs_pt", "operate_cit_pt"}
-MONEY_KEYS = {"costs"}
+MONEY_KEYS = {"costs", "cost_savings"}
 
 
 def _jira_identity(user: User | None) -> str:

@@ -14,10 +14,25 @@ from app.db import get_db
 from app.models import AppSetting, User
 from app.schemas import LoginIn
 from app.security import (
+    cookie_kwargs,
     get_or_create_jira_user,
+    get_or_create_user,
     optional_user,
+    read_blob,
     required_user,
+    sign_blob,
     sign_session,
+)
+from app.services.cidaas import (
+    OIDC_COOKIE,
+    OIDC_MAX_AGE,
+    CidaasError,
+    authorize_url,
+    display_from_userinfo,
+    exchange_code,
+    pkce_pair,
+    safe_next,
+    userinfo,
 )
 from app.services.settings_service import decrypt_secret, encrypt_secret, get_runtime_config
 
@@ -120,10 +135,95 @@ def me(user: User | None = Depends(optional_user)) -> dict:
     return {"authenticated": True, "user": _user_out(user)}
 
 
+@router.get("/config")
+def auth_config() -> dict:
+    settings = get_settings()
+    return {
+        "cidaas": settings.cidaas_enabled,
+        "devLogin": (not settings.cidaas_enabled)
+        and (settings.dev_login_enabled or settings.app_env == "dev"),
+    }
+
+
+@router.get("/cidaas/start")
+def cidaas_start(next: str | None = Query(default=None, alias="next")):
+    settings = get_settings()
+    if not settings.cidaas_enabled:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Cidaas nicht konfiguriert")
+    try:
+        verifier, challenge = pkce_pair()
+        state = secrets.token_urlsafe(24)
+        nonce = secrets.token_urlsafe(24)
+        url = authorize_url(state=state, nonce=nonce, challenge=challenge, settings=settings)
+    except CidaasError as err:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(err)) from err
+    blob = sign_blob(
+        {
+            "state": state,
+            "nonce": nonce,
+            "verifier": verifier,
+            "next": safe_next(next, settings),
+        },
+        settings,
+    )
+    redirect = RedirectResponse(url=url, status_code=302)
+    redirect.set_cookie(OIDC_COOKIE, blob, **cookie_kwargs(settings, max_age=OIDC_MAX_AGE))
+    return redirect
+
+
+@router.get("/cidaas/callback")
+def cidaas_callback(
+    request: Request,
+    db: Session = Depends(get_db),
+    code: str | None = Query(default=None),
+    state: str | None = Query(default=None),
+    error: str | None = Query(default=None),
+    error_description: str | None = Query(default=None),
+):
+    settings = get_settings()
+    if not settings.cidaas_enabled:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Cidaas nicht konfiguriert")
+    if error:
+        text = error_description or error
+        return RedirectResponse(url=f"/login?error={text}", status_code=302)
+    pending = read_blob(
+        request.cookies.get(OIDC_COOKIE) or "",
+        max_age=OIDC_MAX_AGE,
+        settings=settings,
+    )
+    if not code or not state or not pending or pending.get("state") != state:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Ungültiger Cidaas-Callback")
+    try:
+        tokens = exchange_code(code, str(pending["verifier"]), settings)
+        info = userinfo(str(tokens["access_token"]), settings)
+    except CidaasError as err:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(err)) from err
+    email, name = display_from_userinfo(info)
+    user = get_or_create_user(db, email, name)
+    if name and user.display_name != name:
+        user.display_name = name
+        db.flush()
+    target = safe_next(str(pending.get("next") or ""), settings)
+    redirect = RedirectResponse(url=target, status_code=302)
+    redirect.set_cookie(
+        settings.session_cookie,
+        sign_session(user.id, settings),
+        **cookie_kwargs(settings),
+    )
+    redirect.delete_cookie(
+        OIDC_COOKIE,
+        path="/",
+        secure=settings.cookie_secure,
+        httponly=True,
+        samesite="lax",
+    )
+    return redirect
+
+
 @router.post("/login")
 def login(payload: LoginIn, response: Response, db: Session = Depends(get_db)) -> dict:
     settings = get_settings()
-    if not settings.dev_login_enabled and settings.app_env != "dev":
+    if settings.cidaas_enabled or (not settings.dev_login_enabled and settings.app_env != "dev"):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Dev-Login deaktiviert")
     account = _resolve_jira_account(db, payload.account)
     if not account:
@@ -138,10 +238,7 @@ def login(payload: LoginIn, response: Response, db: Session = Depends(get_db)) -
     response.set_cookie(
         key=settings.session_cookie,
         value=token,
-        httponly=True,
-        samesite="lax",
-        path="/",
-        max_age=60 * 60 * 12,
+        **cookie_kwargs(settings),
     )
     return {"authenticated": True, "user": _user_out(user)}
 

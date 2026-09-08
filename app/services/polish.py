@@ -76,6 +76,7 @@ LABELS = {
     "process_owner": "Process Owner",
     "solution_owner": "Solution Owner",
     "costs": "Kosten",
+    "cost_savings": "Kostenersparnis",
     "effort_fb": "Aufwand FB",
     "effort_it": "Aufwand IT",
     "effort_tshirt": "Effort Project",

@@ -4,13 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>CRITR</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="/styles.css?v=cal-size-v2" />
+    <link rel="stylesheet" href="/styles.css?v=scos-ci-v1" />
   </head>
   <body class="gated">
     <header class="chrome">
@@ -44,11 +38,14 @@
           <section class="ticket-section" id="ticket-overview" hidden>
             <h3 class="ticket-section-title">Übersicht</h3>
             <dl class="ticket-fields ticket-overview-grid" id="ticket-overview-fields"></dl>
+            <p class="ticket-section-hint" id="overview-ai-hint" hidden>
+              Bitte alles nochmal überprüfen. KI kann Fehler machen.
+            </p>
           </section>
           <div class="ticket-split">
             <section class="ticket-section" id="ticket-costs" hidden>
               <h3 class="ticket-section-title">Kosten</h3>
-              <p class="ticket-section-hint">Google Sheet öffnen, ausfüllen, Fenster schließen.</p>
+              <p class="ticket-section-hint">Vorlage öffnen, Aufwand FB eintragen, Fenster schließen.</p>
               <div class="effort-sheet" id="effort-sheet">
                 <button type="button" class="btn btn-primary" id="effort-sheet-open">Vorlage öffnen</button>
                 <p class="effort-sheet-link" id="effort-sheet-link" hidden>
@@ -88,7 +85,7 @@
         </article>
       </main>
 
-      <section class="hub" id="hub" hidden>
+      <section class="hub" id="hub" aria-label="Jira-Tickets">
         <div class="table-wrap" id="table-wrap">
           <table class="grid" id="grid">
             <thead>
@@ -118,7 +115,13 @@
           <div id="date-wrap" class="date-wrap" hidden>
             <div id="date-cal" class="cal"></div>
           </div>
-          <form id="form" class="composer composer-card">
+          <button type="button" class="jira-create" id="start-change">
+            Neuen Change anlegen
+          </button>
+          <button type="button" class="jira-create" id="ai-review-ok" hidden>
+            Ich habe alles geprüft
+          </button>
+          <form id="form" class="composer composer-card hidden">
             <div class="composer-main">
               <textarea
                 id="input"
@@ -149,8 +152,8 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="/auth.js?v=login-search-v1"></script>
-    <script src="/app.js?v=owners-v1"></script>
-    <script src="/workspace.js?v=review-fix-v1"></script>
+    <script src="/auth.js?v=login-v2"></script>
+    <script src="/app.js?v=cost-savings-v1"></script>
+    <script src="/workspace.js?v=cost-savings-v1"></script>
   </body>
 </html>

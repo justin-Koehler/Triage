@@ -36,5 +36,13 @@ def test_dummy_template_skips_google():
     from app.services.effort_sheet import DUMMY_TEMPLATE_URL, fetch_effort_sheet
 
     parsed = fetch_effort_sheet(DUMMY_TEMPLATE_URL)
-    assert parsed["effort_fb"] == "5 PT"
+    assert parsed["effort_fb"] == "0 PT"
+    assert parsed["effort_it"] == "0 PT"
     assert parsed["effort_sheet_url"] == DUMMY_TEMPLATE_URL
+
+
+def test_aufwand_fb_it_columns():
+    parsed = parse_effort_csv("Aufwand FB,Aufwand IT,Summe\n3,5,99\n1,1,0\n")
+    assert parsed["effort_fb"] == "4 PT"
+    assert parsed["effort_it"] == "6 PT"
+    assert parsed["summe"] == "10"

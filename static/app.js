@@ -2,6 +2,7 @@
   const form = document.getElementById("form");
   const input = document.getElementById("input");
   const send = document.getElementById("send");
+  const startChangeBtn = document.getElementById("start-change");
   const choiceRow = document.getElementById("choice-row");
   const jiraSuggest = document.getElementById("jira-suggest");
   const enhanceBtn = document.getElementById("ai-enhance");
@@ -389,6 +390,40 @@
     }
     jiraSuggest.hidden = false;
     jiraSuggest.classList.toggle("is-tags-multi", multi);
+    const tree =
+      kind === "components" && window.filterComponentTree
+        ? window.filterComponentTree(window.jiraComponentTree, query)
+        : [];
+    if (multi && tree.length && window.renderComponentTree) {
+      const body = document.createElement("div");
+      body.className = "field-tags-body";
+      const host = document.createElement("div");
+      window.renderComponentTree(host, tree, {
+        query,
+        selected: multiPicks.map((item) => item.name || item.label),
+        onToggle: (node) => {
+          toggleMultiPick(node);
+          renderJiraSuggest(items, query, kind);
+        },
+      });
+      const go = document.createElement("button");
+      go.type = "button";
+      go.className = "suggestion go field-tags-go";
+      go.textContent = "Weiter";
+      go.disabled = multiPicks.length === 0;
+      go.onclick = () => {
+        if (!multiPicks.length) return;
+        const joined = multiJoined();
+        multiPicks = [];
+        void submitAnswer(joined, go);
+      };
+      const actions = document.createElement("div");
+      actions.className = "field-tags-actions";
+      actions.appendChild(go);
+      body.append(host, actions);
+      jiraSuggest.appendChild(body);
+      return;
+    }
     const chipHost = multi ? document.createElement("div") : jiraSuggest;
     if (multi) chipHost.className = "field-tags-chips";
     items.forEach((item) => {
@@ -452,6 +487,25 @@
     if (dateWrap) dateWrap.hidden = true;
     hideJiraSuggest();
     if (!isMultiStep(step)) multiPicks = [];
+    const reviewOk = document.getElementById("ai-review-ok");
+    if (window.intakeIdle?.()) {
+      form.classList.add("hidden");
+      if (startChangeBtn) startChangeBtn.hidden = false;
+      if (reviewOk) reviewOk.hidden = true;
+      syncEnhance(null);
+      if (choiceRow) choiceRow.hidden = true;
+      return;
+    }
+    if (startChangeBtn) startChangeBtn.hidden = true;
+    if (window.aiReviewPending?.()) {
+      form.classList.add("hidden");
+      if (reviewOk) reviewOk.hidden = false;
+      syncEnhance(null);
+      if (choiceRow) choiceRow.hidden = true;
+      hideJiraSuggest();
+      return;
+    }
+    if (reviewOk) reviewOk.hidden = true;
     if (!step) {
       input.placeholder = "";
       input.setAttribute("aria-label", "Eingabe");
@@ -481,6 +535,8 @@
     }
     input.placeholder = step.placeholder;
     input.setAttribute("aria-label", step.placeholder);
+    if (step.number) input.setAttribute("inputmode", "decimal");
+    else input.removeAttribute("inputmode");
     input.classList.toggle("is-long", Boolean(step.long));
     if (isMultiStep(step)) {
       if (choiceRow) {
@@ -621,11 +677,26 @@
     }
   }
 
+  function isPlainNumber(text) {
+    return /^-?\d+([.,]\d+)?$/.test(String(text || "").trim().replace(/\s/g, ""));
+  }
+
   async function submitAnswer(text, origin) {
     if (busy) return;
     const step = window.getTicketStep?.();
     if (!step || typeof window.prepareTicketField !== "function") return;
     if (step.choices?.length && !step.keepForm && !step.choices.includes(text)) return;
+    if (step.number) {
+      const raw = String(text || "").trim();
+      const skip =
+        !raw ||
+        (typeof window.isUnknownFieldValue === "function"
+          ? window.isUnknownFieldValue(raw)
+          : /^(keine|kein|keiner)$/i.test(raw));
+      if (skip) text = "";
+      else if (!isPlainNumber(raw)) return;
+      else text = raw.replace(/\s/g, "").replace(",", ".");
+    }
 
     if (step.jiraLookup && window.jiraSuggest && !isMultiStep(step)) {
       const unknown =
@@ -725,7 +796,10 @@
       }
       return;
     }
-    if (!text) return;
+    if (!text) {
+      if (step?.optional) void submitAnswer(step.number ? "" : "Keine", input);
+      return;
+    }
     void submitAnswer(text, input);
   });
 
@@ -733,9 +807,14 @@
   window.resizeIntakeField = resizeInput;
   window.openWorkspaceTicket = function () {};
 
+  startChangeBtn?.addEventListener("click", () => {
+    window.startNewChange?.();
+    input.focus();
+  });
+
   (window.whenAuthed || Promise.resolve()).then(() => {
     syncInput();
     resizeInput();
-    input.focus();
+    if (!window.intakeIdle?.()) input.focus();
   });
 })();

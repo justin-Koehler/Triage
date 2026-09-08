@@ -59,3 +59,20 @@ class TicketPort(Protocol):
     def search_similar(self, text: str, limit: int = 5) -> list[dict[str, str]]: ...
 
     def get_issue(self, key: str) -> dict[str, Any] | None: ...
+
+    def list_issues(
+        self,
+        *,
+        query: str = "",
+        limit: int = 50,
+        user_token: str | None = None,
+        user_email: str | None = None,
+    ) -> list[dict[str, Any]]: ...
+
+    def inbox_issue(
+        self,
+        key: str,
+        *,
+        user_token: str | None = None,
+        user_email: str | None = None,
+    ) -> dict[str, Any] | None: ...

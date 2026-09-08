@@ -78,6 +78,55 @@ class FakeTicketSystem:
                 issue.priority = priority.value.capitalize()
             db.commit()
 
+    def _inbox_item(self, issue: FakeExternalIssue) -> dict[str, Any]:
+        fields = dict(issue.fields or {})
+        values = {
+            "title": issue.summary,
+            "description": issue.description or "",
+        }
+        for key, raw in fields.items():
+            if isinstance(raw, (str, int, float)):
+                values[key] = str(raw)
+        return {
+            "key": issue.key,
+            "title": issue.summary,
+            "status": str(fields.get("status") or "Offen"),
+            "priority": (issue.priority or "medium").lower(),
+            "kind": "it_request" if "it" in (issue.issue_type or "").lower() else "change_request",
+            "updatedAt": issue.updated_at.isoformat() if issue.updated_at else "",
+            "url": f"/external/{issue.key}",
+            "values": values,
+        }
+
+    def list_issues(
+        self,
+        *,
+        query: str = "",
+        limit: int = 50,
+        user_token: str | None = None,
+        user_email: str | None = None,
+    ) -> list[dict[str, Any]]:
+        needle = (query or "").strip().lower()
+        with self._session_factory() as db:
+            stmt = select(FakeExternalIssue).order_by(FakeExternalIssue.updated_at.desc())
+            if needle:
+                stmt = stmt.where(func.lower(FakeExternalIssue.summary).contains(needle))
+            rows = db.scalars(stmt.limit(limit)).all()
+        return [self._inbox_item(row) for row in rows]
+
+    def inbox_issue(
+        self,
+        key: str,
+        *,
+        user_token: str | None = None,
+        user_email: str | None = None,
+    ) -> dict[str, Any] | None:
+        with self._session_factory() as db:
+            issue = db.get(FakeExternalIssue, (key or "").strip().upper())
+            if not issue:
+                return None
+            return self._inbox_item(issue)
+
     def search_similar(self, text: str, limit: int = 5) -> list[dict[str, str]]:
         needle = text.strip().lower()[:24]
         if not needle:

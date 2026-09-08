@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
@@ -28,6 +28,7 @@ from app.services.effort import review_effort
 from app.services.effort_sheet import (
     EffortSheetError,
     commit_effort_csv,
+    dummy_template_bytes,
     fetch_effort_sheet,
     load_share_csv,
     share_html,
@@ -244,12 +245,27 @@ def post_effort(
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(err)) from err
 
 
+def _public_base(request: Request) -> str:
+    proto = (request.headers.get("x-forwarded-proto") or request.url.scheme).split(",")[0].strip()
+    host = (
+        request.headers.get("x-forwarded-host")
+        or request.headers.get("host")
+        or request.url.netloc
+    ).split(",")[0].strip()
+    return f"{proto}://{host}"
+
+
 @router.get("/effort-sheet/template")
-def get_effort_sheet_template(_: User = Depends(current_actor)) -> Response:
+def get_effort_sheet_template(
+    dummy: bool = Query(default=False),
+    _: User = Depends(current_actor),
+) -> Response:
+    content = dummy_template_bytes() if dummy else template_bytes()
+    name = "aufwand-dummy.csv" if dummy else "aufwand-vorlage.csv"
     return Response(
-        content=template_bytes(),
+        content=content,
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="aufwand-vorlage.csv"'},
+        headers={"Content-Disposition": f'attachment; filename="{name}"'},
     )
 
 
@@ -272,7 +288,7 @@ def post_effort_sheet_commit(
     _: User = Depends(current_actor),
 ) -> dict:
     try:
-        return commit_effort_csv(db, payload.csv, str(request.base_url))
+        return commit_effort_csv(db, payload.csv, _public_base(request))
     except EffortSheetError as err:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(err)) from err
 

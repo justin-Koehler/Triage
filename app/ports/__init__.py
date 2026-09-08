@@ -24,6 +24,8 @@ __all__ = [
 
 def build_ticket_port(settings: Settings | None = None) -> TicketPort:
     settings = settings or get_settings()
+    import app.db as dbmod
+
     try:
         from app.services.settings_service import get_runtime_config
 
@@ -32,13 +34,17 @@ def build_ticket_port(settings: Settings | None = None) -> TicketPort:
             from app.ports.jira_v3 import JiraRestV3
 
             return JiraRestV3(runtime=runtime, settings=settings)
-        return FakeTicketSystem(SessionLocal, project=runtime.jira_project_key or "TRI")
+        return FakeTicketSystem(
+            lambda: dbmod.SessionLocal(), project=runtime.jira_project_key or "TRI"
+        )
     except Exception:
         if settings.ticket_port == "jira":
             from app.ports.jira_v3 import JiraRestV3
 
             return JiraRestV3(settings=settings)
-        return FakeTicketSystem(SessionLocal, project=settings.jira_project_key or "TRI")
+        return FakeTicketSystem(
+            lambda: dbmod.SessionLocal(), project=settings.jira_project_key or "TRI"
+        )
 
 
 @lru_cache

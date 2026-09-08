@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import sys
 from contextlib import asynccontextmanager
+from urllib.parse import quote
 
-from fastapi import Depends, FastAPI
-from fastapi.responses import FileResponse
+from fastapi import Depends, FastAPI, Request
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -17,11 +20,41 @@ from app.api import settings as settings_api
 from app.config import get_settings
 from app.db import Base, SessionLocal, engine, ensure_columns, ensure_default_actor, get_db
 from app.ports import get_ticket_port
+from app.security import read_session
 from app.services.settings_service import get_runtime_config
 from app.sync.outbox import process_pending
 
 log = logging.getLogger("triage")
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+
+
+class _JsonLog(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            "ts": self.formatTime(record, datefmt="%Y-%m-%dT%H:%M:%S"),
+            "level": record.levelname,
+            "logger": record.name,
+            "msg": record.getMessage(),
+        }
+        if record.exc_info:
+            payload["exc"] = self.formatException(record.exc_info)
+        return json.dumps(payload, ensure_ascii=False)
+
+
+def _configure_logging() -> None:
+    handler = logging.StreamHandler(sys.stdout)
+    if get_settings().app_env == "dev":
+        handler.setFormatter(
+            logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
+        )
+    else:
+        handler.setFormatter(_JsonLog())
+    root = logging.getLogger()
+    root.handlers.clear()
+    root.addHandler(handler)
+    root.setLevel(logging.INFO)
+
+
+_configure_logging()
 
 
 async def _outbox_loop(stop: asyncio.Event) -> None:
@@ -60,10 +93,56 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         stop.set()
-        await task
+        try:
+            await asyncio.wait_for(task, timeout=25)
+        except (TimeoutError, asyncio.CancelledError):
+            task.cancel()
 
 
 app = FastAPI(title="CRITR", lifespan=lifespan)
+
+_PUBLIC_EXACT = {
+    "/login",
+    "/api/live",
+    "/api/ready",
+    "/api/health",
+    "/api/auth/me",
+    "/api/auth/config",
+    "/api/auth/login",
+    "/api/auth/logout",
+    "/styles.css",
+    "/favicon.ico",
+}
+
+
+def _is_public(path: str) -> bool:
+    if path in _PUBLIC_EXACT:
+        return True
+    if path.startswith("/api/auth/cidaas"):
+        return True
+    if path.startswith("/aufwand/"):
+        return True
+    if path.startswith("/static/"):
+        return True
+    return path.endswith((".css", ".js", ".ico", ".png", ".svg", ".woff2"))
+
+
+@app.middleware("http")
+async def cidaas_gate(request: Request, call_next):
+    settings = get_settings()
+    if not settings.cidaas_enabled:
+        return await call_next(request)
+    if request.method == "OPTIONS" or _is_public(request.url.path):
+        return await call_next(request)
+    token = request.cookies.get(settings.session_cookie)
+    if token and read_session(token, settings):
+        return await call_next(request)
+    if request.url.path.startswith("/api/"):
+        return JSONResponse({"detail": "Anmeldung erforderlich"}, status_code=401)
+    nxt = request.url.path
+    if request.url.query:
+        nxt = f"{nxt}?{request.url.query}"
+    return RedirectResponse(url=f"/login?next={quote(nxt, safe='')}", status_code=302)
 
 
 @app.get("/api/live")
@@ -110,6 +189,11 @@ def _html(name: str) -> FileResponse:
 
 def _asset(name: str, media_type: str) -> FileResponse:
     return FileResponse(STATIC / name, media_type=media_type, headers=NO_STORE)
+
+
+@app.get("/login")
+def login_page() -> FileResponse:
+    return _html("login.html")
 
 
 @app.get("/")

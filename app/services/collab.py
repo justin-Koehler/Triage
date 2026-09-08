@@ -28,7 +28,7 @@ TARGET = {
 }
 LABEL = {
     COLLAB_RISKS: "Risiken & Hindernisse",
-    COLLAB_SIMILAR: "Ähnliche Lösung",
+    COLLAB_SIMILAR: "Bezug",
 }
 
 YES = {
