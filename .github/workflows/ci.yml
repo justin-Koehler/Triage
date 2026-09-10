@@ -56,7 +56,7 @@ jobs:
           format: cyclonedx
           output: sbom.cdx.json
           exit-code: "0"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sbom-${{ github.sha }}
           path: sbom.cdx.json
