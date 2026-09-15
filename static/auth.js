@@ -17,18 +17,63 @@
     }
     box.replaceChildren();
     box.hidden = false;
+    box.classList.remove("is-open");
 
-    const nameEl = el("span", "account-name", user.displayName);
-    box.appendChild(nameEl);
+    const nameBtn = el("button", "account-name", user.displayName || "Konto");
+    nameBtn.type = "button";
+    nameBtn.setAttribute("aria-haspopup", "menu");
+    nameBtn.setAttribute("aria-expanded", "false");
+
+    const menu = el("div", "account-menu");
+    menu.setAttribute("role", "menu");
+    menu.hidden = true;
 
     const out = el("button", "account-out", "Abmelden");
     out.type = "button";
+    out.setAttribute("role", "menuitem");
     out.onclick = async () => {
       await fetch("/api/auth/logout", { method: "POST" });
       const cfg = await fetch("/api/auth/config").then((r) => r.json()).catch(() => ({}));
       location.href = cfg.cidaas ? "/login" : "/";
     };
-    box.appendChild(out);
+    menu.appendChild(out);
+
+    const setOpen = (open) => {
+      box.classList.toggle("is-open", open);
+      menu.hidden = !open;
+      nameBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    };
+
+    nameBtn.onclick = (event) => {
+      event.stopPropagation();
+      setOpen(!box.classList.contains("is-open"));
+    };
+    menu.addEventListener("click", (event) => event.stopPropagation());
+
+    if (!showAccount._outsideBound) {
+      showAccount._outsideBound = true;
+      document.addEventListener("click", () => {
+        const acc = document.getElementById("account");
+        if (!acc?.classList.contains("is-open")) return;
+        acc.classList.remove("is-open");
+        const m = acc.querySelector(".account-menu");
+        const n = acc.querySelector(".account-name");
+        if (m) m.hidden = true;
+        if (n) n.setAttribute("aria-expanded", "false");
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        const acc = document.getElementById("account");
+        if (!acc?.classList.contains("is-open")) return;
+        acc.classList.remove("is-open");
+        const m = acc.querySelector(".account-menu");
+        const n = acc.querySelector(".account-name");
+        if (m) m.hidden = true;
+        if (n) n.setAttribute("aria-expanded", "false");
+      });
+    }
+
+    box.append(nameBtn, menu);
   }
 
   function gate() {

@@ -1,7 +1,17 @@
 scscm.stackit.gg {
 	encode gzip
-	# Login: /login → Cidaas. App prüft Session-Cookie.
-	reverse_proxy app:8000
+
+	handle /ki-buddy* {
+		basic_auth {
+			campus $2a$14$vZzoVTurvax4TgrdiDywRe7nvB1dfPlGCdjhf6/OQg46cTMqdab5i
+		}
+		reverse_proxy ki-buddy:3000
+	}
+
+	handle {
+		# Login: /login → Cidaas. App prüft Session-Cookie.
+		reverse_proxy app:8000
+	}
 }
 
 smartmirror.runs.onstackit.cloud {

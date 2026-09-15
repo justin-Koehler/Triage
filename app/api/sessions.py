@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request, status
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
+from app.config import ROOT
 from app.db import get_db
 from app.models import User
 from app.schemas import (
@@ -29,9 +30,10 @@ from app.services.effort_sheet import (
     EffortSheetError,
     commit_effort_csv,
     dummy_template_bytes,
+    effort_sync_fields,
     fetch_effort_sheet,
+    kalkulation_xlsx,
     load_share_csv,
-    share_html,
     template_bytes,
 )
 from app.services.fields import (
@@ -280,6 +282,22 @@ def post_effort_sheet(
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(err)) from err
 
 
+@router.post("/effort-sheet/xlsx")
+def post_effort_sheet_xlsx(
+    payload: EffortSheetCommitIn,
+    _: User = Depends(current_actor),
+) -> Response:
+    try:
+        data = kalkulation_xlsx(payload.csv)
+    except EffortSheetError as err:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(err)) from err
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="kalkulation.xlsx"'},
+    )
+
+
 @router.post("/effort-sheet/commit")
 def post_effort_sheet_commit(
     payload: EffortSheetCommitIn,
@@ -288,9 +306,18 @@ def post_effort_sheet_commit(
     _: User = Depends(current_actor),
 ) -> dict:
     try:
-        return commit_effort_csv(db, payload.csv, _public_base(request))
+        parsed = commit_effort_csv(
+            db, payload.csv, _public_base(request), share_id=payload.share_id
+        )
     except EffortSheetError as err:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(err)) from err
+    if payload.request_id:
+        from app.services.requests_service import get_request, update_request
+
+        ticket = get_request(db, payload.request_id)
+        if ticket:
+            update_request(db, ticket, effort_sync_fields(parsed))
+    return parsed
 
 
 @router.post("/priority")
@@ -388,9 +415,40 @@ def post_confirm(
 share_router = APIRouter(tags=["intake"])
 
 
-@share_router.get("/aufwand/{share_id}", response_class=HTMLResponse)
-def effort_sheet_share(share_id: str, db: Session = Depends(get_db)) -> str:
+@share_router.get("/aufwand/{share_id}/xlsx")
+def effort_sheet_share_xlsx(share_id: str, db: Session = Depends(get_db)) -> Response:
     csv_text = load_share_csv(db, share_id)
     if not csv_text:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Aufwandstabelle unbekannt")
-    return share_html(csv_text)
+    data = kalkulation_xlsx(csv_text)
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="kalkulation-{share_id[:8]}.xlsx"'
+        },
+    )
+
+
+@share_router.get("/aufwand/{share_id}/data")
+def effort_sheet_share_data(share_id: str, db: Session = Depends(get_db)) -> Response:
+    csv_text = load_share_csv(db, share_id)
+    if not csv_text:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Aufwandstabelle unbekannt")
+    body = csv_text if isinstance(csv_text, str) else csv_text.decode("utf-8")
+    if not body.startswith("\ufeff"):
+        body = f"\ufeff{body}"
+    return Response(
+        content=body.encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="kalkulation-{share_id[:8]}.csv"'
+        },
+    )
+
+
+@share_router.get("/aufwand/{share_id}")
+def effort_sheet_share(share_id: str, db: Session = Depends(get_db)) -> FileResponse:
+    if not load_share_csv(db, share_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Aufwandstabelle unbekannt")
+    return FileResponse(ROOT / "static" / "effort-sheet.html", media_type="text/html")

@@ -1,24 +1,19 @@
-"""Was gerade los ist: KI-Fassung aus dem ganzen Status-Tab. Nichts erfinden."""
+"""Status-Rohdaten + Trigger für den einheitlichen Stand."""
 
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 
 from sqlalchemy.orm import Session
 
-from app.domain.fieldspec import get_rules
-from app.domain.types import RequestKind, parse_kind
 from app.models import Request
-from app.services import requests_service as svc
-from app.triage.providers import LlmUnavailable, build_provider
 
 MAX_STATUS = 2500
 MAX_BLURB = 90
 MAX_ENTRIES = 40
 DIGEST_KEY = "status_digest"
-PROMPT_VERSION = "v6-split"
+PROMPT_VERSION = "v9-briefing-prose"
 
 RAG_LABELS = {
     "green": "grün",
@@ -28,26 +23,8 @@ RAG_LABELS = {
     "blue": "blau",
 }
 
-SYSTEM = """Du schreibst zwei Texte zum Status eines Changes.
-
-Quelle: alle Status-Einträge (Datum, Ampel, Satz, nächster Schritt, Risiko). Nichts erfinden.
-summary: eine Zeile, maximal 12 Wörter, nur der letzte Stand. Für Titel und Liste.
-ablauf: detaillierter Fließtext, chronologisch ältester zuerst, neuester zuletzt.
-Jeder inhaltliche Eintrag kommt im Ablauf vor. Ampel, nächster Schritt und Risiko mitnehmen, wenn sie stehen.
-Verstehe die Logik: Frage und spätere Antwort sind ein Vorgang, in Zeitreihenfolge.
-Kurze Hauptsätze. Ein Gedanke pro Satz. Kein Schachtelsatz.
-Deutsche Orthografie mit Umlauten und ß.
-
-Gut: „Heilbronn wurde nach den Kosten gefragt. Rückmeldung: 5 Euro.“
-Schlecht: „wurde gefragt und gewartet, woraufhin mitgeteilt wurde, dass Heilbronn 5 Euro sagte.“
-
-Datum nennen, wenn es den Schritt datiert (z. B. am 17.08.2026).
-Kein Satz über fehlende Historie. Kein „Anfangs wurde das Projekt gestartet“, wenn das nicht im Eintrag steht.
-Keine Floskeln. Keine Stichpunkte.
-
-JSON: {"ablauf": "...", "summary": "..."}"""
-
 _SENTENCE = re.compile(r"(?<=[.!?])\s+")
+_BULLET = re.compile(r"^[\s]*[•\-–*]+\s*")
 _EMPTY_PAST = re.compile(
     r"(?i)"
     r"(keine|kein|nichts|nicht).{0,48}"
@@ -72,6 +49,24 @@ def _clip(text: str, limit: int) -> str:
     return f"{cut}…"
 
 
+def _as_bullets(text: str, limit: int = MAX_STATUS) -> str:
+    """Legacy-Name: knapper Fließtext aus Stichpunkten/Zeilen."""
+    raw = str(text or "").strip()
+    if not raw:
+        return ""
+    chunks = re.split(r"[\n\r]+", raw)
+    parts: list[str] = []
+    for chunk in chunks:
+        line = " ".join(chunk.split()).strip()
+        line = _BULLET.sub("", line).strip()
+        if not line:
+            continue
+        if not line.endswith((".", "!", "?")):
+            line = f"{line.rstrip('.,;:· ')}."
+        parts.append(line)
+    return _clip(" ".join(parts), limit)
+
+
 def _fallback_summary(text: str) -> str:
     parts = [p.strip() for p in _SENTENCE.split(text.strip()) if p.strip()]
     first = parts[0] if parts else text.strip()
@@ -79,7 +74,7 @@ def _fallback_summary(text: str) -> str:
 
 
 def _fallback_prose(texts: list[str]) -> str:
-    """Neueste zuerst, dann Vergangenheit. Ein Fliesstext ohne KI."""
+    """Neueste zuerst als knapper Fließtext, ohne KI."""
     seen: list[str] = []
     lowered: set[str] = set()
     for raw in texts:
@@ -89,19 +84,19 @@ def _fallback_prose(texts: list[str]) -> str:
             continue
         seen.append(line.rstrip("."))
         lowered.add(key)
-    return _clip(". ".join(seen) + ("." if seen else ""), MAX_STATUS)
+    return _as_bullets("\n".join(seen[:4]), MAX_STATUS)
 
 
 def _strip_filler(text: str) -> str:
     """Keine Saetze ueber leere Vergangenheit oder 'Projekt gestartet'."""
-    parts = [p.strip() for p in _SENTENCE.split(str(text or "").strip()) if p.strip()]
+    parts = [p.strip() for p in re.split(r"[\n\r]+|(?<=[.!?])\s+", str(text or "").strip()) if p.strip()]
     kept: list[str] = []
     for part in parts:
-        low = part.lower()
-        if _EMPTY_PAST.search(low) or _STARTED_PAD.search(low):
+        clean = _BULLET.sub("", part).strip()
+        if _EMPTY_PAST.search(clean) or _STARTED_PAD.search(clean):
             continue
-        kept.append(part if part[-1] in ".!?" else f"{part}.")
-    return _clip(" ".join(kept), MAX_STATUS)
+        kept.append(clean)
+    return _as_bullets("\n".join(kept), MAX_STATUS)
 
 
 def _sorted_updates(request: Request, *, newest_first: bool = True) -> list:
@@ -179,10 +174,10 @@ def _update_texts(request: Request, *, newest_first: bool = True) -> list[str]:
 
 
 def _fallback_ablauf(request: Request) -> str:
-    """Chronologisch, aeltester zuerst. Ohne KI."""
+    """Neueste Status-Signale als kurzer Text (ohne KI)."""
     parts: list[str] = []
     seen: set[str] = set()
-    for item in _sorted_updates(request, newest_first=False):
+    for item in _sorted_updates(request, newest_first=True):
         body = " ".join(_entry_body(item).split())
         if not body:
             continue
@@ -190,10 +185,13 @@ def _fallback_ablauf(request: Request) -> str:
         if key in seen:
             continue
         seen.add(key)
-        day = _format_day(item.reported_on)
-        chunk = f"{day}: {body.rstrip('.')}" if day else body.rstrip(".")
-        parts.append(chunk)
-    return _clip(". ".join(parts) + ("." if parts else ""), MAX_STATUS)
+        parts.append(body.rstrip("."))
+        if len(parts) >= 3:
+            break
+    if not parts:
+        return ""
+    text = ". ".join(reversed(parts)) + "."
+    return _clip(text, MAX_STATUS)
 
 
 def _digest(tab: str) -> str:
@@ -205,59 +203,20 @@ def list_blurb(values: dict[str, str]) -> str:
 
 
 def summarize(db: Session, request: Request) -> dict:
+    from app.services.stand_summary import refresh_stand
+
     tab = status_tab_text(request, newest_first=False)
     if not tab:
         raise StatusEmpty("Keine Status-Einträge.")
 
-    digest = _digest(tab)
-    values = request.field_values()
-    ablauf = (values.get("status_ablauf") or values.get("current_status") or "").strip()
-    blurb = (values.get("status_summary") or "").strip()
-    if values.get(DIGEST_KEY) == digest and ablauf:
-        return {"ablauf": ablauf, "current_status": ablauf, "summary": blurb, "source": tab, "unchanged": True}
-
-    ablauf = ""
-    blurb = ""
-    try:
-        raw = build_provider().complete_json(
-            SYSTEM,
-            json.dumps(
-                {
-                    "title": request.steckbrief_name or request.title,
-                    "updates": _updates_payload(request),
-                    "status_tab": tab,
-                },
-                ensure_ascii=False,
-            ),
-        )
-        ablauf = _strip_filler(
-            _clip(str(raw.get("ablauf") or raw.get("current_status") or "").strip(), MAX_STATUS)
-        )
-        blurb = _clip(str(raw.get("summary") or "").strip(), MAX_BLURB)
-    except LlmUnavailable:
-        ablauf = ""
-        blurb = ""
+    result = refresh_stand(db, request, llm=True)
+    ablauf = str(result.get("ablauf") or "").strip()
+    blurb = str(result.get("summary") or "").strip()
     texts = _update_texts(request, newest_first=False)
-    if not ablauf:
-        ablauf = _fallback_ablauf(request)
-    if not blurb:
-        newest = next(
-            (
-                str(item.summary or "").strip()
-                for item in _sorted_updates(request, newest_first=True)
-                if str(item.summary or "").strip()
-            ),
-            texts[0] if texts else "",
-        )
-        blurb = _fallback_summary(newest)
-
-    spec = get_rules().spec(parse_kind(request.kind) or RequestKind.CHANGE_REQUEST).field_map()
-    ablauf_label = spec["status_ablauf"].label if "status_ablauf" in spec else "Ablauf"
-    status_label = spec["current_status"].label if "current_status" in spec else "Was gerade los ist"
-    blurb_label = spec["status_summary"].label if "status_summary" in spec else "KI-Zusammenfassung"
-    svc._upsert_field(db, request, "status_ablauf", ablauf_label, ablauf)
-    svc._upsert_field(db, request, "current_status", status_label, ablauf)
-    svc._upsert_field(db, request, "status_summary", blurb_label, blurb)
-    svc._upsert_field(db, request, DIGEST_KEY, "Status-Digest", digest)
-    db.flush()
-    return {"ablauf": ablauf, "current_status": ablauf, "summary": blurb, "source": texts[0]}
+    return {
+        "ablauf": ablauf,
+        "current_status": ablauf,
+        "summary": blurb,
+        "source": texts[0] if texts else tab,
+        "unchanged": bool(result.get("unchanged")),
+    }

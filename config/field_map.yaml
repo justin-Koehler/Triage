@@ -200,6 +200,11 @@ fields:
     label: Kosten
     required: false
     jira_type: number
+  it_costs:
+    jira: customfield_10709
+    label: IT Cost (one time - in €)
+    required: false
+    jira_type: number
   extra_account:
     jira: null
     label: Zusatzkontierung
@@ -223,7 +228,6 @@ fields:
     label: Konzeption PT Plan CIT
     required: false
     jira_type: number
-    kinds: [it_request]
   operate_scs_pt:
     jira: null
     label: Betrieb PT Plan SCS

@@ -40,7 +40,9 @@ class SyncState(StrEnum):
 class OutboxOperation(StrEnum):
     CREATE_ISSUE = "create_issue"
     ADD_COMMENT = "add_comment"
+    DELETE_COMMENT = "delete_comment"
     UPDATE_FIELDS = "update_fields"
+    ADD_ATTACHMENT = "add_attachment"
 
 
 class TriageSource(StrEnum):

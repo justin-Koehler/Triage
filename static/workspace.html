@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>CRITR</title>
-    <link rel="stylesheet" href="/styles.css?v=scos-ci-v1" />
+    <link rel="stylesheet" href="/styles.css?v=list-remind-v1" />
   </head>
   <body class="gated">
     <header class="chrome">
@@ -19,8 +19,9 @@
         <article id="ticket" class="ticket-sheet" hidden aria-label="Change">
           <header class="ticket-head">
             <div class="ticket-head-top">
+              <h2 class="ticket-headline" id="ticket-headline" hidden></h2>
               <p class="ticket-kicker" id="ticket-kind" data-kind="open">Typ offen</p>
-              <div class="ticket-aside">
+              <div class="ticket-aside" hidden>
                 <p class="ticket-jira" id="ticket-jira" hidden>
                   <span class="ticket-jira-label">Ticket</span>
                   <a class="ticket-jira-key" id="ticket-jira-key" target="_blank" rel="noopener"></a>
@@ -31,12 +32,30 @@
                 </p>
               </div>
             </div>
-            <p class="ticket-edit-hint">Jedes Feld kann durch Anklicken bearbeitet werden</p>
-            <h2 class="ticket-headline" id="ticket-headline" hidden></h2>
             <dl class="ticket-meta" id="ticket-meta" hidden></dl>
+            <aside class="comment-stand" id="comment-stand" hidden>
+              <header class="comment-stand-head">
+                <label class="comment-stand-health-wrap">
+                  <span class="visually-hidden">Ampel</span>
+                  <select class="comment-stand-health" id="comment-stand-health" aria-label="Stand-Ampel">
+                    <option value="green">Im Plan</option>
+                    <option value="blue">Im Blick behalten</option>
+                    <option value="yellow">Kritisch</option>
+                    <option value="red">Überzogen</option>
+                    <option value="white">On hold</option>
+                    <option value="done">Done</option>
+                  </select>
+                </label>
+                <p class="comment-stand-meta" id="comment-stand-meta"></p>
+              </header>
+              <p class="comment-ablauf" id="comment-ablauf"></p>
+            </aside>
           </header>
-          <section class="ticket-section" id="ticket-overview" hidden>
-            <h3 class="ticket-section-title">Übersicht</h3>
+          <section class="ticket-section ticket-overview" id="ticket-overview" hidden>
+            <header class="ticket-overview-head">
+              <h3 class="ticket-section-title">Übersicht</h3>
+              <p class="ticket-overview-meta" id="ticket-overview-meta"></p>
+            </header>
             <dl class="ticket-fields ticket-overview-grid" id="ticket-overview-fields"></dl>
             <p class="ticket-section-hint" id="overview-ai-hint" hidden>
               Bitte alles nochmal überprüfen. KI kann Fehler machen.
@@ -45,12 +64,9 @@
           <div class="ticket-split">
             <section class="ticket-section" id="ticket-costs" hidden>
               <h3 class="ticket-section-title">Kosten</h3>
-              <p class="ticket-section-hint">Vorlage öffnen, Aufwand FB eintragen, Fenster schließen.</p>
+              <p class="ticket-section-hint">Vorlage öffnen, Kalkulation ausfüllen, Fenster schließen.</p>
               <div class="effort-sheet" id="effort-sheet">
                 <button type="button" class="btn btn-primary" id="effort-sheet-open">Vorlage öffnen</button>
-                <p class="effort-sheet-link" id="effort-sheet-link" hidden>
-                  <a href="#" target="_blank" rel="noopener"></a>
-                </p>
               </div>
               <dl class="ticket-team ticket-costs" id="ticket-cost-fields"></dl>
             </section>
@@ -60,10 +76,39 @@
             </section>
           </div>
           <section class="ticket-section" id="ticket-files" hidden>
-            <h3 class="ticket-section-title">Anhang</h3>
+            <h3 class="ticket-section-title">Anhänge</h3>
+            <div class="ticket-file-gallery" id="ticket-file-gallery" hidden></div>
             <ul class="ticket-file-list" id="ticket-file-list"></ul>
+            <p class="ticket-file-empty" id="ticket-file-empty" hidden>
+              Noch keine Anhänge aus Jira.
+            </p>
             <button type="button" class="file-add" id="ticket-file-add">Datei hinzufügen</button>
             <input type="file" id="ticket-file-input" hidden multiple />
+          </section>
+          <section class="ticket-comments" id="ticket-comments" hidden>
+            <div class="ticket-comments-head">
+              <h3 class="ticket-section-title">Kommentare</h3>
+              <span class="comment-count" id="comment-count" hidden></span>
+            </div>
+            <ul class="comment-list" id="comment-list"></ul>
+            <form class="comment-form" id="comment-form">
+              <label class="comment-form-label" for="comment-input">Neuer Kommentar</label>
+              <div class="comment-compose">
+                <textarea
+                  id="comment-input"
+                  rows="3"
+                  maxlength="8000"
+                  placeholder="Aktuellen Stand oder Hinweis schreiben…"
+                  aria-label="Neuer Kommentar"
+                ></textarea>
+                <div class="comment-mention" id="comment-mention" hidden></div>
+              </div>
+              <p class="comment-preview" id="comment-preview" hidden></p>
+              <div class="comment-form-actions">
+                <span class="comment-form-hint" id="comment-form-hint" hidden></span>
+                <button type="submit" class="btn btn-primary" id="comment-send">Senden</button>
+              </div>
+            </form>
           </section>
           <button type="button" class="jira-create" id="jira-create" hidden>
             In Jira Anlegen
@@ -86,20 +131,44 @@
       </main>
 
       <section class="hub" id="hub" aria-label="Jira-Tickets">
+        <div class="hub-bar">
+          <label class="search" for="hub-search">
+            <span class="search-icon" aria-hidden="true">/</span>
+            <input
+              type="search"
+              id="hub-search"
+              placeholder="Suche"
+              autocomplete="off"
+              aria-label="Suche"
+            />
+          </label>
+          <div class="hub-view-switch" role="group" aria-label="Ansicht">
+            <button type="button" class="hub-view-btn is-active" id="hub-view-list" data-view="list">
+              Liste
+            </button>
+            <button type="button" class="hub-view-btn" id="hub-view-board" data-view="board">
+              Board
+            </button>
+          </div>
+          <span class="hub-offline" id="hub-offline" hidden>Offline</span>
+        </div>
         <div class="table-wrap" id="table-wrap">
           <table class="grid" id="grid">
             <thead>
               <tr>
                 <th data-sort="title"><button type="button">Change</button></th>
-                <th data-sort="status" class="col-status"><button type="button">Status</button></th>
               </tr>
             </thead>
             <tbody id="rows"></tbody>
           </table>
           <div class="state" id="state" hidden></div>
         </div>
+        <div class="hub-board" id="hub-board" hidden></div>
+        <div class="hub-board-fade" id="hub-board-fade" aria-hidden="true"></div>
+        <p class="hub-board-hint" id="hub-board-hint" hidden>Weiter</p>
         <div class="hub-foot">
           <span class="count" id="count"></span>
+          <span class="hub-sync" id="hub-sync" hidden></span>
         </div>
       </section>
 
@@ -130,6 +199,11 @@
                 placeholder="Titel Change"
                 aria-label="Titel Change"
               ></textarea>
+            </div>
+            <div class="composer-bar">
+              <button type="button" class="ai-enhance" id="ai-enhance" hidden>
+                mit KI aufwerten
+              </button>
               <button type="submit" id="send" class="send" aria-label="Senden">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path
@@ -142,18 +216,26 @@
                 </svg>
               </button>
             </div>
-            <button type="button" class="ai-enhance" id="ai-enhance" hidden>
-              mit KI aufwerten
-            </button>
           </form>
         </div>
       </footer>
     </div>
 
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="toast" id="toast" role="status" aria-live="polite">
+      <span class="toast-msg" id="toast-msg"></span>
+      <button type="button" class="toast-action" id="toast-action" hidden>Rückgängig</button>
+    </div>
 
-    <script src="/auth.js?v=login-v2"></script>
-    <script src="/app.js?v=cost-savings-v1"></script>
-    <script src="/workspace.js?v=cost-savings-v1"></script>
+    <div class="file-lightbox" id="file-lightbox" hidden>
+      <button type="button" class="file-lightbox-close" id="file-lightbox-close" aria-label="Schließen">
+        ×
+      </button>
+      <img id="file-lightbox-img" alt="" />
+      <p class="file-lightbox-caption" id="file-lightbox-caption"></p>
+    </div>
+
+    <script src="/auth.js?v=account-menu-v1"></script>
+    <script src="/app.js?v=input-grow-v1"></script>
+    <script src="/workspace.js?v=list-remind-v1"></script>
   </body>
 </html>

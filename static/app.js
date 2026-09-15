@@ -72,10 +72,12 @@
   }
 
   function resizeInput() {
-    input.style.height = "auto";
-    const floor = stepLong() ? 88 : 40;
-    const cap = stepLong() ? 220 : 180;
-    const next = Math.min(Math.max(input.scrollHeight || floor, floor), cap);
+    if (!input || form.classList.contains("hidden")) return;
+    input.style.height = "0px";
+    const long = stepLong();
+    const floor = long ? 76 : 44;
+    const cap = long ? 280 : 168;
+    const next = Math.min(Math.max(input.scrollHeight, floor), cap);
     input.style.height = `${next}px`;
   }
 
@@ -551,6 +553,7 @@
       }
       syncEnhance(step);
       void refreshJiraSuggest();
+      requestAnimationFrame(resizeInput);
       return;
     }
     renderChoices(step);
@@ -564,6 +567,7 @@
     ) {
       void refreshJiraSuggest();
     }
+    requestAnimationFrame(resizeInput);
   }
 
   function flyFrom(origin, text, anchor, onDone) {

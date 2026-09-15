@@ -73,6 +73,8 @@ class Settings(BaseSettings):
 
     outbox_max_attempts: int = 6
     outbox_poll_seconds: int = 3
+    comment_sync_seconds: int = 300
+    jira_webhook_secret: str = ""
 
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-5"

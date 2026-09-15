@@ -5,7 +5,7 @@ import io
 from datetime import UTC, datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -21,6 +21,67 @@ from app.services.ticket_chat import TicketChatService
 from app.triage.providers import build_provider_from_runtime
 
 router = APIRouter(prefix="/api/requests", tags=["requests"])
+
+
+def _sync_request_later(request_id: str) -> None:
+    import logging
+
+    from app.db import SessionLocal
+    from app.ports import build_ticket_port
+    from app.sync.outbox import process_request
+
+    log = logging.getLogger("triage.sync")
+    with SessionLocal() as session:
+        try:
+            stats = process_request(session, build_ticket_port(), request_id)
+            session.commit()
+            if any(stats.values()):
+                log.info("comment sync %s %s", request_id[:8], stats)
+        except Exception:
+            session.rollback()
+            log.exception("comment sync fehlgeschlagen %s", request_id)
+
+
+def _stand_later(request_id: str, expect_comment_id: str | None = None) -> None:
+    """Stand-Briefing nach Commit — nie im Request-Pfad (LLM blockiert sonst)."""
+    import logging
+    import time
+
+    from app.db import SessionLocal
+    from app.services.stand_summary import refresh_stand
+
+    log = logging.getLogger("triage.stand")
+    for attempt in range(6):
+        with SessionLocal() as session:
+            try:
+                request = svc.get_request(session, request_id)
+                if not request:
+                    return
+                # Frische Kommentare aus der DB — nicht die ggf. stale Collection
+                from sqlalchemy import select
+
+                from app.models import Comment
+
+                rows = list(
+                    session.scalars(select(Comment).where(Comment.request_id == request_id)).all()
+                )
+                request.comments = rows
+                if expect_comment_id and not any(c.id == expect_comment_id for c in rows):
+                    session.rollback()
+                    time.sleep(0.12 * (attempt + 1))
+                    continue
+                refresh_stand(session, request, llm=True)
+                session.commit()
+                return
+            except Exception:
+                session.rollback()
+                log.exception("stand refresh fehlgeschlagen %s", request_id[:8])
+                return
+    log.warning(
+        "stand refresh: Kommentar %s noch nicht sichtbar für %s",
+        (expect_comment_id or "")[:8],
+        request_id[:8],
+    )
 
 
 def get_ticket_chat(db: Session = Depends(get_db)) -> TicketChatService:
@@ -158,6 +219,7 @@ def post_ticket_chat(
 def patch_request(
     request_id: str,
     payload: RequestPatch,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _user: User = Depends(required_user),
 ) -> dict:
@@ -168,6 +230,8 @@ def patch_request(
     if not changes:
         return svc.to_detail(request)
     updated = svc.update_request(db, request, changes)
+    if any(k in changes for k in ("change_lead", "status", "priority")):
+        background_tasks.add_task(_sync_request_later, request_id)
     return svc.to_detail(updated)
 
 
@@ -204,19 +268,188 @@ def delete_request(
 def post_comment(
     request_id: str,
     payload: CommentIn,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(required_user),
 ) -> dict:
+    from app.services.stand_summary import refresh_stand
+
     request = svc.get_request(db, request_id)
     if not request:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Anliegen unbekannt")
     comment = svc.add_comment(db, request, payload.body, user)
+    # Sofort Fallback inkl. neuem Kommentar; LLM danach im Hintergrund
+    stand = refresh_stand(db, request, llm=False)
+    # Vor Background committen — sonst sieht _stand_later den Kommentar nicht
+    db.commit()
+    background_tasks.add_task(_sync_request_later, request_id)
+    background_tasks.add_task(_stand_later, request_id, comment.id)
     return {
         "id": comment.id,
         "author": comment.author_name,
         "body": comment.body,
         "createdAt": comment.created_at.isoformat(),
+        "commentAblauf": (stand.get("brief") or "").strip(),
+        "commentSummary": (stand.get("line") or "").strip(),
+        "standPending": True,
     }
+
+
+@router.delete("/{request_id}/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_comment(
+    request_id: str,
+    comment_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: User = Depends(required_user),
+) -> Response:
+    from app.api.jira_lookup import _inbox_port, _user_jira_credentials
+    from app.ports.ticket_port import TicketPortError
+
+    request = svc.get_request(db, request_id)
+    if not request:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Anliegen unbekannt")
+    comment = next((c for c in (request.comments or []) if c.id == comment_id), None)
+    external_id = str(comment.external_id or "").strip() if comment else ""
+    jira_key = next(
+        (
+            str(r.external_key or "").strip()
+            for r in (request.external_refs or [])
+            if str(r.external_key or "").strip()
+        ),
+        "",
+    )
+    if not svc.delete_comment(db, request, comment_id, user_id=user.id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Kommentar unbekannt")
+    # Sofort in Jira löschen, damit Sync den Kommentar nicht zurückholt
+    if external_id and jira_key:
+        token, email = _user_jira_credentials(db, user)
+        try:
+            _inbox_port(db).delete_comment(
+                jira_key,
+                external_id,
+                user_token=token,
+                user_email=email,
+            )
+        except TicketPortError:
+            # Outbox retry übernimmt
+            pass
+        except Exception:
+            pass
+    db.commit()
+    background_tasks.add_task(_sync_request_later, request_id)
+    background_tasks.add_task(_stand_later, request_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{request_id}/attachments")
+async def post_attachment(
+    request_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(required_user),
+) -> dict:
+    from app.api.jira_lookup import _inbox_port
+    from app.ports.ticket_port import TicketPortError
+    from app.services.jira_inbox import upload_attachment
+
+    request = svc.get_request(db, request_id)
+    if not request:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Anliegen unbekannt")
+    raw = await file.read()
+    try:
+        att = upload_attachment(
+            db,
+            _inbox_port(db),
+            request,
+            filename=file.filename or "anhang",
+            content=raw,
+            content_type=file.content_type or "application/octet-stream",
+            user=user,
+        )
+        db.commit()
+    except TicketPortError as err:
+        db.rollback()
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(err)) from err
+    except Exception as err:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, f"Upload fehlgeschlagen: {err}"
+        ) from err
+    return {
+        "id": att.id,
+        "externalId": att.external_id,
+        "filename": att.filename,
+        "contentType": att.content_type or "",
+        "size": int(att.size_bytes or 0),
+        "author": att.author_name or "",
+        "createdAt": att.created_at.isoformat() if att.created_at else "",
+        "source": "jira" if att.external_id else "local",
+    }
+
+
+@router.get("/{request_id}/attachments/{attachment_id}/content")
+def get_attachment_content(
+    request_id: str,
+    attachment_id: str,
+    thumb: bool = Query(default=False),
+    db: Session = Depends(get_db),
+    user: User = Depends(required_user),
+) -> Response:
+    from urllib.parse import quote
+
+    from app.api.jira_lookup import _inbox_port, _user_jira_credentials
+    from app.models import RequestAttachment
+    from app.ports.ticket_port import TicketPortError
+
+    request = svc.get_request(db, request_id)
+    if not request:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Anliegen unbekannt")
+    att = next((a for a in (request.attachments or []) if a.id == attachment_id), None)
+    if not att:
+        # Fallback: frisch laden
+        att = db.get(RequestAttachment, attachment_id)
+        if not att or att.request_id != request_id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Anhang unbekannt")
+    external_id = str(att.external_id or "").strip()
+    if not external_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Kein Jira-Anhang")
+    token, email = _user_jira_credentials(db, user)
+    try:
+        content, filename, content_type = _inbox_port(db).download_attachment(
+            external_id,
+            user_token=token,
+            user_email=email,
+            thumbnail=bool(thumb),
+        )
+    except TicketPortError as err:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(err)) from err
+    name = filename or att.filename or "anhang"
+    safe = quote(name)
+    media = (content_type or att.content_type or "").strip() or "application/octet-stream"
+    # Bildvorschau im Browser: nie als Download erzwingen
+    if media.startswith("image/") or str(att.filename or "").lower().endswith(
+        (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg")
+    ):
+        if not media.startswith("image/"):
+            ext = str(att.filename or name).rsplit(".", 1)[-1].lower()
+            media = {
+                "png": "image/png",
+                "jpg": "image/jpeg",
+                "jpeg": "image/jpeg",
+                "gif": "image/gif",
+                "webp": "image/webp",
+                "svg": "image/svg+xml",
+            }.get(ext, "image/png")
+    return Response(
+        content=content,
+        media_type=media,
+        headers={
+            "Content-Disposition": f"inline; filename*=UTF-8''{safe}",
+            "Cache-Control": "private, max-age=300",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.post("/{request_id}/status-summary")

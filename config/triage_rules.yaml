@@ -270,6 +270,13 @@ common_fields:
     type: money
     group: kalkulation
     fill: workspace
+  - key: it_costs
+    label: IT Kosten
+    question: ""
+    hard: false
+    type: money
+    group: kalkulation
+    fill: workspace
   - key: cost_savings
     label: Kostenersparnis
     question: Welche Kostenersparnis erwartest du?
@@ -437,7 +444,6 @@ kinds:
       - concept_scs_pt
       - concept_scs_pt_detail
       - concept_scs_material
-      - concept_cit_pt
       - concept_cit_pt_detail
       - concept_cit_material
       - concept_cit_released_pt

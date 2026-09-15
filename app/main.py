@@ -75,6 +75,33 @@ async def _outbox_loop(stop: asyncio.Event) -> None:
             continue
 
 
+async def _comment_sync_loop(stop: asyncio.Event) -> None:
+    settings = get_settings()
+    # erster Lauf etwas verzögert
+    try:
+        await asyncio.wait_for(stop.wait(), timeout=45)
+        return
+    except TimeoutError:
+        pass
+    while not stop.is_set():
+        try:
+            get_ticket_port.cache_clear()
+            port = get_ticket_port()
+            from app.services.jira_inbox import sync_comments_batch
+
+            with SessionLocal() as db:
+                stats = sync_comments_batch(db, port, limit=20)
+                db.commit()
+                if stats.get("updated") or stats.get("failed"):
+                    log.info("comment-sync %s", stats)
+        except Exception:
+            log.exception("comment-sync fehlgeschlagen")
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=max(60, settings.comment_sync_seconds))
+        except TimeoutError:
+            continue
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Models registrieren
@@ -84,19 +111,21 @@ async def lifespan(app: FastAPI):
     # SQLite: create_all für lokale Dev/Tests. Postgres: Schema kommt von Alembic.
     if settings.is_sqlite:
         Base.metadata.create_all(bind=engine)
-        ensure_columns(engine)
+    ensure_columns(engine)
     ensure_default_actor(engine)
     stop = asyncio.Event()
-    task = asyncio.create_task(_outbox_loop(stop))
+    outbox_task = asyncio.create_task(_outbox_loop(stop))
+    comment_task = asyncio.create_task(_comment_sync_loop(stop))
     log.info("CRITR ready (%s)", settings.llm_label)
     try:
         yield
     finally:
         stop.set()
-        try:
-            await asyncio.wait_for(task, timeout=25)
-        except (TimeoutError, asyncio.CancelledError):
-            task.cancel()
+        for task in (outbox_task, comment_task):
+            try:
+                await asyncio.wait_for(task, timeout=25)
+            except (TimeoutError, asyncio.CancelledError):
+                task.cancel()
 
 
 app = FastAPI(title="CRITR", lifespan=lifespan)
@@ -119,6 +148,8 @@ def _is_public(path: str) -> bool:
     if path in _PUBLIC_EXACT:
         return True
     if path.startswith("/api/auth/cidaas"):
+        return True
+    if path.startswith("/api/jira/hooks/"):
         return True
     if path.startswith("/aufwand/"):
         return True

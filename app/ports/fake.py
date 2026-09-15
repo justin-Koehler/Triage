@@ -47,15 +47,164 @@ class FakeTicketSystem:
             db.commit()
         return ExternalIssueRef(key=key, url=f"/external/{key}")
 
-    def add_comment(self, key: str, body: str, author: str) -> None:
+    def add_attachment(
+        self,
+        key: str,
+        filename: str,
+        content: bytes,
+        content_type: str = "text/csv",
+        *,
+        user_token: str | None = None,
+        user_email: str | None = None,
+        replace_same_name: bool = True,
+        strip_kalk: bool = True,
+    ) -> list[dict[str, Any]]:
         with self._session_factory() as db:
             issue = db.get(FakeExternalIssue, key)
             if not issue:
                 raise TicketPortError(f"unbekannter Key {key}")
+            skip = {(filename or "").strip().lower()} if replace_same_name else set()
+            if strip_kalk:
+                skip.update({"kalkulation.xlsx", "kalkulation.csv"})
+            files = []
+            for item in list(issue.fields.get("attachments") or []):
+                low = str(item.get("filename") or "").strip().lower()
+                if low in skip:
+                    continue
+                if strip_kalk and (
+                    low.endswith("-kalkulation.xlsx") or low.endswith("-kalkulation.csv")
+                ):
+                    continue
+                files.append(item)
+            aid = f"a-{len(files) + 1}-{len(content or b'')}"
+            row = {
+                "id": aid,
+                "filename": filename,
+                "contentType": content_type,
+                "mimeType": content_type,
+                "size": len(content or b""),
+                "author": "fake",
+                "created": datetime.now(UTC).isoformat(),
+                "content": bytes(content or b""),
+            }
+            files.append(row)
+            issue.fields = dict(issue.fields) | {"attachments": files}
+            db.commit()
+            return [
+                {
+                    "id": aid,
+                    "filename": filename,
+                    "mimeType": content_type,
+                    "size": len(content or b""),
+                    "author": "fake",
+                    "created": row["created"],
+                }
+            ]
+
+    def add_comment(self, key: str, body: str, author: str) -> str | None:
+        with self._session_factory() as db:
+            issue = db.get(FakeExternalIssue, key)
+            if not issue:
+                raise TicketPortError(f"unbekannter Key {key}")
+            comment_id = f"c-{len(issue.comments) + 1}"
             issue.comments = [
                 *issue.comments,
-                {"author": author, "body": body, "created": datetime.now(UTC).isoformat()},
+                {
+                    "id": comment_id,
+                    "author": author,
+                    "body": body,
+                    "created": datetime.now(UTC).isoformat(),
+                },
             ]
+            db.commit()
+            return comment_id
+
+    def list_comments(
+        self,
+        key: str,
+        *,
+        user_token: str | None = None,
+        user_email: str | None = None,
+    ) -> list[dict[str, Any]]:
+        with self._session_factory() as db:
+            issue = db.get(FakeExternalIssue, (key or "").strip().upper())
+            if not issue:
+                return []
+            return [
+                {
+                    "id": str(c.get("id") or ""),
+                    "author": str(c.get("author") or ""),
+                    "body": str(c.get("body") or ""),
+                    "created": str(c.get("created") or ""),
+                }
+                for c in (issue.comments or [])
+                if str(c.get("id") or "").strip()
+            ]
+
+    def list_attachments(
+        self,
+        key: str,
+        *,
+        user_token: str | None = None,
+        user_email: str | None = None,
+    ) -> list[dict[str, Any]]:
+        with self._session_factory() as db:
+            issue = db.get(FakeExternalIssue, (key or "").strip().upper())
+            if not issue:
+                return []
+            files = list((issue.fields or {}).get("attachments") or [])
+            return [
+                {
+                    "id": str(f.get("id") or ""),
+                    "filename": str(f.get("filename") or f.get("name") or "anhang"),
+                    "mimeType": str(f.get("mimeType") or f.get("contentType") or ""),
+                    "size": int(f.get("size") or 0),
+                    "author": str(f.get("author") or ""),
+                    "created": str(f.get("created") or ""),
+                    "content": f.get("content") or b"",
+                }
+                for f in files
+                if str(f.get("id") or "").strip()
+            ]
+
+    def download_attachment(
+        self,
+        attachment_id: str,
+        *,
+        user_token: str | None = None,
+        user_email: str | None = None,
+        thumbnail: bool = False,
+    ) -> tuple[bytes, str, str]:
+        aid = str(attachment_id or "").strip()
+        with self._session_factory() as db:
+            rows = db.scalars(select(FakeExternalIssue)).all()
+            for issue in rows:
+                for f in list((issue.fields or {}).get("attachments") or []):
+                    if str(f.get("id") or "") != aid:
+                        continue
+                    raw = f.get("content")
+                    data = raw if isinstance(raw, (bytes, bytearray)) else b""
+                    name = str(f.get("filename") or f.get("name") or "anhang")
+                    ctype = str(f.get("mimeType") or f.get("contentType") or "application/octet-stream")
+                    if thumbnail:
+                        return bytes(data[:200] or b"thumb"), f"thumb-{name}", "image/png"
+                    return bytes(data), name, ctype
+        raise TicketPortError(f"Anhang {aid} unbekannt")
+
+    def delete_comment(
+        self,
+        key: str,
+        comment_id: str,
+        *,
+        user_token: str | None = None,
+        user_email: str | None = None,
+    ) -> None:
+        with self._session_factory() as db:
+            issue = db.get(FakeExternalIssue, key)
+            if not issue:
+                raise TicketPortError(f"unbekannter Key {key}")
+            cid = str(comment_id or "").strip()
+            issue.comments = [c for c in issue.comments if str(c.get("id") or "") != cid]
             db.commit()
 
     def update_fields(

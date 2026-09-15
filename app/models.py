@@ -148,6 +148,11 @@ class Request(Base, TimestampMixin):
     comments: Mapped[list[Comment]] = relationship(
         back_populates="request", cascade="all, delete-orphan", order_by="Comment.created_at"
     )
+    attachments: Mapped[list[RequestAttachment]] = relationship(
+        back_populates="request",
+        cascade="all, delete-orphan",
+        order_by="RequestAttachment.created_at",
+    )
     external_refs: Mapped[list[ExternalRef]] = relationship(
         back_populates="request", cascade="all, delete-orphan"
     )
@@ -221,9 +226,32 @@ class Comment(Base):
     author_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     author_name: Mapped[str] = mapped_column(String(120), default="unbekannt")
     body: Mapped[str] = mapped_column(Text)
+    external_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     request: Mapped[Request] = relationship(back_populates="comments")
+
+
+class RequestAttachment(Base):
+    """Anhang aus Jira (Metadaten). Inhalt wird bei Bedarf live geholt."""
+
+    __tablename__ = "request_attachments"
+    __table_args__ = (
+        UniqueConstraint("request_id", "external_id", name="uq_request_attachment_ext"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    request_id: Mapped[str] = mapped_column(
+        ForeignKey("requests.id", ondelete="CASCADE"), index=True
+    )
+    external_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    filename: Mapped[str] = mapped_column(String(255))
+    content_type: Mapped[str] = mapped_column(String(120), default="")
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0)
+    author_name: Mapped[str] = mapped_column(String(120), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    request: Mapped[Request] = relationship(back_populates="attachments")
 
 
 class ExternalRef(Base):

@@ -37,6 +37,8 @@ services:
     depends_on:
       app:
         condition: service_healthy
+      ki-buddy:
+        condition: service_started
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -46,6 +48,37 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+
+  ki-buddy:
+    build:
+      context: ./ki-buddy
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - deploy/compose.env
+    environment:
+      QWEN_BASE_URL: ${QWEN_BASE_URL:-https://llm.stackit.rocks/v1}
+      QWEN_API_KEY: ${QWEN_API_KEY:-}
+      QWEN_MODEL: ${QWEN_MODEL:-qwen3.6-27b}
+      QWEN_TIMEOUT_MS: ${QWEN_TIMEOUT_MS:-180000}
+    networks:
+      - proxy_network
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/ki-buddy').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
 
   app:
     image: critr:${IMAGE_TAG:-local}

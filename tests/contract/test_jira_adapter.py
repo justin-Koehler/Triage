@@ -370,13 +370,15 @@ def test_create_skips_kind_and_create_false_fields(runtime, monkeypatch):
                 "responsible_sit": "Alice",
                 "change_team": "Team A",
                 "concept_cit_pt": "3",
+                "it_costs": "24181,79",
             }
         )
     )
     fields = captured["json"]["fields"]
     assert "customfield_17203" not in fields
     assert "customfield_19652" not in fields
-    assert "customfield_17200" not in fields
+    assert fields.get("customfield_17200") == 3
+    assert fields.get("customfield_10709") == 24181.79
     desc = json.dumps(fields["description"])
     assert "Ist die verantwortliche Person aus der IT" in desc or "Alice" in desc
 
@@ -428,3 +430,38 @@ def test_create_issue_sends_effort_sheet_url(runtime, monkeypatch):
     )
     fields = captured["json"]["fields"]
     assert fields["customfield_99901"] == "https://docs.google.com/spreadsheets/d/abc/edit"
+
+
+def test_add_attachment_replaces_previous_kalkulation(runtime, monkeypatch):
+    calls: list[tuple[str, str]] = []
+
+    def fake_request(self, method, path, **kwargs):
+        calls.append((method, path))
+        request = httpx.Request(method, "https://example.atlassian.net" + path)
+        if method == "GET":
+            return httpx.Response(
+                200,
+                json={
+                    "fields": {
+                        "attachment": [
+                            {"id": "11", "filename": "TRI-1-kalkulation.xlsx"},
+                            {"id": "12", "filename": "notes.pdf"},
+                        ]
+                    }
+                },
+                request=request,
+            )
+        if method == "DELETE":
+            return httpx.Response(204, request=request)
+        return httpx.Response(200, json=[], request=request)
+
+    monkeypatch.setattr(JiraRestV3, "_request", fake_request)
+    JiraRestV3(runtime=runtime).add_attachment(
+        "TRI-1",
+        "TRI-1-kalkulation.xlsx",
+        b"xlsx",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    assert ("DELETE", "/rest/api/3/attachment/11") in calls
+    assert ("DELETE", "/rest/api/3/attachment/12") not in calls
+    assert ("POST", "/rest/api/3/issue/TRI-1/attachments") in calls

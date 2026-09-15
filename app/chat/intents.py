@@ -169,6 +169,13 @@ RAG_WORDS = {
     "amber": "yellow",
     "rot": "red",
     "red": "red",
+    "blau": "blue",
+    "blue": "blue",
+    "weiss": "white",
+    "weiß": "white",
+    "white": "white",
+    "hold": "white",
+    "onhold": "white",
 }
 
 SETTABLE_STATUS = {

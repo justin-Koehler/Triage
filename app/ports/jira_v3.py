@@ -211,6 +211,14 @@ def _format_jira_field_value(
     return raw
 
 
+def _is_kalk_filename(name: str) -> bool:
+    low = (name or "").strip().lower()
+    return low.endswith("-kalkulation.xlsx") or low.endswith("-kalkulation.csv") or low in {
+        "kalkulation.xlsx",
+        "kalkulation.csv",
+    }
+
+
 def _rejected_field_ids(body: str) -> list[str]:
     """Field-IDs aus Jira-400 (Screen/unknown/Option ungültig)."""
     raw = (body or "").strip()
@@ -357,11 +365,17 @@ class JiraRestV3:
                 if not name or name.lower() in seen:
                     continue
                 seen.add(name.lower())
+                avatars = row.get("avatarUrls") if isinstance(row.get("avatarUrls"), dict) else {}
+                avatar = (
+                    str(avatars.get("48x48") or avatars.get("32x32") or avatars.get("24x24") or "")
+                    .strip()
+                )
                 out.append(
                     {
                         "name": name,
                         "displayName": str(row.get("displayName") or name).strip(),
                         "emailAddress": str(row.get("emailAddress") or "").strip(),
+                        "avatarUrl": avatar,
                     }
                 )
                 added += 1
@@ -722,6 +736,12 @@ class JiraRestV3:
             return f"/issue{suffix}"
         return f"/rest/api/3/issue{suffix}"
 
+    def _attachment_path(self, attachment_id: str) -> str:
+        aid = str(attachment_id or "").strip()
+        if self._rest_root():
+            return f"/attachment/{aid}"
+        return f"/rest/api/3/attachment/{aid}"
+
     def _request(
         self,
         method: str,
@@ -734,14 +754,15 @@ class JiraRestV3:
         headers.setdefault("accept", "*/*")
         extra, auth = jira_auth(self._runtime, user_token=user_token, user_email=user_email)
         headers.update(extra)
+        url = path if str(path).startswith("http://") or str(path).startswith("https://") else self._url(path)
         try:
             response = httpx.request(
                 method,
-                self._url(path),
+                url,
                 auth=auth,
-                timeout=30,
+                timeout=60,
                 headers=headers,
-                follow_redirects=False,
+                follow_redirects=bool(kwargs.pop("follow_redirects", False)),
                 trust_env=False,
                 **kwargs,
             )
@@ -925,13 +946,342 @@ class JiraRestV3:
             return f"https://jira.schwarz/browse/{key}"
         return f"{base}/browse/{key}"
 
-    def add_comment(self, key: str, body: str, author: str) -> None:
+    def add_comment(self, key: str, body: str, author: str) -> str | None:
         text = f"{author}: {body}" if author else body
-        self._request(
+        response = self._request(
             "POST",
             self._issue_path(f"/{key}/comment"),
             json={"body": self._comment_body(text)},
         )
+        if not response.content:
+            return None
+        try:
+            data = response.json()
+        except Exception:
+            return None
+        if isinstance(data, dict) and data.get("id") is not None:
+            return str(data["id"])
+        return None
+
+    def list_comments(
+        self,
+        key: str,
+        *,
+        user_token: str | None = None,
+        user_email: str | None = None,
+    ) -> list[dict[str, Any]]:
+        issue_key = (key or "").strip()
+        if not issue_key:
+            return []
+        out: list[dict[str, Any]] = []
+        start = 0
+        page = 50
+        while True:
+            response = self._request(
+                "GET",
+                self._issue_path(f"/{issue_key}/comment"),
+                params={"startAt": start, "maxResults": page},
+                user_token=user_token,
+                user_email=user_email,
+            )
+            data = _parse_json(response)
+            rows = data.get("comments") if isinstance(data, dict) else None
+            if not isinstance(rows, list):
+                rows = data if isinstance(data, list) else []
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                cid = str(row.get("id") or "").strip()
+                if not cid:
+                    continue
+                author_raw = row.get("author") or {}
+                author = ""
+                if isinstance(author_raw, dict):
+                    author = str(
+                        author_raw.get("displayName")
+                        or author_raw.get("name")
+                        or author_raw.get("emailAddress")
+                        or ""
+                    ).strip()
+                elif author_raw:
+                    author = str(author_raw).strip()
+                out.append(
+                    {
+                        "id": cid,
+                        "author": author,
+                        "body": adf_to_text(row.get("body")),
+                        "created": str(row.get("created") or "").strip(),
+                    }
+                )
+            total = int(data.get("total") or 0) if isinstance(data, dict) else len(rows)
+            start += len(rows)
+            if not rows or start >= total or len(rows) < page:
+                break
+            if start > 500:
+                break
+        return out
+
+    def delete_comment(
+        self,
+        key: str,
+        comment_id: str,
+        *,
+        user_token: str | None = None,
+        user_email: str | None = None,
+    ) -> None:
+        cid = str(comment_id or "").strip()
+        if not cid:
+            raise TicketPortError("Jira-Kommentar-ID fehlt")
+        try:
+            self._request(
+                "DELETE",
+                self._issue_path(f"/{key}/comment/{cid}"),
+                user_token=user_token,
+                user_email=user_email,
+            )
+        except TicketPortError as err:
+            # Bereits weg = Erfolg (Doppel-Delete / Race mit Sync)
+            if "404" in str(err):
+                return
+            raise
+
+    def list_attachments(
+        self,
+        key: str,
+        *,
+        user_token: str | None = None,
+        user_email: str | None = None,
+    ) -> list[dict[str, Any]]:
+        issue_key = (key or "").strip()
+        if not issue_key:
+            return []
+        try:
+            response = self._request(
+                "GET",
+                self._issue_path(f"/{issue_key}"),
+                params={"fields": "attachment"},
+                user_token=user_token,
+                user_email=user_email,
+            )
+        except TicketPortError:
+            return []
+        data = _parse_json(response)
+        files = ((data.get("fields") or {}).get("attachment")) or []
+        out: list[dict[str, Any]] = []
+        for row in files:
+            if not isinstance(row, dict):
+                continue
+            aid = str(row.get("id") or "").strip()
+            if not aid:
+                continue
+            author_raw = row.get("author") or {}
+            author = ""
+            if isinstance(author_raw, dict):
+                author = str(
+                    author_raw.get("displayName")
+                    or author_raw.get("name")
+                    or author_raw.get("emailAddress")
+                    or ""
+                ).strip()
+            out.append(
+                {
+                    "id": aid,
+                    "filename": str(row.get("filename") or "anhang").strip() or "anhang",
+                    "mimeType": str(row.get("mimeType") or "").strip(),
+                    "size": int(row.get("size") or 0),
+                    "author": author,
+                    "created": str(row.get("created") or "").strip(),
+                }
+            )
+        return out
+
+    def download_attachment(
+        self,
+        attachment_id: str,
+        *,
+        user_token: str | None = None,
+        user_email: str | None = None,
+        thumbnail: bool = False,
+    ) -> tuple[bytes, str, str]:
+        aid = str(attachment_id or "").strip()
+        if not aid:
+            raise TicketPortError("Anhang-ID fehlt")
+        meta_name = "anhang"
+        meta_type = "application/octet-stream"
+        meta: dict[str, Any] = {}
+        try:
+            meta = _parse_json(
+                self._request(
+                    "GET",
+                    self._attachment_path(aid),
+                    user_token=user_token,
+                    user_email=user_email,
+                )
+            )
+            if not isinstance(meta, dict):
+                meta = {}
+            meta_name = str(meta.get("filename") or meta_name).strip() or meta_name
+            meta_type = str(meta.get("mimeType") or meta_type).strip() or meta_type
+        except TicketPortError:
+            meta = {}
+
+        content_url = ""
+        if thumbnail:
+            content_url = str(meta.get("thumbnail") or "").strip()
+            if content_url:
+                meta_name = f"thumb-{meta_name}"
+                meta_type = "image/png"
+        if not content_url:
+            content_url = str(meta.get("content") or "").strip()
+
+        if content_url.startswith("http://") or content_url.startswith("https://"):
+            response = self._request(
+                "GET",
+                content_url,
+                user_token=user_token,
+                user_email=user_email,
+                follow_redirects=True,
+            )
+        else:
+            # Fallback: REST-Content-Pfad (Cloud / ältere Gateways)
+            content_path = (
+                f"/attachment/{aid}/content"
+                if self._rest_root()
+                else f"/rest/api/3/attachment/content/{aid}"
+            )
+            try:
+                response = self._request(
+                    "GET",
+                    content_path,
+                    user_token=user_token,
+                    user_email=user_email,
+                    follow_redirects=True,
+                )
+            except TicketPortError:
+                # Letzter Versuch: /secure/attachment/{id} relativ zur Base
+                base = (self._runtime.jira_base_url or "").rstrip("/")
+                if not base:
+                    raise
+                response = self._request(
+                    "GET",
+                    f"{base}/secure/attachment/{aid}",
+                    user_token=user_token,
+                    user_email=user_email,
+                    follow_redirects=True,
+                )
+
+        ctype = (
+            str(response.headers.get("content-type") or "").split(";")[0].strip()
+            or meta_type
+        )
+        return response.content or b"", meta_name, ctype
+
+    def add_attachment(
+        self,
+        key: str,
+        filename: str,
+        content: bytes,
+        content_type: str = "text/csv",
+        *,
+        user_token: str | None = None,
+        user_email: str | None = None,
+        replace_same_name: bool = True,
+        strip_kalk: bool = True,
+    ) -> list[dict[str, Any]]:
+        name = (filename or "kalkulation.csv").strip() or "kalkulation.csv"
+        if replace_same_name or strip_kalk:
+            self._remove_kalk_attachments(
+                key,
+                name,
+                user_token=user_token,
+                user_email=user_email,
+                replace_same_name=replace_same_name,
+                strip_kalk=strip_kalk,
+            )
+        response = self._request(
+            "POST",
+            self._issue_path(f"/{key}/attachments"),
+            headers={"X-Atlassian-Token": "no-check"},
+            files={"file": (name, content or b"", content_type or "text/csv")},
+            user_token=user_token,
+            user_email=user_email,
+        )
+        try:
+            data = response.json() if response.content else []
+        except ValueError as err:
+            raise TicketPortError("Jira: keine JSON-Antwort beim Anhang-Upload") from err
+        rows = data if isinstance(data, list) else [data] if isinstance(data, dict) else []
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            aid = str(row.get("id") or "").strip()
+            if not aid:
+                continue
+            author_raw = row.get("author") or {}
+            author = ""
+            if isinstance(author_raw, dict):
+                author = str(
+                    author_raw.get("displayName")
+                    or author_raw.get("name")
+                    or author_raw.get("emailAddress")
+                    or ""
+                ).strip()
+            out.append(
+                {
+                    "id": aid,
+                    "filename": str(row.get("filename") or name).strip() or name,
+                    "mimeType": str(row.get("mimeType") or content_type or "").strip(),
+                    "size": int(row.get("size") or len(content or b"") or 0),
+                    "author": author,
+                    "created": str(row.get("created") or "").strip(),
+                }
+            )
+        return out
+
+    def _remove_kalk_attachments(
+        self,
+        key: str,
+        incoming: str,
+        *,
+        user_token: str | None = None,
+        user_email: str | None = None,
+        replace_same_name: bool = True,
+        strip_kalk: bool = True,
+    ) -> None:
+        try:
+            response = self._request(
+                "GET",
+                self._issue_path(f"/{key}"),
+                params={"fields": "attachment"},
+                user_token=user_token,
+                user_email=user_email,
+            )
+        except TicketPortError:
+            return
+        files = ((_parse_json(response).get("fields") or {}).get("attachment")) or []
+        incoming_l = incoming.strip().lower()
+        for item in files:
+            if not isinstance(item, dict):
+                continue
+            fname = str(item.get("filename") or "").strip()
+            low = fname.lower()
+            same = replace_same_name and low == incoming_l
+            kalk = strip_kalk and _is_kalk_filename(low)
+            if not same and not kalk:
+                continue
+            aid = str(item.get("id") or "").strip()
+            if not aid:
+                continue
+            try:
+                self._request(
+                    "DELETE",
+                    self._attachment_path(aid),
+                    user_token=user_token,
+                    user_email=user_email,
+                )
+            except TicketPortError:
+                continue
 
     def update_fields(
         self,
@@ -1019,7 +1369,16 @@ class JiraRestV3:
         return _parse_json(response)
 
     def _mapped_jira_ids(self) -> list[str]:
-        ids = ["summary", "description", "status", "priority", "issuetype", "updated"]
+        ids = [
+            "summary",
+            "description",
+            "status",
+            "priority",
+            "issuetype",
+            "updated",
+            "assignee",
+            "reporter",
+        ]
         for meta in (self._field_map.get("fields") or {}).values():
             jira_id = str((meta or {}).get("jira") or "").strip()
             if jira_id and jira_id not in ids:
@@ -1109,6 +1468,10 @@ class JiraRestV3:
             else "change_request"
         )
         base = (self._runtime.jira_base_url or "").rstrip("/")
+        assignee = self._jira_field_text(fields.get("assignee"))
+        reporter = self._jira_field_text(fields.get("reporter"))
+        if reporter:
+            values["author"] = reporter
         return {
             "key": key,
             "title": values.get("title") or key,
@@ -1117,6 +1480,8 @@ class JiraRestV3:
             "kind": kind,
             "updatedAt": str(fields.get("updated") or ""),
             "url": f"{base}/browse/{key}" if base and key else "",
+            "assignee": assignee,
+            "reporter": reporter,
             "values": values,
         }
 
@@ -1132,7 +1497,12 @@ class JiraRestV3:
         jql = f"project = {project} ORDER BY updated DESC"
         needle = (query or "").replace('"', " ").strip()[:80]
         if needle:
-            jql = f'project = {project} AND text ~ "{needle}" ORDER BY updated DESC'
+            # Titel/Text und Personenfelder (Assignee/Reporter) durchsuchen
+            jql = (
+                f"project = {project} AND ("
+                f'text ~ "{needle}" OR assignee ~ "{needle}" OR reporter ~ "{needle}"'
+                f") ORDER BY updated DESC"
+            )
         data = self._search_raw(
             jql,
             ",".join(self._mapped_jira_ids()),

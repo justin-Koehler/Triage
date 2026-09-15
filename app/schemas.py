@@ -104,11 +104,19 @@ class EffortSheetIn(BaseModel):
 
 class EffortSheetCommitIn(BaseModel):
     csv: str = Field(min_length=8, max_length=50000)
+    share_id: str | None = Field(default=None, max_length=36)
+    request_id: str | None = Field(default=None, max_length=36)
 
     @field_validator("csv")
     @classmethod
     def strip_csv(cls, value: str) -> str:
         return value.strip()
+
+    @field_validator("share_id", "request_id")
+    @classmethod
+    def blank_id(cls, value: str | None) -> str | None:
+        text = (value or "").strip()
+        return text or None
 
 
 class EffortIn(PolishIn):

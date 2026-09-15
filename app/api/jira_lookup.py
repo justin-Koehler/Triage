@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -59,6 +59,7 @@ def search_users(
                 "name": row["name"],
                 "displayName": row.get("displayName") or row["name"],
                 "label": f'{row.get("displayName") or row["name"]} ({row["name"]})',
+                "avatarUrl": row.get("avatarUrl") or "",
             }
             for row in items
         ]
@@ -180,31 +181,79 @@ def resolve_value(
 def list_issues(
     q: str = Query(default="", max_length=80),
     limit: int = Query(default=50, ge=1, le=100),
+    sync: bool = Query(default=False),
     db: Session = Depends(get_db),
     user: User = Depends(current_actor),
 ) -> dict:
-    from app.services.jira_inbox import list_inbox
+    from app.services.jira_inbox import list_inbox, sync_comments_batch
 
     token, email = _user_jira_credentials(db, user)
     try:
-        return list_inbox(
+        port = _inbox_port(db)
+        body = list_inbox(
             db,
-            _inbox_port(db),
+            port,
             query=q,
             limit=limit,
             user_token=token,
             user_email=email,
+            actor=user,
         )
+        sync_info = {"synced": 0, "updated": 0, "failed": 0}
+        if sync:
+            keys = [str(item.get("key") or "") for item in (body.get("items") or [])]
+            sync_info = sync_comments_batch(
+                db, port, keys=keys, limit=limit, user_token=token, user_email=email
+            )
+            # Stand-Zeilen nach Sync neu lesen
+            body = list_inbox(
+                db,
+                port,
+                query=q,
+                limit=limit,
+                user_token=token,
+                user_email=email,
+                actor=user,
+            )
+        body["sync"] = sync_info
+        return body
     except TicketPortError as err:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(err)) from err
+
+
+@router.post("/hooks/sync")
+def webhook_sync_comments(
+    payload: dict = Body(default_factory=dict),
+    key: str = Query(default="", max_length=64),
+    secret: str = Query(default="", max_length=200),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Jira-Webhook oder manueller Trigger: Kommentare eines Tickets nachziehen."""
+    from app.config import get_settings
+    from app.services.jira_inbox import sync_comments_batch
+
+    settings = get_settings()
+    expected = (settings.jira_webhook_secret or "").strip()
+    if not expected or secret.strip() != expected:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Webhook-Secret ungültig")
+    issue_key = (key or "").strip()
+    if not issue_key and isinstance(payload, dict):
+        issue = payload.get("issue") if isinstance(payload.get("issue"), dict) else {}
+        issue_key = str(issue.get("key") or payload.get("key") or "").strip()
+    if not issue_key:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Issue-Key fehlt")
+    stats = sync_comments_batch(db, _inbox_port(db), keys=[issue_key], limit=1)
+    return {"ok": True, "key": issue_key, **stats}
 
 
 @router.post("/issues/{key}/import")
 def import_issue(
     key: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(current_actor),
 ) -> dict:
+    from app.api.requests import _stand_later
     from app.services.jira_inbox import import_issue_view
 
     token, email = _user_jira_credentials(db, user)
@@ -221,4 +270,7 @@ def import_issue(
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(err)) from err
     except TicketPortError as err:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(err)) from err
+    rid = str(body.get("id") or "").strip()
+    if rid:
+        background_tasks.add_task(_stand_later, rid)
     return body

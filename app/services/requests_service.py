@@ -28,7 +28,8 @@ from app.domain.types import (
     parse_kind,
 )
 from app.models import Comment, IntakeSession, Request, RequestField, StatusUpdate, User
-from app.sync.outbox import enqueue
+from app.sync.outbox import enqueue, enqueue_effort_attachment
+from app.services.effort_sheet import EFFORT_SYNC_KEYS
 from app.config import get_settings
 from app.triage.engine import BUNDLE_MEMBERS, Diagnosis, Draft, TriageEngine
 from app.triage.providers import NoLlmProvider
@@ -184,6 +185,34 @@ def waiting_todo(request: Request, actor: User | None) -> str:
     return ""
 
 
+def _clip_next_step(text: str, limit: int = 110) -> str:
+    raw = " ".join(str(text or "").split()).strip()
+    if not raw:
+        return ""
+    if not raw.endswith((".", "!", "?")):
+        raw = f"{raw.rstrip('.,;:· ')}."
+    if len(raw) <= limit:
+        return raw
+    cut = raw[:limit].rsplit(" ", 1)[0].rstrip(".,;:· ")
+    return f"{cut}." if cut else raw[:limit].rstrip() + "."
+
+
+def hub_next_step(request: Request | None, actor: User | None = None) -> dict[str, object]:
+    """Nächster Schritt für Hub-Zeile: eigenes Todo bevorzugt, sonst Status-Next."""
+    if not request:
+        return {"waitingOnMe": False, "waitingTodo": "", "nextStep": ""}
+    waiting = bool(actor and actor_named_in_status(request, actor=actor))
+    todo = waiting_todo(request, actor) if waiting else ""
+    if todo:
+        return {"waitingOnMe": True, "waitingTodo": todo, "nextStep": todo}
+    updates = list(request.status_updates or [])
+    if updates:
+        step = _clip_next_step(updates[0].next_steps or "")
+        if step:
+            return {"waitingOnMe": False, "waitingTodo": "", "nextStep": step}
+    return {"waitingOnMe": waiting, "waitingTodo": "", "nextStep": ""}
+
+
 def to_list_item(request: Request, actor: User | None = None) -> dict:
     # Die Spalten sind String, aus der DB kommen deshalb rohe Werte zurueck.
     kind = parse_kind(request.kind) or RequestKind.CHANGE_REQUEST
@@ -222,9 +251,9 @@ def to_list_item(request: Request, actor: User | None = None) -> dict:
 
 
 def _status_blurb(request: Request) -> str:
-    from app.services.status_summary import list_blurb
+    from app.services.stand_summary import list_stand
 
-    return list_blurb(request.field_values())
+    return list_stand(request.field_values())
 
 
 def _field_values(spec) -> list[str]:
@@ -235,7 +264,16 @@ def _field_values(spec) -> list[str]:
     return list(spec.values or ())
 
 
-HIDDEN_DETAIL_KEYS = {"status_summary", "status_digest", "current_status"}
+HIDDEN_DETAIL_KEYS = {
+    "status_summary",
+    "status_digest",
+    "current_status",
+    "comment_digest",
+    "comment_ablauf",
+    "comment_summary",
+    "stand_digest",
+    "stand_summary",
+}
 
 
 def _grouped_fields(request: Request) -> list[dict]:
@@ -324,6 +362,14 @@ def _missing_labels(request: Request) -> list[str]:
 
 
 def to_detail(request: Request, actor: User | None = None) -> dict:
+    from app.services.open_todos import open_todos
+    from app.services.stand_summary import stand_health, stand_trust
+
+    values = request.field_values()
+    trust = stand_trust(values)
+    next_info = hub_next_step(request, actor)
+    todos = open_todos(request)
+    health = stand_health(request)
     return to_list_item(request, actor) | {
         "steckbriefName": request.steckbrief_name,
         "description": request.description,
@@ -332,7 +378,7 @@ def to_detail(request: Request, actor: User | None = None) -> dict:
         "fields": [
             {"key": f.key, "label": f.label, "value": f.value}
             for f in sorted(request.fields, key=lambda f: f.position)
-            if f.key != "status_digest"
+            if f.key not in {"status_digest", "comment_digest", "stand_digest", "stand_health"}
         ],
         "groups": _grouped_fields(request),
         "statusUpdates": [_status_update_view(item) for item in request.status_updates],
@@ -343,8 +389,30 @@ def to_detail(request: Request, actor: User | None = None) -> dict:
                 "body": c.body,
                 "createdAt": c.created_at.isoformat(),
             }
-            for c in request.comments
+            for c in sorted(request.comments, key=lambda x: x.created_at or 0)
         ],
+        "attachments": [
+            {
+                "id": a.id,
+                "externalId": a.external_id,
+                "filename": a.filename,
+                "contentType": a.content_type or "",
+                "size": int(a.size_bytes or 0),
+                "author": a.author_name or "",
+                "createdAt": a.created_at.isoformat() if a.created_at else "",
+                "source": "jira" if a.external_id else "local",
+            }
+            for a in sorted(request.attachments or [], key=lambda x: x.created_at or 0)
+        ],
+        "commentAblauf": (values.get("comment_ablauf") or "").strip(),
+        "commentSummary": (values.get("comment_summary") or "").strip(),
+        "statusAblauf": (values.get("status_ablauf") or values.get("current_status") or "").strip(),
+        "standSummary": trust.get("summary") or "",
+        "standDigest": (values.get("stand_digest") or "").strip(),
+        "standTrust": trust,
+        "standHealth": health,
+        "nextStep": str(next_info.get("nextStep") or ""),
+        "openTodos": todos,
     }
 
 
@@ -352,6 +420,7 @@ def _base_query():
     return select(Request).options(
         selectinload(Request.fields),
         selectinload(Request.comments),
+        selectinload(Request.attachments),
         selectinload(Request.external_refs),
         selectinload(Request.status_updates),
         selectinload(Request.author),
@@ -606,6 +675,9 @@ def update_request(
     spec = rules.spec(parse_kind(request.kind) or RequestKind.CHANGE_REQUEST)
     field_labels = spec.field_map()
     synced_fields: dict[str, str] = {}
+    before_lead = str(request.change_lead or "").strip()
+    before_status = RequestStatus(request.status)
+    before_priority = Priority(request.priority)
 
     for key, value in changes.items():
         if key in EDITABLE_SCALARS:
@@ -626,12 +698,29 @@ def update_request(
                 synced_fields[key] = str(value or "")
             continue
 
-        if key in {"current_status", "status_summary", "status_digest", "status_ablauf"}:
+        if key in {
+            "current_status",
+            "status_summary",
+            "status_digest",
+            "status_ablauf",
+            "comment_digest",
+            "comment_ablauf",
+            "comment_summary",
+            "stand_digest",
+            "stand_summary",
+        }:
             continue
-        if key not in field_labels:
+        if key == "stand_health":
+            from app.services.stand_summary import normalize_stand_health
+
+            health = normalize_stand_health(value)
+            _upsert_field(db, request, "stand_health", "Stand-Ampel", health)
+            continue
+        if key not in field_labels and key not in EFFORT_SYNC_KEYS:
             continue
         text = str(value or "")
-        _upsert_field(db, request, key, field_labels[key].label, text)
+        label = field_labels[key].label if key in field_labels else key
+        _upsert_field(db, request, key, label, text)
         synced_fields[key] = text
 
     # Jira kennt keine Custom-Fields mit `jira: null`. Dafür schreiben wir die
@@ -658,6 +747,23 @@ def update_request(
     request.incomplete = bool(spec.missing_hard_fields(request.field_values() | synced_fields))
     db.flush()
 
+    notes: list[str] = []
+    after_lead = str(request.change_lead or "").strip()
+    if "change_lead" in changes and after_lead != before_lead:
+        notes.append(
+            f"Bearbeiter gewechselt: {before_lead or '—'} → {after_lead or '—'}."
+        )
+    if "status" in changes and RequestStatus(request.status) != before_status:
+        notes.append(
+            f"Status gewechselt: {STATUS_LABELS[before_status]} → {STATUS_LABELS[RequestStatus(request.status)]}."
+        )
+    if "priority" in changes and Priority(request.priority) != before_priority:
+        notes.append(
+            f"Priorität gewechselt: {PRIORITY_LABELS[before_priority]} → {PRIORITY_LABELS[Priority(request.priority)]}."
+        )
+    for note in notes:
+        add_system_comment(db, request, note, sync=True)
+
     if synced_fields or "priority" in changes:
         enqueue(
             db,
@@ -665,6 +771,8 @@ def update_request(
             OutboxOperation.UPDATE_FIELDS,
             {"fields": synced_fields, "priority": Priority(request.priority).value},
         )
+    if any(key in synced_fields for key in EFFORT_SYNC_KEYS):
+        enqueue_effort_attachment(db, request)
     return request
 
 
@@ -745,7 +853,55 @@ def add_comment(db: Session, request: Request, body: str, user: User | None) -> 
         OutboxOperation.ADD_COMMENT,
         {"body": body, "author": comment.author_name, "comment_id": comment.id},
     )
+    # Stand-KI läuft asynchron (API BackgroundTask) — sonst hängt POST/Commit
     return comment
+
+
+def add_system_comment(db: Session, request: Request, body: str, *, sync: bool = False) -> Comment:
+    text = " ".join(str(body or "").split()).strip()
+    if not text:
+        raise ValueError("leerer Systemkommentar")
+    comment = Comment(
+        request_id=request.id,
+        author_id=None,
+        author_name="System",
+        body=text,
+    )
+    db.add(comment)
+    db.flush()
+    if sync:
+        enqueue(
+            db,
+            request.id,
+            OutboxOperation.ADD_COMMENT,
+            {"body": text, "author": "System", "comment_id": comment.id},
+        )
+    return comment
+
+
+def delete_comment(
+    db: Session, request: Request, comment_id: str, *, user_id: str | None = None
+) -> bool:
+    comment = next((c for c in request.comments if c.id == comment_id), None)
+    if not comment:
+        return False
+    external_id = str(comment.external_id or "").strip()
+    db.delete(comment)
+    db.flush()
+    # relationship collection aktuell halten
+    request.comments = [c for c in request.comments if c.id != comment_id]
+    if external_id:
+        enqueue(
+            db,
+            request.id,
+            OutboxOperation.DELETE_COMMENT,
+            {
+                "external_id": external_id,
+                "comment_id": comment_id,
+                "user_id": str(user_id or request.created_by or ""),
+            },
+        )
+    return True
 
 
 def filter_options(db: Session) -> dict:
@@ -785,11 +941,12 @@ def update_status_update(
 
 
 def _refresh_live_status(db: Session, request: Request) -> None:
-    from app.services.status_summary import StatusEmpty, summarize
+    from app.services.stand_summary import refresh_stand
 
+    # Ohne LLM — sonst hängt jedes Status-Update am Modell
     try:
-        summarize(db, request)
-    except StatusEmpty:
+        refresh_stand(db, request, llm=False)
+    except Exception:
         return
 
 

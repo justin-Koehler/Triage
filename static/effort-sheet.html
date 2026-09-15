@@ -3,21 +3,28 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Aufwand — Vorlage</title>
-    <link rel="stylesheet" href="/styles.css?v=scos-ci-v1" />
+    <title>Kostenkalkulation — CRITR</title>
+    <link rel="stylesheet" href="/styles.css?v=effort-design-v1" />
   </head>
   <body class="effort-sheet-page">
-    <header class="effort-sheet-head">
-      <p class="effort-sheet-kicker">CRITR</p>
-      <h1>Aufwand</h1>
-      <p class="effort-sheet-note">Zellen ausfüllen. Summe = Aufwand FB + Aufwand IT. Fenster schließen übernimmt Werte und Link.</p>
+    <header class="effort-sheet-chrome">
+      <a class="brand" href="/workspace">CRITR</a>
+      <p class="effort-sheet-chrome-meta">Kostenkalkulation</p>
     </header>
-    <div class="effort-sheet-toolbar">
-      <button type="button" class="btn btn-ghost" id="add-row">Zeile hinzufügen</button>
-    </div>
-    <div class="effort-sheet-wrap">
-      <table class="effort-grid" id="grid"></table>
-    </div>
-    <script src="/effort-sheet.js?v=effort-excel-v1"></script>
+    <main class="effort-sheet-main">
+      <header class="effort-sheet-head">
+        <p class="effort-sheet-kicker">Kosten</p>
+        <h1>Kalkulation</h1>
+        <p class="effort-sheet-note">
+          SCS (inkl. andere Schwarz-Gruppen) und CIT je Phase. Speichern übernimmt die Summen ins Ticket.
+        </p>
+      </header>
+      <div id="kalk" class="kalk"></div>
+      <div class="kalk-bar">
+        <button type="button" class="btn btn-ghost" id="kalk-csv">Sheet herunterladen</button>
+        <button type="button" class="btn btn-primary" id="kalk-save">Speichern und schließen</button>
+      </div>
+    </main>
+    <script src="/effort-sheet.js?v=effort-design-v1"></script>
   </body>
 </html>
