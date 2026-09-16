@@ -751,7 +751,8 @@
 
     const rect = kindEl.getBoundingClientRect();
     drop.style.top = (rect.bottom + window.scrollY + 6) + "px";
-    drop.style.left = Math.max(8, rect.right - drop.offsetWidth) + "px";
+    const left = rect.left + rect.width / 2 - drop.offsetWidth / 2;
+    drop.style.left = Math.max(8, Math.min(left, window.innerWidth - drop.offsetWidth - 8)) + "px";
 
     setTimeout(() => {
       document.addEventListener("click", function outsideKind(e) {
@@ -934,7 +935,7 @@
       openJiraLink.classList.add("is-disabled");
       openJiraLink.setAttribute("aria-disabled", "true");
     }
-    setIntro(key ? `Ticket-Nummer: ${key}` : "Change in Jira angelegt");
+    setIntro("");
   }
 
   function syncJiraButton() {
@@ -3106,8 +3107,10 @@
   function showJiraBadge(key, jiraUrl) {
     const badge = document.getElementById("ticket-jira");
     const badgeKey = document.getElementById("ticket-jira-key");
+    const sep = document.getElementById("ticket-eyebrow-sep");
     if (!key || !badge || !badgeKey) return;
     badge.hidden = false;
+    if (sep) sep.hidden = false;
     badgeKey.textContent = key;
     if (jiraUrl) {
       badgeKey.href = jiraUrl;
@@ -3840,7 +3843,7 @@
     }
   }
 
-  function applyRequest(detail) {
+  function applyRequest(detail, { animate = true } = {}) {
     syncedRequestId = detail.id || null;
     const fieldMap = {};
     for (const row of detail.fields || []) {
@@ -4194,32 +4197,64 @@
         card.dataset.index = String(flatIndex);
         card.tabIndex = 0;
         card.setAttribute("role", "button");
+        if (item.waitingOnMe) card.classList.add("is-waiting");
         if (flatIndex === hubFocusIndex) card.classList.add("is-hub-focus");
-        const name = document.createElement("div");
-        name.className = "hub-card-title";
-        name.textContent = item.title || item.key || "Change";
-        card.appendChild(name);
 
-        const cueText = hubCueText(item);
+        const wrap = document.createElement("div");
+        wrap.className = "row-change";
+        const dot = document.createElement("span");
+        dot.className = "row-dot";
+        const healthKey = String(item?.standHealth?.key || "").toLowerCase();
+        if (
+          healthKey === "green" ||
+          healthKey === "blue" ||
+          healthKey === "yellow" ||
+          healthKey === "red" ||
+          healthKey === "white" ||
+          healthKey === "done"
+        ) {
+          dot.dataset.health = healthKey;
+        } else if (item.completed || item.localStatus === "abgeschlossen") {
+          dot.dataset.health = "done";
+        } else {
+          dot.dataset.health = "green";
+        }
+        dot.setAttribute("aria-hidden", "true");
+        if (item.standHealth?.label) dot.title = item.standHealth.label;
+
+        const stack = document.createElement("div");
+        stack.className = "row-stack";
+        const head = document.createElement("div");
+        head.className = "row-head";
+        const name = document.createElement("span");
+        name.className = "row-title";
+        name.textContent = item.title || item.key || "Change";
+        head.appendChild(name);
+        const cueText = hubCueText(item) || item.statusSummary || "";
         if (cueText) {
-          const cue = document.createElement("div");
-          cue.className = `hub-card-cue${hubCueIsAction(item) ? " is-next" : ""}`;
+          const cue = document.createElement("span");
+          cue.className = `row-cue${hubCueIsAction(item) ? " is-next" : ""}`;
           cue.textContent = cueText;
           const tip = standTooltip(item);
           if (tip) cue.title = tip;
-          card.appendChild(cue);
+          head.appendChild(cue);
         }
-        if (item.key) {
-          const key = document.createElement("div");
-          key.className = "hub-card-key";
-          key.textContent = item.key;
-          card.appendChild(key);
+        stack.appendChild(head);
+        const metaBits = [item.key, item.status].filter(Boolean);
+        if (metaBits.length) {
+          const metaLine = document.createElement("span");
+          metaLine.className = "row-meta";
+          metaLine.textContent = metaBits.join(" · ");
+          stack.appendChild(metaLine);
         }
-        card.addEventListener("click", () => openHubItem(item));
+        wrap.append(dot, stack);
+        card.appendChild(wrap);
+
+        card.addEventListener("click", (event) => openHubItem(item, event.currentTarget));
         card.addEventListener("keydown", (e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            openHubItem(item);
+            openHubItem(item, card);
           }
         });
         list.appendChild(card);
@@ -4254,18 +4289,36 @@
       tr.dataset.key = item.key || "";
       tr.dataset.index = String(index);
       if (item.waitingOnMe) tr.classList.add("is-waiting");
+      const healthKey = String(item?.standHealth?.key || "").toLowerCase();
       const title = document.createElement("td");
       const wrap = document.createElement("div");
       wrap.className = "row-change";
       const dot = document.createElement("span");
       dot.className = "row-dot";
+      if (
+        healthKey === "green" ||
+        healthKey === "blue" ||
+        healthKey === "yellow" ||
+        healthKey === "red" ||
+        healthKey === "white" ||
+        healthKey === "done"
+      ) {
+        dot.dataset.health = healthKey;
+      } else if (item.completed || item.localStatus === "abgeschlossen") {
+        dot.dataset.health = "done";
+      } else {
+        dot.dataset.health = "green";
+      }
       dot.setAttribute("aria-hidden", "true");
+      if (item.standHealth?.label) dot.title = item.standHealth.label;
       const stack = document.createElement("div");
       stack.className = "row-stack";
+      const head = document.createElement("div");
+      head.className = "row-head";
       const name = document.createElement("span");
       name.className = "row-title";
       name.textContent = item.title || item.key || "Change";
-      stack.appendChild(name);
+      head.appendChild(name);
       const cueText = hubCueText(item) || item.statusSummary || "";
       if (cueText) {
         const cue = document.createElement("span");
@@ -4273,8 +4326,9 @@
         cue.textContent = cueText;
         const tip = standTooltip(item);
         if (tip) cue.title = tip;
-        stack.appendChild(cue);
+        head.appendChild(cue);
       }
+      stack.appendChild(head);
       const metaBits = [item.key, item.status].filter(Boolean);
       if (metaBits.length) {
         const meta = document.createElement("span");
@@ -4285,8 +4339,8 @@
       wrap.append(dot, stack);
       title.appendChild(wrap);
       tr.append(title);
-      tr.addEventListener("click", () => {
-        openHubItem(item);
+      tr.addEventListener("click", (event) => {
+        openHubItem(item, event.currentTarget);
       });
       rows.appendChild(tr);
     });
@@ -4316,15 +4370,36 @@
     }
   }
 
-  function openHubItem(item) {
-    if (!item) return;
-    if (syncedRequestId) markCommentVisit(syncedRequestId);
-    saveScrollMemory();
-    if (item.requestId) {
-      history.replaceState({}, "", `/workspace/${item.requestId}`);
-      void openExisting(item.requestId);
-    } else {
-      void openJiraTicket(item.key);
+
+  function prefersReducedMotion() {
+    return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  }
+
+  async function openHubItem(item) {
+    if (!item || openHubItem._busy) return;
+    openHubItem._busy = true;
+    try {
+      if (syncedRequestId) markCommentVisit(syncedRequestId);
+      saveScrollMemory();
+      const hub = document.getElementById("hub");
+      if (hub) hub.hidden = true;
+      document.body.classList.remove("is-opening-ticket");
+      if (item.requestId) {
+        history.replaceState({}, "", `/workspace/${item.requestId}`);
+        await openExisting(item.requestId, {
+          skipHubExit: true,
+          deferHideHub: true,
+          animate: false,
+        });
+      } else {
+        await openJiraTicket(item.key, {
+          skipHubExit: true,
+          deferHideHub: true,
+          animate: false,
+        });
+      }
+    } finally {
+      openHubItem._busy = false;
     }
   }
 
@@ -4478,7 +4553,11 @@
     }
   }
 
-  async function openJiraTicket(key) {
+  async function openJiraTicket(key, { skipHubExit = false, deferHideHub = false, animate = true } = {}) {
+    if (!deferHideHub) {
+      const hub = document.getElementById("hub");
+      if (hub) hub.hidden = true;
+    }
     const r = await fetch(`/api/jira/issues/${encodeURIComponent(key)}/import`, {
       method: "POST",
     });
@@ -4491,30 +4570,32 @@
       return;
     }
     history.replaceState({}, "", `/workspace/${body.id}`);
-    applyRequest(body);
+    applyRequest(body, { animate });
   }
 
-  async function openExisting(slug) {
-    const hub = document.getElementById("hub");
-    if (hub) hub.hidden = true;
+  async function openExisting(slug, { skipHubExit = false, deferHideHub = false, animate = true } = {}) {
+    if (!deferHideHub) {
+      const hub = document.getElementById("hub");
+      if (hub) hub.hidden = true;
+    }
     const local = await fetch(`/api/requests/${encodeURIComponent(slug)}`);
     if (local.ok) {
       const detail = await local.json();
-      applyRequest(detail);
+      applyRequest(detail, { animate });
       const jiraKey = detail.externalKey;
       if (jiraKey) {
         try {
           const r = await fetch(`/api/jira/issues/${encodeURIComponent(jiraKey)}/import`, {
             method: "POST",
           });
-          if (r.ok) applyRequest(await r.json());
+          if (r.ok) applyRequest(await r.json(), { animate: false });
         } catch (_) {
           /* lokaler Stand bleibt */
         }
       }
       return;
     }
-    await openJiraTicket(slug);
+    await openJiraTicket(slug, { skipHubExit: true, deferHideHub, animate });
   }
 
   function bootWorkspace() {

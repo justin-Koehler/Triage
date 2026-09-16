@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>CRITR</title>
-    <link rel="stylesheet" href="/styles.css?v=list-remind-v1" />
+    <link rel="stylesheet" href="/styles.css?v=stand-colors-v2" />
   </head>
   <body class="gated">
     <header class="chrome">
@@ -18,21 +18,16 @@
       <main class="ticket-view" id="ticket-view">
         <article id="ticket" class="ticket-sheet" hidden aria-label="Change">
           <header class="ticket-head">
-            <div class="ticket-head-top">
-              <h2 class="ticket-headline" id="ticket-headline" hidden></h2>
-              <p class="ticket-kicker" id="ticket-kind" data-kind="open">Typ offen</p>
-              <div class="ticket-aside" hidden>
-                <p class="ticket-jira" id="ticket-jira" hidden>
-                  <span class="ticket-jira-label">Ticket</span>
+            <div class="ticket-hero">
+              <p class="ticket-eyebrow">
+                <span class="ticket-jira" id="ticket-jira" hidden>
                   <a class="ticket-jira-key" id="ticket-jira-key" target="_blank" rel="noopener"></a>
-                </p>
-                <p class="ticket-author ticket-priority" id="ticket-priority-cell" data-key="priority">
-                  <span class="ticket-author-label">Priorität</span>
-                  <span class="ticket-author-name" id="ticket-priority">Mittel</span>
-                </p>
-              </div>
+                </span>
+                <span class="ticket-eyebrow-sep" id="ticket-eyebrow-sep" hidden aria-hidden="true">—</span>
+                <span class="ticket-kicker" id="ticket-kind" data-kind="open">Typ offen</span>
+              </p>
+              <h2 class="ticket-headline" id="ticket-headline" hidden></h2>
             </div>
-            <dl class="ticket-meta" id="ticket-meta" hidden></dl>
             <aside class="comment-stand" id="comment-stand" hidden>
               <header class="comment-stand-head">
                 <label class="comment-stand-health-wrap">
@@ -50,6 +45,13 @@
               </header>
               <p class="comment-ablauf" id="comment-ablauf"></p>
             </aside>
+            <div class="ticket-aside" hidden>
+              <p class="ticket-author ticket-priority" id="ticket-priority-cell" data-key="priority">
+                <span class="ticket-author-label">Priorität</span>
+                <span class="ticket-author-name" id="ticket-priority">Mittel</span>
+              </p>
+            </div>
+            <dl class="ticket-meta" id="ticket-meta" hidden></dl>
           </header>
           <section class="ticket-section ticket-overview" id="ticket-overview" hidden>
             <header class="ticket-overview-head">
@@ -236,6 +238,6 @@
 
     <script src="/auth.js?v=account-menu-v1"></script>
     <script src="/app.js?v=input-grow-v1"></script>
-    <script src="/workspace.js?v=list-remind-v1"></script>
+    <script src="/workspace.js?v=no-open-anim-v1"></script>
   </body>
 </html>
