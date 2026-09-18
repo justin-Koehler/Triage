@@ -165,7 +165,7 @@
       key: "approver",
       prompt: "Wer genehmigt den Change (nach Freigabematrix)?",
       placeholder: "Name suchen…",
-      label: "Genehmigende Person",
+      label: "Genehmigung",
       kind: "team",
       jiraLookup: "user",
       choices: ["Ich weiß es nicht"],
@@ -175,15 +175,15 @@
       key: "lead",
       prompt: "Wer übernimmt die Gesamtprojektleitung?",
       placeholder: "Gesamtprojektleitung",
-      label: "Gesamtprojektleitung",
+      label: "Projektleitung",
       kind: "team",
       jiraLookup: "user",
     },
     {
       key: "it_owner",
       prompt: "Wer ist die verantwortliche Person aus der IT?",
-      placeholder: "Ist die verantwortliche Person aus der IT",
-      label: "Ist die verantwortliche Person aus der IT",
+      placeholder: "IT-Verantwortung",
+      label: "IT-Verantwortung",
       kind: "team",
       onlyKind: "it_request",
       jiraLookup: "user",
@@ -978,11 +978,7 @@
         }
       }
     }
-    if (overviewMeta) {
-      const parts = [`${filled} von ${steps.length}`];
-      if (thin) parts.push("kurz prüfen");
-      overviewMeta.textContent = parts.join(" · ");
-    }
+    if (overviewMeta) overviewMeta.textContent = "";
   }
 
   function ensureFieldShell(step) {
@@ -1042,7 +1038,10 @@
         )}-value" class="ticket-row-value"></span></dd>`;
         teamFields.appendChild(cell);
       }
+      const dt = cell.querySelector("dt");
+      if (dt) dt.textContent = step.label;
       cell.hidden = false;
+      orderTeamFields();
       return document.getElementById(`ticket-${step.key}-value`);
     }
 
@@ -1083,8 +1082,24 @@
     ensureFieldShell(step);
   }
 
+  function orderTeamFields() {
+    [
+      "lead",
+      "approver",
+      "it_owner",
+      "author",
+      "process_owner",
+      "solution_owner",
+      "change_team",
+      "stakeholder",
+    ].forEach((key) => {
+      const cell = teamFields.querySelector(`[data-key="${key}"]`);
+      if (cell) teamFields.appendChild(cell);
+    });
+  }
+
   function orderCostFields() {
-    ["effort_fb", "effort_it", "it_costs", "costs"].forEach((key) => {
+    ["cost_savings", "effort_fb", "effort_it", "it_costs", "costs"].forEach((key) => {
       const cell = costFields.querySelector(`[data-key="${key}"]`);
       if (cell) costFields.appendChild(cell);
     });
@@ -3339,6 +3354,21 @@
     }, 180);
   }
 
+  function commentDayLabel(ms) {
+    const d = new Date(ms);
+    const today = new Date();
+    const startToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const startThat = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diffDays = Math.round((startToday - startThat) / 86400000);
+    if (diffDays === 0) return "Heute";
+    if (diffDays === 1) return "Gestern";
+    return d.toLocaleDateString("de-DE", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
+  }
+
   function formatCommentWhen(iso) {
     if (!iso) return "";
     const d = new Date(iso);
@@ -3347,17 +3377,7 @@
     const mins = Math.round(diffMs / 60000);
     if (mins < 1) return "gerade eben";
     if (mins < 60) return `vor ${mins} Min.`;
-    const hours = Math.round(mins / 60);
-    if (hours < 24) return `vor ${hours} Std.`;
-    const days = Math.round(hours / 24);
-    if (days < 7) return `vor ${days} Tag${days === 1 ? "" : "en"}`;
-    return d.toLocaleString("de-DE", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
   }
 
   function commentInitials(name) {
@@ -3419,20 +3439,15 @@
     if (!commentList) return;
     liveComments = Array.isArray(items) ? items.slice() : [];
     if (commentCount) {
-      if (liveComments.length) {
-        commentCount.hidden = false;
-        commentCount.textContent = String(liveComments.length);
-      } else {
-        commentCount.hidden = true;
-        commentCount.textContent = "";
-      }
+      commentCount.hidden = true;
+      commentCount.textContent = "";
     }
     commentList.replaceChildren();
     if (!liveComments.length) {
       const empty = document.createElement("li");
       empty.className = "comment-empty";
       empty.innerHTML =
-        "<strong>Noch still hier.</strong><span>Schreib unten den ersten Kommentar — er landet auch in Jira.</span>";
+        "<strong>Noch keine Kommentare.</strong><span>Notiz unten schreiben — sie erscheint hier und in Jira.</span>";
       commentList.appendChild(empty);
       return;
     }
@@ -3440,9 +3455,22 @@
     const visitAt = lastCommentVisit(syncedRequestId);
     const visitMs = visitAt ? Date.parse(visitAt) : NaN;
     let splitDone = false;
+    let lastDay = "";
+    let lastAuthor = "";
 
     for (const c of liveComments) {
       const createdMs = c.createdAt ? Date.parse(c.createdAt) : NaN;
+      const dayKey = Number.isFinite(createdMs)
+        ? new Date(createdMs).toLocaleDateString("de-DE")
+        : "";
+      if (dayKey && dayKey !== lastDay) {
+        const day = document.createElement("li");
+        day.className = "comment-day";
+        day.textContent = commentDayLabel(createdMs);
+        commentList.appendChild(day);
+        lastDay = dayKey;
+        lastAuthor = "";
+      }
       const isNew =
         Number.isFinite(visitMs) &&
         Number.isFinite(createdMs) &&
@@ -3451,13 +3479,17 @@
       if (isNew && !splitDone) {
         const split = document.createElement("li");
         split.className = "comment-visit-split";
-        split.textContent = "Seit deinem letzten Besuch";
+        split.textContent = "Neu seit deinem letzten Besuch";
         commentList.appendChild(split);
         splitDone = true;
+        lastAuthor = "";
       }
 
       const li = document.createElement("li");
       li.className = "comment-item";
+      const authorName = c.author || "unbekannt";
+      if (authorName === lastAuthor) li.classList.add("is-follow");
+      lastAuthor = authorName;
       if (c.pending) li.classList.add("is-pending");
       if (c.failed) li.classList.add("is-failed");
       li.dataset.id = c.id || "";
@@ -3470,7 +3502,7 @@
       const meta = document.createElement("div");
       meta.className = "comment-meta";
       const author = document.createElement("strong");
-      author.textContent = c.author || "unbekannt";
+      author.textContent = authorName;
       const right = document.createElement("span");
       right.className = "comment-meta-right";
       const when = document.createElement("time");
@@ -3588,23 +3620,10 @@
     }
   }
 
-  function paintStandMeta(detail, { waiting = false } = {}) {
+  function paintStandMeta(_detail, { waiting = false } = {}) {
     if (!commentStandMeta) return;
-    const trust = detail?.standTrust || {};
-    const parts = [];
-    if (waiting) parts.push("wartet auf dich");
-    else if (trust.sourceLabel) parts.push(trust.sourceLabel);
-    const rel = standRelativeTime(detail?.updatedAt);
-    if (rel) parts.push(rel);
-    commentStandMeta.textContent = parts.join(" · ");
-    commentStandMeta.title = [
-      trust.sourceLabel ? `Quelle: ${trust.sourceLabel}` : "",
-      detail?.updatedAt
-        ? `Aktualisiert ${new Date(detail.updatedAt).toLocaleString("de-DE")}`
-        : "",
-    ]
-      .filter(Boolean)
-      .join(" · ");
+    commentStandMeta.textContent = waiting ? "wartet auf dich" : "";
+    commentStandMeta.removeAttribute("title");
   }
 
   function renderComments(detail) {
@@ -3781,9 +3800,6 @@
     const cleaned = standWithoutTodoEcho(ablauf);
     commentAblauf.textContent = cleaned || ablauf;
     commentAblauf.classList.toggle("is-empty", !(cleaned || ablauf));
-    if (commentStandMeta) {
-      commentStandMeta.textContent = "gerade eben";
-    }
   }
 
   async function pollStandUpgrade(requestId) {

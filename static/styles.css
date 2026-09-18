@@ -2114,12 +2114,12 @@ body.ticket-active .chrome .top {
 .ticket-meta {
   margin: 28px 0 0;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid rgba(17, 17, 17, 0.07);
-  border-radius: 16px;
-  background: rgba(17, 17, 17, 0.025);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 18px 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   text-align: left;
   justify-items: stretch;
   box-sizing: border-box;
@@ -2151,14 +2151,14 @@ body.ticket-active .chrome .top {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   width: auto;
   margin: 0;
-  padding: 14px 16px;
-  border: 1px solid rgba(17, 17, 17, 0.06);
-  border-radius: 12px;
-  background: #fff;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   box-sizing: border-box;
 }
 
@@ -2187,7 +2187,6 @@ body.ticket-active .chrome .top {
 .ticket-meta-item[data-key="nonprofit"] { order: 4; }
 .ticket-meta-item[data-key="components"] {
   order: 5;
-  grid-column: 1 / -1;
   min-width: 0;
 }
 
@@ -2274,8 +2273,8 @@ body.ticket-active .chrome .top {
 
 .ticket-split {
   display: none;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 28px 40px;
+  grid-template-columns: 1fr;
+  gap: 32px;
   align-items: start;
   margin: 28px 0 0;
   padding: 28px 0 0;
@@ -2644,7 +2643,7 @@ a.ticket-file-name:hover {
 }
 
 .ticket-costs {
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .effort-sheet {
@@ -3117,19 +3116,7 @@ a.ticket-file-name:hover {
 }
 
 .ticket-overview-meta {
-  margin: 0;
-  min-width: 0;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(17, 17, 17, 0.04);
-  font-size: 0.72rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  color: var(--muted);
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: none !important;
 }
 
 .ticket-overview-meta:empty {
@@ -3162,31 +3149,26 @@ a.ticket-file-name:hover {
   display: grid;
   gap: 8px;
   margin: 0;
-  padding: 14px 16px;
-  border: 1px solid rgba(17, 17, 17, 0.07);
-  border-radius: 14px;
-  background: #fff;
+  padding: 10px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   min-width: 0;
   justify-items: stretch;
   text-align: left;
-  box-shadow: 0 1px 2px rgba(17, 17, 17, 0.02);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.ticket-overview-grid .ticket-block:first-child {
-  padding: 14px 16px;
-}
-
+.ticket-overview-grid .ticket-block:first-child,
 .ticket-overview-grid .ticket-block.is-lead {
-  padding: 18px 20px;
-  gap: 10px;
-  border-color: rgba(17, 17, 17, 0.08);
-  background: linear-gradient(180deg, #fafafa 0%, #fff 100%);
+  padding: 10px 0;
+  gap: 8px;
+  border: 0;
+  background: transparent;
   box-shadow: none;
 }
 
 .ticket-overview-grid .ticket-block.is-lead + .ticket-block {
-  border-top: 1px solid rgba(17, 17, 17, 0.07);
+  border-top: 0;
 }
 
 .ticket-overview-grid .ticket-block dt {
@@ -3199,8 +3181,8 @@ a.ticket-file-name:hover {
 }
 
 .ticket-overview-grid .ticket-block.is-lead dt {
-  font-size: 0.7rem;
-  color: rgba(107, 107, 107, 0.9);
+  font-size: 0.68rem;
+  color: var(--muted);
 }
 
 .ticket-overview-grid .ticket-block dd {
@@ -3228,11 +3210,11 @@ a.ticket-file-name:hover {
 }
 
 .ticket-overview-grid .ticket-block.is-lead .ticket-prose {
-  font-size: 1.08rem;
-  font-weight: 450;
-  line-height: 1.58;
-  letter-spacing: -0.018em;
-  max-width: 48rem;
+  font-size: 0.94rem;
+  font-weight: 400;
+  line-height: 1.55;
+  letter-spacing: -0.01em;
+  max-width: none;
 }
 
 .ticket-overview-grid .ticket-block.is-empty .ticket-prose,
@@ -3243,8 +3225,8 @@ a.ticket-file-name:hover {
 }
 
 .ticket-overview-grid .ticket-block.is-editable:hover {
-  border-color: rgba(17, 17, 17, 0.14);
-  box-shadow: 0 2px 10px rgba(17, 17, 17, 0.04);
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .ticket-overview-grid .ticket-block.is-editable:hover .ticket-prose {
@@ -3254,7 +3236,7 @@ a.ticket-file-name:hover {
 }
 
 .ticket-overview-grid .ticket-block.is-lead.is-editable:hover {
-  background: linear-gradient(180deg, #f7f7f7 0%, #fff 100%);
+  background: transparent;
 }
 
 .ticket-overview-grid .ticket-ai {
@@ -3327,10 +3309,10 @@ a.ticket-file-name:hover {
 .ticket-team {
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 28px;
-  padding: 0;
-  width: auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px 24px;
+  padding: 4px 0 0;
+  width: 100%;
   text-align: left;
   justify-items: stretch;
 }
@@ -3340,13 +3322,45 @@ a.ticket-file-name:hover {
   align-items: flex-start;
 }
 
+.ticket-team .ticket-meta-item {
+  min-width: 0;
+  gap: 6px;
+}
+
+.ticket-team .ticket-meta-item dt {
+  font-size: 0.62rem;
+  letter-spacing: 0.09em;
+  line-height: 1.2;
+}
+
+.ticket-team .ticket-meta-item dd {
+  min-width: 0;
+  width: 100%;
+}
+
+.ticket-team .ticket-row-value {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 550;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.ticket-team .ticket-tags {
+  gap: 6px;
+}
+
 .ticket-team[hidden] {
   display: none !important;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 900px) {
+  .ticket-costs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
   .ticket-team {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 20px;
   }
 }
 
@@ -5045,14 +5059,7 @@ body.intake-open .dock:has(#form.hidden) {
   color: var(--muted);
 }
 .ticket-comments .comment-count {
-  min-width: 1.4em;
-  padding: 1px 7px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--muted);
-  line-height: 1.4;
+  display: none !important;
 }
 .ticket-comments .comment-count[hidden] {
   display: none !important;
@@ -5065,7 +5072,7 @@ body.intake-open .dock:has(#form.hidden) {
   flex-direction: column;
   gap: 0;
   width: 100%;
-  max-height: min(420px, 48vh);
+  max-height: min(360px, 42vh);
   overflow: auto;
   border: 0;
   border-radius: 0;
@@ -5092,16 +5099,34 @@ body.intake-open .dock:has(#form.hidden) {
   line-height: inherit;
   max-width: none;
 }
+.ticket-comments .comment-day {
+  list-style: none;
+  margin: 12px 0 4px;
+  padding: 0;
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: center;
+}
 .ticket-comments .comment-item {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  gap: 10px 12px;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 6px 10px;
   margin: 0;
-  padding: 14px 0;
+  padding: 8px 0;
   border: 0;
   border-bottom: 1px solid rgba(17, 17, 17, 0.06);
   background: transparent;
   text-align: left;
+}
+.ticket-comments .comment-item.is-follow {
+  padding-top: 6px;
+}
+.ticket-comments .comment-item.is-follow .comment-avatar,
+.ticket-comments .comment-item.is-follow .comment-meta strong {
+  visibility: hidden;
 }
 .ticket-comments .comment-item:last-child {
   border-bottom: 0;
@@ -5110,14 +5135,14 @@ body.intake-open .dock:has(#form.hidden) {
   background: transparent;
 }
 .ticket-comments .comment-avatar {
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   background: #eef2ff;
   color: var(--sg-blue-5);
-  font-size: 0.72rem;
+  font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   flex-shrink: 0;
@@ -5137,7 +5162,7 @@ body.intake-open .dock:has(#form.hidden) {
 .ticket-comments .comment-meta strong {
   color: var(--ink);
   font-weight: 650;
-  font-size: 0.88rem;
+  font-size: 0.8rem;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5194,8 +5219,8 @@ body.intake-open .dock:has(#form.hidden) {
 .ticket-comments .comment-body {
   margin: 0;
   white-space: normal;
-  line-height: 1.5;
-  font-size: 0.9rem;
+  line-height: 1.4;
+  font-size: 0.82rem;
   color: var(--ink);
 }
 .ticket-comments .comment-body a {

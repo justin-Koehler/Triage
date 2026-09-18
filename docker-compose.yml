@@ -56,11 +56,7 @@ services:
     restart: unless-stopped
     env_file:
       - deploy/compose.env
-    environment:
-      QWEN_BASE_URL: ${QWEN_BASE_URL:-https://llm.stackit.rocks/v1}
-      QWEN_API_KEY: ${QWEN_API_KEY:-}
-      QWEN_MODEL: ${QWEN_MODEL:-qwen3.6-27b}
-      QWEN_TIMEOUT_MS: ${QWEN_TIMEOUT_MS:-180000}
+    # Qwen-Secrets nur aus env_file — ${QWEN_API_KEY:-} würde leere Host-Env den Key überschreiben.
     networks:
       - proxy_network
     security_opt:
