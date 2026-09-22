@@ -250,6 +250,9 @@ def _parse_vorlage_csv(rows: list[list[str]]) -> dict[str, str]:
         "sach-/lizenz",
         "aufschluesselung",
         "kosten-kalkulation",
+        "gesamt personentage",
+        "gesamtsumme",
+        "gesamt pt",
         "gesamt-pt",
         "gesamt-personentage",
         "tarifsatz",
@@ -294,7 +297,7 @@ def _parse_vorlage_csv(rows: list[list[str]]) -> dict[str, str]:
         }:
             mode = "calc"
             continue
-        if first.startswith("summe brutto"):
+        if first.startswith("summe brutto") or first.startswith("gesamtsumme"):
             amount = parse_number(cells[-1] if len(cells) > 1 else "")
             if party == "cit":
                 cit_brutto += amount
@@ -310,7 +313,7 @@ def _parse_vorlage_csv(rows: list[list[str]]) -> dict[str, str]:
         desc = cells[1] if len(cells) > 1 else ""
         if not qty and not desc:
             continue
-        if _norm(desc).startswith("bitte trage") or _norm(desc).startswith("gesamt-personentage"):
+        if _norm(desc).startswith("bitte trage") or _norm(desc).startswith("gesamt"):
             continue
         if _norm(desc).startswith("aufschluesselung"):
             continue
@@ -408,6 +411,19 @@ def parse_effort_csv(text: str) -> dict[str, str]:
     })
 
 
+def _material_sum(parsed: dict[str, str]) -> float:
+    """Sach-/Lizenzkosten aus allen vier Blöcken."""
+    return sum(
+        parse_number(parsed.get(key))
+        for key in (
+            "concept_scs_material",
+            "concept_cit_material",
+            "operate_scs_material",
+            "operate_cit_material",
+        )
+    )
+
+
 def _with_it_costs(parsed: dict[str, str]) -> dict[str, str]:
     rates = load_rates()
     cit_pt = parse_number(parsed.get("effort_it"))
@@ -437,6 +453,12 @@ def _with_it_costs(parsed: dict[str, str]) -> dict[str, str]:
         parsed["costs"] = _qty(scs_total)
     if not parsed.get("it_costs") and cit_total:
         parsed["it_costs"] = _qty(cit_total)
+    material = _material_sum(parsed) or scs_mat + cit_mat
+    if material:
+        parsed["material_costs"] = _qty(round(material, 2))
+    total = parse_number(parsed.get("costs")) + parse_number(parsed.get("it_costs"))
+    if total:
+        parsed["total_costs"] = _qty(round(total, 2))
     return parsed
 
 
@@ -488,6 +510,8 @@ EFFORT_SYNC_KEYS = (
     "effort_sheet_url",
     "costs",
     "it_costs",
+    "material_costs",
+    "total_costs",
     "concept_scs_pt",
     "concept_cit_pt",
     "operate_scs_pt",
@@ -577,7 +601,7 @@ def kalkulation_xlsx(csv_text: str) -> bytes:
     def kind(cells: list[str]) -> str:
         first = (cells[0] if cells else "").strip().lower()
         blob = " ".join(cells).lower()
-        if first.startswith("konzeptions") or first.startswith("betriebs"):
+        if first.startswith("konzeption") or first.startswith("betrieb"):
             return "phase"
         if first.startswith("kalkulation it"):
             return "cit"
@@ -587,9 +611,9 @@ def kalkulation_xlsx(csv_text: str) -> bytes:
             return "colhead"
         if first.startswith("kosten-kalkulation"):
             return "colhead"
-        if first.startswith("summe brutto"):
+        if first.startswith("summe brutto") or first.startswith("gesamtsumme"):
             return "brutto"
-        if "gesamt-personentage" in blob:
+        if "gesamt-personentage" in blob or "gesamt personentage" in blob or "gesamt pt" in blob or "gesamtsumme" in blob:
             return "gesamt"
         return "body"
 

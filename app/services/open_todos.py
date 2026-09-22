@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from app.domain.text import todo_from_status
-from app.models import Request
+from app.models import Request, created_at_utc
 
 MAX_TODOS = 6
 MAX_LEN = 110
@@ -384,7 +384,7 @@ def _pieces_from_text(text: str, *, require_cue: bool) -> list[tuple[str, str]]:
 def _done_keys_from_comments(request: Request) -> set[str]:
     """Spätere ‚erledigt‘-Kommentare entwerten ältere Todos grob."""
     keys: set[str] = set()
-    comments = sorted(request.comments or [], key=lambda c: c.created_at or 0)
+    comments = sorted(request.comments or [], key=created_at_utc)
     for c in comments:
         body = " ".join(str(c.body or "").split()).strip()
         m = _DONE_PREFIX.match(body)
@@ -415,7 +415,7 @@ def _status_pieces(request: Request) -> list[tuple[str, str]]:
 
 
 def _comment_pieces(request: Request) -> list[tuple[str, str]]:
-    comments = sorted(request.comments or [], key=lambda c: c.created_at or 0)
+    comments = sorted(request.comments or [], key=created_at_utc)
     recent = list(reversed(comments[-16:]))
     pieces: list[tuple[str, str]] = []
     for c in recent:

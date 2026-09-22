@@ -223,4 +223,25 @@
     }
     return gate();
   })();
+
+  (function bindVersionInfo() {
+    const wrap = document.getElementById("app-version");
+    const btn = document.getElementById("app-version-info");
+    const pop = document.getElementById("app-version-pop");
+    if (!wrap || !btn || !pop) return;
+    const setOpen = (open) => {
+      wrap.classList.toggle("is-open", open);
+      pop.hidden = !open;
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+    };
+    btn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      setOpen(pop.hidden);
+    });
+    pop.addEventListener("click", (event) => event.stopPropagation());
+    document.addEventListener("click", () => setOpen(false));
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") setOpen(false);
+    });
+  })();
 })();

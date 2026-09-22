@@ -180,11 +180,12 @@ def _format_jira_field_value(
         iso = normalize_date_value(raw)
         return iso if re.fullmatch(r"\d{4}-\d{2}-\d{2}", iso) else raw
     if jira_type == "number":
-        cleaned = raw.replace(",", ".").replace(" PT", "").replace("PT", "").strip()
-        try:
-            return float(cleaned) if "." in cleaned else int(cleaned)
-        except ValueError:
+        from app.domain.calc import parse_money_amount
+
+        amount = parse_money_amount(raw)
+        if amount is None:
             return None
+        return int(amount) if amount == int(amount) else amount
     if jira_type == "user":
         from app.triage.engine import is_unknown_answer
 
@@ -194,6 +195,29 @@ def _format_jira_field_value(
             return user_resolver(raw)
         name = _jira_username(raw)
         return {"name": name} if name else None
+    if jira_type == "users":
+        from app.triage.engine import is_unknown_answer
+
+        if is_unknown_answer(raw):
+            return None
+        parts = [part.strip() for part in raw.replace(";", ",").split(",") if part.strip()]
+        out: list[dict[str, str]] = []
+        seen: set[str] = set()
+        for part in parts:
+            if is_unknown_answer(part):
+                continue
+            resolved = user_resolver(part) if user_resolver else None
+            if not resolved:
+                name = _jira_username(part)
+                resolved = {"name": name} if name else None
+            if not resolved:
+                continue
+            key = str(resolved.get("name") or resolved.get("accountId") or "").lower()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            out.append(resolved)
+        return out or None
     if jira_type == "option":
         if option_resolver:
             resolved = option_resolver(jira_id, raw)

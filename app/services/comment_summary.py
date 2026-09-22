@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from app.models import Comment, Request
+from app.models import Comment, Request, created_at_utc
 
 MAX_BLURB = 120
 
 
 def _sorted_comments(request: Request) -> list[Comment]:
-    return sorted(request.comments or [], key=lambda c: c.created_at or 0)
+    return sorted(request.comments or [], key=created_at_utc)
 
 
 def comments_payload(request: Request) -> list[dict]:

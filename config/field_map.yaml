@@ -1,5 +1,5 @@
 # Mapping eigenes Domain-Modell -> Jira. Nur der Adapter liest diese Datei.
-# jira_type: string|date|user|option|number|components|text (nur description)
+# jira_type: string|date|user|users|option|number|components|text (nur description)
 
 project_key: CHANGE
 kinds:
@@ -121,11 +121,10 @@ fields:
     jira_type: user
     kinds: [it_request]
   change_team:
-    jira: customfield_19652
-    label: Change-Team
+    jira: customfield_24101
+    label: Additional Assignees
     required: false
-    jira_type: option
-    create: false
+    jira_type: users
   stakeholder:
     jira: customfield_14203
     label: Stakeholder
@@ -205,6 +204,14 @@ fields:
     label: IT Cost (one time - in €)
     required: false
     jira_type: number
+  material_costs:
+    jira: null
+    label: Sachkosten
+    required: false
+  total_costs:
+    jira: null
+    label: Gesamtsumme
+    required: false
   extra_account:
     jira: null
     label: Zusatzkontierung

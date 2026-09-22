@@ -151,6 +151,24 @@
       keepForm: true,
     },
     {
+      key: "help_needed",
+      prompt: "Benötigst du Hilfe?",
+      placeholder: "Hilfe benötigt",
+      label: "Hilfe benötigt",
+      kind: "overview",
+      choices: ["Ja", "Nein"],
+    },
+    {
+      key: "help_topic",
+      prompt: "Bei was genau brauchst du Hilfe?",
+      placeholder: "z. B. Abstimmung mit der IT",
+      label: "Hilfe bei",
+      kind: "overview",
+      long: true,
+      onlyIf: () => String(values.help_needed || "").trim().toLowerCase() === "ja",
+      hint: "Der Punkt wird unten in der Beschreibung ergänzt.",
+    },
+    {
       key: "cost_savings",
       prompt: "Welche Kostenersparnis erwartest du?",
       placeholder: "Zahl, z. B. 12000",
@@ -191,19 +209,23 @@
     {
       key: "change_team",
       prompt: "Welche Personen unterstützen bei diesem Projekt?",
-      placeholder: "Namen, durch Komma getrennt",
+      placeholder: "Namen suchen…",
       label: "Change-Team",
       kind: "team",
       optional: true,
+      multi: true,
+      jiraLookup: "user",
       choices: ["Keine"],
       keepForm: true,
     },
     {
       key: "stakeholder",
-      prompt: "Wer sind die Stakeholder?",
+      prompt:
+        "Wer sind die Stakeholder? z. B. SCS Komplett, Bildungsinstitute oder Einzelpersonen, Geschäftsleitung",
       placeholder: "Stakeholder",
       label: "Stakeholder",
       kind: "team",
+      hint: "Beispiele: SCS Komplett, Bildungsinstitute oder Einzelpersonen, Geschäftsleitung",
     },
     {
       key: "process_owner",
@@ -227,6 +249,24 @@
       jiraLookup: "user",
       choices: ["Ich weiß es noch nicht"],
       keepForm: true,
+    },
+    {
+      key: "solution_category",
+      prompt: "Welche Solution Category?",
+      placeholder: "Solution Category",
+      label: "Solution Category",
+      kind: "team",
+      onlyKind: "it_request",
+      jiraLookup: "option:solution_category",
+    },
+    {
+      key: "solution_name",
+      prompt: "Welche Solution?",
+      placeholder: "Solution",
+      label: "Solution",
+      kind: "team",
+      onlyKind: "it_request",
+      jiraLookup: "option:solution_name",
     },
   ];
 
@@ -295,6 +335,18 @@
     kind: "cost",
   };
 
+  const COST_MATERIAL_STEP = {
+    key: "material_costs",
+    label: "Sachkosten",
+    kind: "cost",
+  };
+
+  const COST_TOTAL_STEP = {
+    key: "total_costs",
+    label: "Gesamtsumme",
+    kind: "cost",
+  };
+
   const PRIORITY_STEP = {
     key: "priority",
     label: "Priorität",
@@ -352,6 +404,11 @@
   function confirmAiReview() {
     aiReviewPending = false;
     if (aiReviewOk) aiReviewOk.hidden = true;
+    revealCostsAfterReview = true;
+    const costIdx = STEPS.findIndex((item) => item.kind === "cost" && stepVisible(item));
+    if (costIdx !== -1 && stepIndex < costIdx) stepIndex = costIdx;
+    prepareCostFields();
+    openEffortTemplate();
     syncPrompt();
   }
 
@@ -405,9 +462,12 @@
   let kindLocked = false;
   let autoFillBusy = false;
   let aiReviewPending = false;
+  let revealCostsAfterReview = false;
   let overviewGen = 0;
   let clarifyDescription = false;
   let forceThinOk = false;
+  // Geladenes Ticket: Stand, Kommentare und Anhänge hängen nicht am Intake-Fortschritt.
+  let loadedTicket = false;
   const jiraUserCache = [];
   const jiraComponentCache = [];
   window.jiraComponentTree = [];
@@ -709,6 +769,7 @@
   function stepVisible(step) {
     if (!step) return false;
     if (step.onlyKind && ticketKind() !== step.onlyKind) return false;
+    if (typeof step.onlyIf === "function" && !step.onlyIf()) return false;
     return true;
   }
 
@@ -852,6 +913,8 @@
     if (key === "effort_it") return COST_IT_STEP;
     if (key === "it_costs") return COST_IT_MONEY_STEP;
     if (key === "costs") return COST_MONEY_STEP;
+    if (key === "material_costs") return COST_MATERIAL_STEP;
+    if (key === "total_costs") return COST_TOTAL_STEP;
     if (key === "priority") return PRIORITY_STEP;
     return STEPS.find((item) => item.key === key) || null;
   }
@@ -922,6 +985,41 @@
     return Boolean(ticketFinish && !ticketFinish.hidden);
   }
 
+  function intakeTailOpen() {
+    if (loadedTicket) return true;
+    if (finishVisible()) return true;
+    if (autoFillBusy || aiReviewPending) return false;
+    if (stepIndex >= STEPS.length && ticketComplete()) return true;
+    return false;
+  }
+
+  function intakeKindReached(kind) {
+    if (kind === "cost" && revealCostsAfterReview) return true;
+    if (intakeTailOpen()) return true;
+    const live = currentStep();
+    if (live?.kind === kind) return true;
+    for (let i = 0; i < STEPS.length; i += 1) {
+      const item = STEPS[i];
+      if (!stepVisible(item) || item.kind !== kind) continue;
+      if (stepIndex > i) return true;
+    }
+    return false;
+  }
+
+  function syncIntakePanels() {
+    const tail = intakeTailOpen();
+    if (team) team.hidden = !intakeKindReached("team");
+    if (costs) costs.hidden = !intakeKindReached("cost");
+    if (filesSection) filesSection.hidden = !tail;
+    if (fieldsRoot) {
+      fieldsRoot.hidden = !tail || !fieldsRoot.children.length;
+    }
+    if (commentsSection) commentsSection.hidden = !(tail && syncedRequestId);
+    if (commentStand && (!tail || !syncedRequestId)) {
+      commentStand.hidden = true;
+    }
+  }
+
   function showFinishActions(key, jiraUrl) {
     if (!ticketFinish || !openJiraLink || !newChangeBtn) return;
     jiraBtn.hidden = true;
@@ -936,6 +1034,7 @@
       openJiraLink.setAttribute("aria-disabled", "true");
     }
     setIntro("");
+    syncIntakePanels();
   }
 
   function syncJiraButton() {
@@ -1027,7 +1126,6 @@
     }
 
     if (step.kind === "team") {
-      team.hidden = false;
       let cell = teamFields.querySelector(`[data-key="${step.key}"]`);
       if (!cell) {
         cell = document.createElement("div");
@@ -1042,11 +1140,11 @@
       if (dt) dt.textContent = step.label;
       cell.hidden = false;
       orderTeamFields();
+      syncIntakePanels();
       return document.getElementById(`ticket-${step.key}-value`);
     }
 
     if (step.kind === "cost") {
-      costs.hidden = false;
       let cell = costFields.querySelector(`[data-key="${step.key}"]`);
       if (!cell) {
         cell = document.createElement("div");
@@ -1059,6 +1157,7 @@
       }
       cell.hidden = false;
       orderCostFields();
+      syncIntakePanels();
       return document.getElementById(`ticket-${step.key}-value`);
     }
 
@@ -1073,6 +1172,7 @@
       fieldsRoot.appendChild(row);
     }
     row.hidden = false;
+    syncIntakePanels();
     return document.getElementById(`ticket-${step.key}-value`);
   }
 
@@ -1090,6 +1190,8 @@
       "author",
       "process_owner",
       "solution_owner",
+      "solution_category",
+      "solution_name",
       "change_team",
       "stakeholder",
     ].forEach((key) => {
@@ -1099,7 +1201,15 @@
   }
 
   function orderCostFields() {
-    ["cost_savings", "effort_fb", "effort_it", "it_costs", "costs"].forEach((key) => {
+    [
+      "effort_fb",
+      "effort_it",
+      "costs",
+      "it_costs",
+      "material_costs",
+      "cost_savings",
+      "total_costs",
+    ].forEach((key) => {
       const cell = costFields.querySelector(`[data-key="${key}"]`);
       if (cell) costFields.appendChild(cell);
     });
@@ -1155,7 +1265,7 @@
     const showIt = ticketKind() === "it_request";
 
     // Verantwortliche Person aus der IT + Solution Owner
-    for (const key of ["it_owner", "solution_owner"]) {
+    for (const key of ["it_owner", "solution_owner", "solution_category", "solution_name"]) {
       const cell = teamFields.querySelector(`[data-key="${key}"]`);
       if (cell) cell.hidden = !showIt;
       else if (showIt) {
@@ -1167,7 +1277,7 @@
       }
     }
 
-    // Solution Category + Solution entfallen
+    // Solution Category + Solution bei IT Request
   }
 
   function displayFor(key) {
@@ -1183,6 +1293,29 @@
       .map((chip) => chip.textContent.trim())
       .filter(Boolean)
       .join(", ");
+  }
+
+  const HELP_MARK = "Hilfe benötigt bei:";
+
+  /** Antwort auf „Bei was brauchst du Hilfe?“ wandert unten in die Beschreibung. */
+  function mergeHelpIntoDescription() {
+    const topic = String(values.help_topic || "").trim();
+    if (!topic) return;
+    const step = stepByKey("description");
+    if (!step) return;
+    const base = String(values.description || "")
+      .replace(/\n*Hilfe benötigt bei:[\s\S]*$/i, "")
+      .trim();
+    const next = `${base}\n\n${HELP_MARK} ${topic}`.trim();
+    if (next === String(values.description || "").trim()) return;
+    values.description = next;
+    const el = ensureFieldShell(step);
+    if (el) {
+      writeFieldValue(el, step, next);
+      el.classList.remove("ticket-row-value-pending");
+      el.classList.add("ticket-row-value-in");
+    }
+    persistField("description", next);
   }
 
   function writeFieldValue(el, step, raw) {
@@ -1342,6 +1475,7 @@
     void refreshKind();
     syncJiraButton();
     persistField(key, values[key] || text);
+    if (key === "help_topic") mergeHelpIntoDescription();
     if (step?.kind === "overview") refreshOverviewChrome();
   }
 
@@ -1376,7 +1510,11 @@
 
   function renderFieldChips(step, valueEl) {
     clearFieldExtras(valueEl);
-    valueEl.hidden = true;
+    valueEl.hidden = Boolean(!step.keepForm);
+    if (step.keepForm) {
+      valueEl.contentEditable = "true";
+      valueEl.classList.add("is-editing");
+    }
     const row = document.createElement("div");
     row.className = "choice-row field-edit-chips";
     step.choices.forEach((value) => {
@@ -1410,7 +1548,7 @@
     clearFieldExtras(valueEl);
     const isTags = isTagStep(step);
 
-    // Stichwörter / Tags: Chips ohne Suchfeld.
+    // Mehrfachauswahl: User-Chips oder Stichwörter.
     if (isTags) {
       valueEl.hidden = false;
       valueEl.contentEditable = "false";
@@ -1419,31 +1557,66 @@
       const wrap = document.createElement("div");
       wrap.className = "field-edit-lookup is-tags";
       wrap.addEventListener("mousedown", (ev) => ev.stopPropagation());
+      if (step.choices?.length) {
+        const chips = document.createElement("div");
+        chips.className = "choice-row field-edit-chips";
+        step.choices.forEach((value) => {
+          const chip = document.createElement("button");
+          chip.type = "button";
+          chip.className = "suggestion";
+          chip.textContent = value;
+          if (value === values[step.key] || (isUnknownFieldValue(value) && isUnknownFieldValue(values[step.key]))) {
+            chip.classList.add("is-selected");
+          }
+          chip.onclick = (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            values[step.key] = value;
+            delete labels[step.key];
+            writeFieldValue(valueEl, step, value);
+            editingKey = null;
+            clearFieldExtras(valueEl);
+            void refreshPriority();
+            void refreshKind();
+            syncJiraButton();
+            persistField(step.key, value);
+          };
+          chips.appendChild(chip);
+        });
+        wrap.appendChild(chips);
+      }
       if (step.hint) {
         const hint = document.createElement("p");
         hint.className = "field-tags-hint";
         hint.textContent = step.hint;
         wrap.appendChild(hint);
       }
+      const search = document.createElement("input");
+      search.type = "search";
+      search.className = "field-lookup-search";
+      search.placeholder = step.placeholder || "Suchen…";
+      search.autocomplete = "off";
+      if (step.jiraLookup === "user") wrap.appendChild(search);
       const list = document.createElement("div");
       list.className = "field-lookup-list";
       wrap.appendChild(list);
       valueEl.insertAdjacentElement("afterend", wrap);
 
-      function selectedComponents() {
+      function selectedParts() {
         return String(values[step.key] || labels[step.key] || "")
           .split(/[,;]/)
           .map((part) => part.trim())
-          .filter(Boolean);
+          .filter(Boolean)
+          .filter((part) => !isUnknownFieldValue(part));
       }
 
       function pick(item) {
         const label = item.label || item.displayName || item.name || "";
         const name = item.name || label;
-        const current = selectedComponents();
+        const current = selectedParts();
         const key = name.toLowerCase();
-        const next = current.some((part) => part.toLowerCase() === key)
-          ? current.filter((part) => part.toLowerCase() !== key)
+        const next = current.some((part) => part.toLowerCase() === key || part.toLowerCase() === label.toLowerCase())
+          ? current.filter((part) => part.toLowerCase() !== key && part.toLowerCase() !== label.toLowerCase())
           : [...current, name];
         const joined = next.join(", ");
         if (joined) {
@@ -1454,11 +1627,12 @@
           delete labels[step.key];
           writeFieldValue(valueEl, step, "");
         }
-        void loadSuggestions("").then((items) => {
+        void loadSuggestions(search.value || "").then((items) => {
           if (editingKey !== step.key) return;
           renderList(items);
         });
         syncJiraButton();
+        persistField(step.key, joined);
       }
 
       async function loadSuggestions(query) {
@@ -1474,32 +1648,37 @@
 
       function renderList(items) {
         list.innerHTML = "";
-        const tree = window.filterComponentTree?.(window.jiraComponentTree, "") || [];
-        if (tree.length && window.renderComponentTree) {
+        const tree = window.filterComponentTree?.(window.jiraComponentTree, search.value || "") || [];
+        if (step.jiraLookup === "components" && tree.length && window.renderComponentTree) {
           list.classList.add("is-tree");
           window.renderComponentTree(list, tree, {
-            selected: selectedComponents(),
+            selected: selectedParts(),
             onToggle: (node) => pick(node),
           });
           return;
         }
+        list.classList.remove("is-tree");
         if (!items.length) {
           const empty = document.createElement("span");
           empty.className = "field-lookup-empty";
-          empty.textContent = "Keine Stichwörter / Tags geladen";
+          empty.textContent =
+            step.jiraLookup === "user"
+              ? search.value.trim()
+                ? "Keine Treffer in Jira"
+                : "Name tippen — Jira schlägt vor"
+              : "Keine Stichwörter / Tags geladen";
           list.appendChild(empty);
           return;
         }
-        const selected = new Set(
-          selectedComponents().map((part) => part.toLowerCase())
-        );
+        const selected = new Set(selectedParts().map((part) => part.toLowerCase()));
         items.forEach((item) => {
           const btn = document.createElement("button");
           btn.type = "button";
           btn.className = "suggestion field-lookup-item";
           btn.textContent = item.label || item.name;
           const key = String(item.name || item.label || "").toLowerCase();
-          if (selected.has(key)) btn.classList.add("is-selected");
+          const lab = String(item.label || item.displayName || "").toLowerCase();
+          if (selected.has(key) || (lab && selected.has(lab))) btn.classList.add("is-selected");
           btn.onclick = (ev) => {
             ev.preventDefault();
             ev.stopPropagation();
@@ -1509,10 +1688,24 @@
         });
       }
 
-      void loadSuggestions("").then((items) => {
+      let timer = 0;
+      search.addEventListener("input", () => {
+        window.clearTimeout(timer);
+        const query = search.value;
+        timer = window.setTimeout(() => {
+          void loadSuggestions(query).then((items) => {
+            if (editingKey !== step.key) return;
+            renderList(items);
+          });
+        }, 120);
+      });
+      void loadSuggestions(step.jiraLookup === "user" ? "" : "").then((items) => {
         if (editingKey !== step.key) return;
         renderList(items);
       });
+      if (step.jiraLookup === "user") {
+        window.setTimeout(() => search.focus(), 0);
+      }
       return;
     }
 
@@ -1684,7 +1877,8 @@
 
   function startEdit(key) {
     if (key === "priority") return;
-    if (key === "effort_fb" || key === "effort_it" || key === "it_costs") return;
+    if (key === "effort_fb" || key === "effort_it") return;
+    if (key === "it_costs" || key === "material_costs" || key === "total_costs") return;
     const step = stepByKey(key);
     if (!step) return;
     const host = fieldCell(step);
@@ -1796,6 +1990,7 @@
     if (!step) {
       if (finishVisible()) {
         window.syncTicketInput?.();
+        syncIntakePanels();
         return;
       }
       if (ticketComplete()) {
@@ -1804,15 +1999,16 @@
         jiraBtn.hidden = false;
       } else {
         jiraBtn.hidden = true;
-        setIntro("Bitte alle offenen Felder im Ticket ausfüllen");
-        intro.classList.add("field-prompt-in");
+        setIntro("");
       }
-      window.syncTicketInput?.();
-      return;
+    window.syncTicketInput?.();
+    syncIntakePanels();
+    return;
     }
 
     if (!finishVisible()) jiraBtn.hidden = true;
     revealCurrentField();
+    syncIntakePanels();
     setIntro(step.prompt);
     intro.classList.remove("field-prompt-in");
     void intro.offsetWidth;
@@ -1838,6 +2034,7 @@
     showAuthor({ preferActor: true });
     refreshPriority();
     showFiles();
+    syncIntakePanels();
 
     const valueEl = ensureFieldShell(step);
     if (!valueEl) return null;
@@ -1922,6 +2119,8 @@
 
     armEdit(step);
     stepIndex += 1;
+    if (step.key === "help_topic") mergeHelpIntoDescription();
+    syncIntakePanels();
     void refreshPriority();
     void refreshKind();
     if (step.kind === "overview") refreshOverviewChrome();
@@ -1934,6 +2133,7 @@
           autoFillBusy = false;
           refreshOverviewChrome();
           showAiReviewHint();
+          syncIntakePanels();
         });
       return;
     }
@@ -2076,6 +2276,10 @@
     return `${n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
   }
 
+  function isMoneyCostKey(key) {
+    return ["costs", "it_costs", "material_costs", "total_costs"].includes(key);
+  }
+
   function formatPtDisplay(text) {
     const raw = String(text || "").trim();
     if (!raw) return "";
@@ -2100,8 +2304,7 @@
     if (step.key === "effort_fb" || step.key === "effort_it") {
       value = formatPtDisplay(value);
     }
-    const shown =
-      step.key === "costs" || step.key === "it_costs" ? formatMoney(value) : value;
+    const shown = isMoneyCostKey(step.key) ? formatMoney(value) : value;
     el.textContent = shown;
     if (value) values[step.key] = value;
     else delete values[step.key];
@@ -2117,13 +2320,17 @@
     const it = values.effort_it || values.concept_cit_pt || "";
     const itMoney = values.it_costs || "";
     const money = values.costs || "";
+    const material = values.material_costs || "";
+    const total = values.total_costs || "";
     const sheet = values.effort_sheet_url || "";
-    if (!fb && !it && !itMoney && !money && !sheet) return;
+    if (!fb && !it && !itMoney && !money && !material && !total && !sheet) return;
     prepareCostFields();
     if (fb) writeCostField(COST_FB_STEP, fb, true);
     if (it) writeCostField(COST_IT_STEP, it, true);
     if (itMoney) writeCostField(COST_IT_MONEY_STEP, itMoney, true);
     if (money) writeCostField(COST_MONEY_STEP, money, true);
+    if (material) writeCostField(COST_MATERIAL_STEP, material, true);
+    if (total) writeCostField(COST_TOTAL_STEP, total, true);
     syncEffortOpenLabel();
     const hintEl = costHintEl();
     if (hintEl && (values.effort_fb || values.effort_it)) {
@@ -2140,6 +2347,8 @@
       "effort_sheet_url",
       "costs",
       "it_costs",
+      "material_costs",
+      "total_costs",
       "concept_scs_pt",
       "concept_cit_pt",
       "operate_scs_pt",
@@ -2154,7 +2363,8 @@
       "operate_cit_material",
     ].forEach((key) => {
       const val = String(values[key] || "").trim();
-      if (val) fields[key] = val;
+      if (!val) return;
+      fields[key] = isMoneyCostKey(key) ? String(parseMoney(val) || val) : val;
     });
     if (!fields.concept_scs_pt) {
       const n = parsePt(values.effort_fb);
@@ -2186,6 +2396,10 @@
     fieldCell(COST_IT_MONEY_STEP)?.classList.add("is-readonly");
     ensureFieldShell(COST_MONEY_STEP);
     fieldCell(COST_MONEY_STEP)?.classList.add("is-readonly");
+    ensureFieldShell(COST_MATERIAL_STEP);
+    fieldCell(COST_MATERIAL_STEP)?.classList.add("is-readonly");
+    ensureFieldShell(COST_TOTAL_STEP);
+    fieldCell(COST_TOTAL_STEP)?.classList.add("is-readonly");
     orderCostFields();
     const hintEl = costHintEl();
     if (hintEl && !parsePt(values.effort_fb)) {
@@ -2216,6 +2430,8 @@
     writeCostField(COST_IT_STEP, body.effort_it || "", true);
     writeCostField(COST_IT_MONEY_STEP, body.it_costs || "", true);
     writeCostField(COST_MONEY_STEP, body.costs || "", true);
+    writeCostField(COST_MATERIAL_STEP, body.material_costs || "", true);
+    writeCostField(COST_TOTAL_STEP, body.total_costs || "", true);
     [
       "effort_sheet_url",
       "concept_scs_pt",
@@ -2231,6 +2447,8 @@
       "operate_scs_material",
       "operate_cit_material",
       "it_costs",
+      "material_costs",
+      "total_costs",
       "summe",
     ].forEach((key) => {
       const val = String(body[key] || "").trim();
@@ -2249,7 +2467,7 @@
     syncJiraButton();
   }
 
-  async function importEffortSheet(url) {
+  async function importEffortSheet(url, ownerId) {
     const href = String(url || "").trim();
     if (!href) throw new Error("Keine Sheet-URL");
     const hintEl = costHintEl();
@@ -2261,6 +2479,7 @@
     });
     const body = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(body.detail || "Übernahme fehlgeschlagen");
+    if (ownerId !== undefined && (ownerId || null) !== (syncedRequestId || null)) return;
     applyEffortSheet(body);
   }
 
@@ -2280,20 +2499,26 @@
     return /dummycritraufwand/i.test(href) || href === "/effort-sheet" || href.endsWith("/effort-sheet");
   }
 
-  async function commitEffortCsv(csv) {
+  /** Die Kalkulation gehört zu genau dem Ticket, für das sie geöffnet wurde. */
+  async function commitEffortCsv(csv, ownerId, shareId) {
     const hintEl = costHintEl();
-    if (hintEl) hintEl.textContent = "Übernehme Aufwand…";
+    const stillOpen = (ownerId || null) === (syncedRequestId || null);
+    if (hintEl && stillOpen) hintEl.textContent = "Übernehme Aufwand…";
     const r = await fetch("/api/sessions/effort-sheet/commit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         csv,
-        share_id: shareIdFromUrl(values.effort_sheet_url) || undefined,
-        request_id: syncedRequestId || undefined,
+        share_id: shareId || undefined,
+        request_id: ownerId || undefined,
       }),
     });
     const body = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(body.detail || "Übernahme fehlgeschlagen");
+    if (!stillOpen) {
+      flash("Aufwand wurde beim ursprünglichen Change gespeichert.");
+      return;
+    }
     applyEffortSheet(body);
     if (hintEl && syncedRequestId) {
       hintEl.textContent = "Aufwand gespeichert und nach Jira gestellt.";
@@ -2301,14 +2526,15 @@
   }
 
   function openEffortTemplate() {
+    // Ticket und Share beim Öffnen festhalten — ein Ticketwechsel darf nichts verschieben.
+    const ownerId = syncedRequestId || null;
     const share = shareIdFromUrl(values.effort_sheet_url);
     const settingsUrl = effortSheetOpenUrl || effortSheetTemplateUrl;
     const dummy = isDummyEffortSheet(effortSheetTemplateUrl) || isDummyEffortSheet(settingsUrl) || !settingsUrl;
-    const url = share
-      ? `/effort-sheet?share=${share}`
-      : dummy
-        ? "/effort-sheet?fresh=1"
-        : settingsUrl;
+    // Titel mitgeben, damit im Sheet steht, zu welchem Change es gehört.
+    const forParam = encodeURIComponent(String(values.title || "").trim().slice(0, 90));
+    const own = share ? `/effort-sheet?share=${share}` : "/effort-sheet?fresh=1";
+    const url = share || dummy ? (forParam ? `${own}&for=${forParam}` : own) : settingsUrl;
     if (!url) {
       const hintEl = costHintEl();
       if (hintEl) {
@@ -2316,7 +2542,11 @@
       }
       return;
     }
-    const popup = window.open(url, "critrEffortSheet", "popup=yes,width=980,height=780");
+    const popup = window.open(
+      url,
+      `critrEffortSheet-${ownerId || "neu"}`,
+      "popup=yes,width=980,height=780"
+    );
     if (!popup) {
       const hintEl = costHintEl();
       if (hintEl) hintEl.textContent = "Popup blockiert — bitte Popups erlauben.";
@@ -2334,10 +2564,10 @@
       clearInterval(timer);
       window.removeEventListener("message", onMsg);
       const run = pendingCsv.trim()
-        ? commitEffortCsv(pendingCsv)
+        ? commitEffortCsv(pendingCsv, ownerId, share)
         : dummy
           ? Promise.resolve()
-          : importEffortSheet(effortSheetTemplateUrl || url);
+          : importEffortSheet(effortSheetTemplateUrl || url, ownerId);
       run.catch((err) => {
         const hintEl = costHintEl();
         if (hintEl) hintEl.textContent = err.message || "Sheet konnte nicht übernommen werden.";
@@ -2713,8 +2943,8 @@
     if (detail && Array.isArray(detail.attachments)) {
       remoteAttachments = detail.attachments;
     }
-    filesSection.hidden = false;
     renderFiles();
+    syncIntakePanels();
   }
 
   async function uploadAttachmentFile(file) {
@@ -3088,6 +3318,8 @@
       ["it_owner", "user"],
       ["author", "user"],
       ["components", "components"],
+      ["solution_category", "option:solution_category"],
+      ["solution_name", "option:solution_name"],
     ];
     const failed = [];
     await Promise.all(
@@ -3646,13 +3878,13 @@
       }
       return;
     }
-    commentsSection.hidden = false;
+    commentsSection.hidden = !(intakeTailOpen() && syncedRequestId);
     const ablauf = (detail.commentAblauf || "").trim();
     const statusAblauf = (detail.statusAblauf || "").trim();
     const standBody = standWithoutTodoEcho(ablauf || statusAblauf);
     const waiting = Boolean(detail.waitingOnMe);
     if (commentStand && commentAblauf) {
-      if (standBody || syncedRequestId) {
+      if (intakeTailOpen() && (standBody || syncedRequestId)) {
         commentStand.hidden = false;
         commentAblauf.textContent = standBody;
         commentAblauf.classList.toggle("is-empty", !standBody);
@@ -3859,8 +4091,30 @@
     }
   }
 
+  /** Kein Rest vom vorher geöffneten Change — sonst wandern Werte ins falsche Ticket. */
+  function resetTicketState() {
+    loadedTicket = false;
+    for (const key of Object.keys(values)) delete values[key];
+    for (const key of Object.keys(labels)) delete labels[key];
+    costFields.replaceChildren();
+    overviewFields.replaceChildren();
+    teamFields.replaceChildren();
+    metaRoot.querySelectorAll("[data-key]").forEach((cell) => {
+      const el = cell.querySelector(".ticket-row-value");
+      if (el) writeFieldValue(el, stepByKey(cell.dataset.key), "");
+      cell.hidden = true;
+    });
+    fieldsRoot.querySelectorAll(".ticket-row").forEach((row) => row.remove());
+    headline.textContent = "";
+    if (effortSheetOpen) effortSheetOpen.textContent = "Vorlage öffnen";
+    const hintEl = costHintEl();
+    if (hintEl) hintEl.textContent = "Vorlage öffnen, Kalkulation ausfüllen, Fenster schließen.";
+  }
+
   function applyRequest(detail, { animate = true } = {}) {
+    resetTicketState();
     syncedRequestId = detail.id || null;
+    loadedTicket = Boolean(syncedRequestId);
     const fieldMap = {};
     for (const row of detail.fields || []) {
       if (row?.key) fieldMap[row.key] = row.value || "";
@@ -3911,17 +4165,18 @@
     }
     setPriority(detail.priorityLabel || "Mittel", detail.priority || "medium");
     showAuthor();
+    const sync = detail.sync || {};
+    if (sync.externalKey) {
+      showJiraBadge(sync.externalKey, sync.externalUrl || "");
+      showFinishActions(sync.externalKey, sync.externalUrl || "");
+    }
     showFiles(detail);
     renderComments(detail);
     hydrateCostFields();
     loadDraft(syncedRequestId);
     restoreTicketScroll(syncedRequestId);
     refreshOverviewChrome();
-    const sync = detail.sync || {};
-    if (sync.externalKey) {
-      showJiraBadge(sync.externalKey, sync.externalUrl || "");
-      showFinishActions(sync.externalKey, sync.externalUrl || "");
-    }
+    syncIntakePanels();
     jiraBtn.hidden = true;
     window.syncTicketInput?.();
   }

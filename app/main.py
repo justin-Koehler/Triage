@@ -89,11 +89,18 @@ async def _comment_sync_loop(stop: asyncio.Event) -> None:
             port = get_ticket_port()
             from app.services.jira_inbox import sync_comments_batch
 
+            from app.services.stand_summary import backfill_missing
+
             with SessionLocal() as db:
-                stats = sync_comments_batch(db, port, limit=20)
+                stats = sync_comments_batch(db, port, limit=20, summarize=True)
                 db.commit()
                 if stats.get("updated") or stats.get("failed"):
                     log.info("comment-sync %s", stats)
+            with SessionLocal() as db:
+                filled = backfill_missing(db, limit=5, llm=True)
+                db.commit()
+                if filled:
+                    log.info("stand-backfill %s", filled)
         except Exception:
             log.exception("comment-sync fehlgeschlagen")
         try:

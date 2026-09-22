@@ -177,13 +177,18 @@ def export_csv(
 @router.get("/{request_id}")
 def get_request(
     request_id: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(current_actor),
 ) -> dict:
     request = svc.get_request(db, request_id)
     if not request:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Anliegen unbekannt")
-    return svc.to_detail(request, actor=user)
+    detail = svc.to_detail(request, actor=user)
+    # Fehlt der Stand (z. B. Ticket kam nur über den Jira-Sync), nachträglich bauen.
+    if not (detail.get("standSummary") or "").strip():
+        background_tasks.add_task(_stand_later, request_id)
+    return detail
 
 
 @router.get("/{request_id}/chat")

@@ -17,7 +17,16 @@ from app.domain.types import (
     parse_kind,
     parse_priority,
 )
-from app.models import Comment, ExternalRef, Request, RequestAttachment, RequestField, User, utcnow
+from app.models import (
+    Comment,
+    ExternalRef,
+    Request,
+    RequestAttachment,
+    RequestField,
+    User,
+    created_at_utc,
+    utcnow,
+)
 from app.ports.ticket_port import TicketPort, TicketPortError
 from app.services.requests_service import hub_next_step, to_detail
 
@@ -141,12 +150,12 @@ def list_inbox(
         if request:
             comments = list(request.comments or [])
             if comments:
-                latest = max(comments, key=lambda c: c.created_at or datetime.min.replace(tzinfo=UTC))
+                latest = max(comments, key=created_at_utc)
                 if latest.created_at:
                     latest_comment = latest.created_at.isoformat()
             atts = list(request.attachments or [])
             if atts:
-                latest_a = max(atts, key=lambda a: a.created_at or datetime.min.replace(tzinfo=UTC))
+                latest_a = max(atts, key=created_at_utc)
                 if latest_a.created_at:
                     latest_attach = latest_a.created_at.isoformat()
         for cand in (activity, latest_comment, latest_attach):
@@ -485,8 +494,23 @@ def upload_attachment(
         if str(a.filename or "").strip().lower() == name.lower()
     ]
     if matches:
-        return sorted(matches, key=lambda a: a.created_at or utcnow(), reverse=True)[0]
+        return sorted(matches, key=created_at_utc, reverse=True)[0]
     raise TicketPortError("Anhang wurde hochgeladen, konnte lokal aber nicht gespiegelt werden")
+
+
+def refresh_stand_after_sync(db: Session, request: Request, *, changed: bool, llm: bool) -> bool:
+    """Stand-Feld nach Jira-Sync anlegen bzw. aktualisieren — auch ohne Kommentare."""
+    from app.services.stand_summary import BRIEF_KEY, LINE_KEY, refresh_stand
+
+    values = request.field_values()
+    missing = not (values.get(LINE_KEY) or "").strip() or not (values.get(BRIEF_KEY) or "").strip()
+    if not changed and not missing:
+        return False
+    try:
+        refresh_stand(db, request, llm=llm)
+        return True
+    except Exception:
+        return False
 
 
 def sync_comments_batch(
@@ -497,11 +521,13 @@ def sync_comments_batch(
     limit: int = 25,
     user_token: str | None = None,
     user_email: str | None = None,
+    summarize: bool = False,
 ) -> dict[str, int]:
     """Kommentare für bekannte Jira-Keys nachziehen (Hub / Hintergrund)."""
     synced = 0
     updated = 0
     failed = 0
+    stand = 0
     targets: list[ExternalRef] = []
     if keys:
         clean = [k.strip() for k in keys if str(k or "").strip()][: max(1, min(limit, 50))]
@@ -514,6 +540,7 @@ def sync_comments_batch(
                         selectinload(ExternalRef.request).selectinload(Request.fields),
                         selectinload(ExternalRef.request).selectinload(Request.external_refs),
                         selectinload(ExternalRef.request).selectinload(Request.attachments),
+                        selectinload(ExternalRef.request).selectinload(Request.status_updates),
                     )
                     .where(ExternalRef.external_key.in_(clean))
                 ).all()
@@ -527,6 +554,7 @@ def sync_comments_batch(
                     selectinload(ExternalRef.request).selectinload(Request.fields),
                     selectinload(ExternalRef.request).selectinload(Request.external_refs),
                     selectinload(ExternalRef.request).selectinload(Request.attachments),
+                    selectinload(ExternalRef.request).selectinload(Request.status_updates),
                 )
                 .where(ExternalRef.external_key.is_not(None))
                 .order_by(ExternalRef.synced_at.desc().nulls_last())
@@ -549,12 +577,14 @@ def sync_comments_batch(
             a = sync_attachments_from_jira(
                 db, port, request, user_token=user_token, user_email=user_email
             )
+            if refresh_stand_after_sync(db, request, changed=bool(n), llm=summarize):
+                stand += 1
             synced += 1
             if n or a:
                 updated += 1
         except Exception:
             failed += 1
-    return {"synced": synced, "updated": updated, "failed": failed}
+    return {"synced": synced, "updated": updated, "failed": failed, "stand": stand}
 
 
 def import_issue(
@@ -641,6 +671,8 @@ def import_issue(
     sync_attachments_from_jira(
         db, port, request, user_token=user_token, user_email=user_email
     )
+    # Stand sofort ohne LLM setzen, damit das Feld direkt nach dem Import steht.
+    refresh_stand_after_sync(db, request, changed=True, llm=False)
     return request
 
 

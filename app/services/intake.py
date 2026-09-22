@@ -108,6 +108,8 @@ UI_FIELDS = {
     "effort_it": "concept_cit_pt",
     "effort_tshirt": "effort_tshirt",
     "effort_sheet_url": "effort_sheet_url",
+    "solution_category": "solution_category",
+    "solution_name": "solution_name",
 }
 DATE_KEYS = {"start_date", "end_date"}
 PT_KEYS = {"concept_scs_pt", "concept_cit_pt", "operate_scs_pt", "operate_cit_pt"}

@@ -4,12 +4,48 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Einstellungen — CRITR</title>
-    <link rel="stylesheet" href="/styles.css?v=account-menu-v1" />
+    <link rel="stylesheet" href="/styles.css?v=v0-2-4" />
   </head>
   <body class="gated">
     <header class="chrome">
       <div class="top">
-        <a class="brand" href="/">CRITR</a>
+        <div class="brand-row">
+          <a class="brand" href="/">CRITR</a>
+          <div class="app-version" id="app-version">
+            <button type="button" class="app-version-label" id="app-version-info" aria-expanded="false" aria-controls="app-version-pop" title="Was ist neu">
+              v0.2.4
+            </button>
+            <div class="app-version-pop" id="app-version-pop" hidden role="dialog" aria-labelledby="app-version-pop-title">
+              <p class="app-version-pop-kicker">Release</p>
+              <h2 class="app-version-pop-title" id="app-version-pop-title">Was neu ist in v0.2.4</h2>
+              <p class="app-version-pop-lead">Der aktuelle Stand steht jetzt in jedem Ticket — auch ohne Kommentar, bei Tickets aus Jira und bei älteren Changes.</p>
+              <section>
+                <h3>Kalkulation und Change</h3>
+                <p>Im Kopf der Kalkulation steht der Change, zu dem sie gehört. Beim Schließen gehen die Summen immer an genau diesen Change — auch wenn du zwischenzeitlich ein anderes Ticket geöffnet hast. Beim Wechsel zwischen Tickets bleiben keine Werte des vorherigen Changes mehr stehen.</p>
+              </section>
+              <section>
+                <h3>Neue Frage</h3>
+                <p>„Benötigst du Hilfe?“ ist eine Pflichtfrage. Bei „Ja“ kommt die Rückfrage, bei was genau — die Antwort landet automatisch unten in der Beschreibung und geht so mit nach Jira.</p>
+              </section>
+              <section>
+                <h3>Kosten im Ticket</h3>
+                <p>Neben Aufwand, Kosten und IT-Kosten stehen jetzt auch Sachkosten und die Gesamtsumme. Die Felder stehen schlicht nebeneinander und brechen auf schmalen Fenstern in die nächste Zeile um.</p>
+              </section>
+              <section>
+                <h3>Kosten Kalkulation</h3>
+                <p>Die Phase „Konzeption &amp; Einführung“ bzw. „Betrieb“ steht jetzt als gleichwertige Überschrift über dem Block. Der SCS-Block heißt „Kalkulation SCS inklusive weiterer Schwarzfirmen“. Tabellen, Abstände und Summen sind ruhiger gesetzt, die Gesamtsumme tritt hervor.</p>
+              </section>
+              <section>
+                <h3>Status</h3>
+                <p>Im Ticket ist der Stand wieder sichtbar, auch bei Changes, in denen noch Fragen offen sind. Fehlt er, wird er beim Öffnen nachgebaut, und im Hintergrund werden ältere Changes nachgezogen. Der aktuelle Stand braucht keinen Kommentar mehr. Gibt es weder Kommentare noch Status-Einträge, beschreibt er den Change aus den Ticketdaten und sagt offen, dass noch keine Rückmeldung vorliegt. Sobald Kommentare kommen, zählen die letzten fünf plus die Status-Einträge. Beim Import aus Jira und bei jedem Abgleich wird er angelegt und nachgezogen; im Tooltip steht, woraus er entstanden ist.</p>
+              </section>
+              <section>
+                <h3>Version</h3>
+                <p>Die Zählung läuft jetzt nach dem Muster x.x.x. Bis zur allgemeinen Freigabe bleibt CRITR unter 1.0.0; Version 1.0.0 gibt es erst, wenn die Seite für alle verfügbar ist.</p>
+              </section>
+            </div>
+          </div>
+        </div>
         <div class="account" id="account" hidden></div>
       </div>
     </header>
@@ -146,7 +182,7 @@
         </form>
       </section>
     </div>
-    <script src="/auth.js?v=account-menu-v1"></script>
+    <script src="/auth.js?v=whats-new-v2"></script>
     <script src="/settings.js"></script>
   </body>
 </html>

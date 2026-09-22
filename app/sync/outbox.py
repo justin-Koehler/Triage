@@ -28,27 +28,7 @@ log = logging.getLogger("triage.sync")
 def enqueue_effort_attachment(
     db: Session, request: Request, filename_key: str | None = None
 ) -> None:
-    from app.services.effort_sheet import load_share_csv, share_id_from_url
-
-    url = str((request.field_values() or {}).get("effort_sheet_url") or "")
-    share_id = share_id_from_url(url)
-    if not share_id or not load_share_csv(db, share_id):
-        return
-    ref = db.scalar(
-        select(ExternalRef).where(
-            ExternalRef.request_id == request.id,
-            ExternalRef.external_key.is_not(None),
-        )
-    )
-    key = str((ref.external_key if ref else "") or filename_key or "").strip()
-    if not key:
-        return
-    enqueue(
-        db,
-        request.id,
-        OutboxOperation.ADD_ATTACHMENT,
-        {"share_id": share_id, "filename": f"{key}-kalkulation.xlsx"},
-    )
+    return
 
 
 def _enqueue_kalkulation_csv(db: Session, request: Request, jira_key: str) -> None:
@@ -205,22 +185,6 @@ def _run_job(db: Session, port: TicketPort, job: OutboxJob) -> None:
         raise TicketPortError("Anlage im Fremdsystem steht noch aus")
 
     if operation == OutboxOperation.ADD_ATTACHMENT:
-        from app.services.effort_sheet import kalkulation_xlsx, load_share_csv
-
-        share_id = str(job.payload.get("share_id") or "")
-        csv_text = load_share_csv(db, share_id) if share_id else None
-        if not csv_text:
-            return
-        name = str(job.payload.get("filename") or f"{ref.external_key}-kalkulation.xlsx")
-        token, email = _user_jira_credentials(db, request.created_by)
-        port.add_attachment(
-            ref.external_key,
-            name,
-            kalkulation_xlsx(csv_text),
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            user_token=token,
-            user_email=email,
-        )
         return
 
     if operation == OutboxOperation.ADD_COMMENT:

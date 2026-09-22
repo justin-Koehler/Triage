@@ -52,7 +52,7 @@
     let name = raw;
     let label = raw;
     try {
-      const hits = await window.jiraSuggest?.("components", raw);
+      const hits = await window.jiraSuggest?.(step?.jiraLookup || "components", raw);
       const exact = (hits || []).find(
         (item) =>
           item.name === raw ||
@@ -354,10 +354,11 @@
     if (!jiraSuggest) return;
     jiraSuggest.innerHTML = "";
     const step = window.getTicketStep?.();
-    const multi = isMultiStep(step) && kind === "components";
+    const multi = isMultiStep(step) && (kind === "components" || kind === "user");
     const browseAll =
       kind === "components" ||
-      (typeof kind === "string" && kind.startsWith("option:"));
+      (typeof kind === "string" && kind.startsWith("option:")) ||
+      (multi && kind === "user");
     const showEmpty = Boolean(query) || browseAll;
     if (!query && !browseAll) {
       hideJiraSuggest();
@@ -382,12 +383,28 @@
       const empty = document.createElement("span");
       empty.className = "field-lookup-empty";
       empty.textContent =
-        browseAll && !query
-          ? kind === "components"
-            ? "Keine Stichwörter / Tags geladen"
-            : "Keine Optionen aus Jira geladen"
-          : "Keine Jira-Treffer";
+        kind === "user"
+          ? query
+            ? "Keine Treffer in Jira"
+            : "Name tippen — Jira schlägt vor"
+          : browseAll && !query
+            ? kind === "components"
+              ? "Keine Stichwörter / Tags geladen"
+              : "Keine Optionen aus Jira geladen"
+            : "Keine Jira-Treffer";
       jiraSuggest.appendChild(empty);
+      if (multi && multiPicks.length) {
+        const go = document.createElement("button");
+        go.type = "button";
+        go.className = "suggestion go field-tags-go";
+        go.textContent = "Weiter";
+        go.onclick = () => {
+          const joined = multiJoined();
+          multiPicks = [];
+          void submitAnswer(joined, go);
+        };
+        jiraSuggest.appendChild(go);
+      }
       return;
     }
     jiraSuggest.hidden = false;
@@ -762,7 +779,7 @@
     }
     const query = input.value.trim();
     const lookup = step.jiraLookup || "";
-    if (!query && lookup !== "components" && !lookup.startsWith("option:")) {
+    if (!query && lookup !== "components" && !lookup.startsWith("option:") && !isMultiStep(step)) {
       hideJiraSuggest();
       return;
     }

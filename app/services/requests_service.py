@@ -27,7 +27,15 @@ from app.domain.types import (
     SyncState,
     parse_kind,
 )
-from app.models import Comment, IntakeSession, Request, RequestField, StatusUpdate, User
+from app.models import (
+    Comment,
+    IntakeSession,
+    Request,
+    RequestField,
+    StatusUpdate,
+    User,
+    created_at_utc,
+)
 from app.sync.outbox import enqueue, enqueue_effort_attachment
 from app.services.effort_sheet import EFFORT_SYNC_KEYS
 from app.config import get_settings
@@ -389,7 +397,7 @@ def to_detail(request: Request, actor: User | None = None) -> dict:
                 "body": c.body,
                 "createdAt": c.created_at.isoformat(),
             }
-            for c in sorted(request.comments, key=lambda x: x.created_at or 0)
+            for c in sorted(request.comments, key=created_at_utc)
         ],
         "attachments": [
             {
@@ -402,7 +410,7 @@ def to_detail(request: Request, actor: User | None = None) -> dict:
                 "createdAt": a.created_at.isoformat() if a.created_at else "",
                 "source": "jira" if a.external_id else "local",
             }
-            for a in sorted(request.attachments or [], key=lambda x: x.created_at or 0)
+            for a in sorted(request.attachments or [], key=created_at_utc)
         ],
         "commentAblauf": (values.get("comment_ablauf") or "").strip(),
         "commentSummary": (values.get("comment_summary") or "").strip(),

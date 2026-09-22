@@ -39,6 +39,16 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+def created_at_utc(row) -> datetime:
+    """Sortierschlüssel: frische Zeilen sind tz-aware, gespeicherte teils naiv."""
+    value = getattr(row, "created_at", None)
+    if not isinstance(value, datetime):
+        return datetime.min.replace(tzinfo=UTC)
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value
+
+
 class TimestampMixin:
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(

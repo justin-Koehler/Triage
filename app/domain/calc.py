@@ -25,10 +25,36 @@ class Rates:
     margin_pct: float = 5.0
 
 
+def parse_money_amount(text: object) -> float | None:
+    raw = str(text or "").strip()
+    if not raw:
+        return None
+    cleaned = re.sub(r"[€\s]", "", raw)
+    cleaned = re.sub(r"(?i)pt$", "", cleaned).strip()
+    if not cleaned:
+        return None
+    if re.fullmatch(r"-?\d{1,3}(?:\.\d{3})+(?:,\d+)?", cleaned):
+        cleaned = cleaned.replace(".", "").replace(",", ".")
+    elif "," in cleaned and "." not in cleaned:
+        cleaned = cleaned.replace(",", ".")
+    elif "." in cleaned and "," in cleaned:
+        if cleaned.rfind(",") > cleaned.rfind("."):
+            cleaned = cleaned.replace(".", "").replace(",", ".")
+        else:
+            cleaned = cleaned.replace(",", "")
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
 def parse_number(text: object) -> float:
     raw = str(text or "").strip()
     if not raw:
         return 0.0
+    money = parse_money_amount(raw)
+    if money is not None:
+        return money
     match = NUMBER.search(raw.replace(" ", ""))
     if not match:
         return 0.0

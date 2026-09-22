@@ -104,6 +104,23 @@ common_fields:
     group: uebersicht
     fill: dialog
     type: longtext
+  - key: help_needed
+    label: Hilfe benötigt
+    question: Benötigst du Hilfe?
+    hard: false
+    group: uebersicht
+    fill: dialog
+    type: choice
+    values:
+      - Ja
+      - Nein
+  - key: help_topic
+    label: Hilfe bei
+    question: Bei was genau brauchst du Hilfe?
+    hard: false
+    group: uebersicht
+    fill: dialog
+    type: longtext
 
   - key: approver
     label: Genehmigende Person
@@ -159,10 +176,10 @@ common_fields:
     hard: false
     group: team
     fill: dialog
-    type: text
+    type: person
   - key: stakeholder
     label: Stakeholder
-    question: Wer sind die Stakeholder?
+    question: Wer sind die Stakeholder? z. B. SCS Komplett, Bildungsinstitute oder Einzelpersonen, Geschäftsleitung
     hard: true
     group: team
     fill: dialog
@@ -272,6 +289,20 @@ common_fields:
     fill: workspace
   - key: it_costs
     label: IT Kosten
+    question: ""
+    hard: false
+    type: money
+    group: kalkulation
+    fill: workspace
+  - key: material_costs
+    label: Sachkosten
+    question: ""
+    hard: false
+    type: money
+    group: kalkulation
+    fill: workspace
+  - key: total_costs
+    label: Gesamtsumme
     question: ""
     hard: false
     type: money

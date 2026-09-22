@@ -158,7 +158,7 @@ def test_commit_reuses_share_id(client):
     assert data.status_code == 200
 
 
-def test_commit_enqueues_jira_field_and_attachment(client):
+def test_commit_enqueues_jira_fields_without_attachment(client):
     from sqlalchemy import select
 
     from app.db import SessionLocal
@@ -189,7 +189,7 @@ def test_commit_enqueues_jira_field_and_attachment(client):
         jobs = db.scalars(select(OutboxJob).where(OutboxJob.request_id == request_id)).all()
         ops = {job.operation for job in jobs}
         assert OutboxOperation.UPDATE_FIELDS in ops
-        assert OutboxOperation.ADD_ATTACHMENT in ops
+        assert OutboxOperation.ADD_ATTACHMENT not in ops
         fields = next(
             job.payload["fields"]
             for job in jobs

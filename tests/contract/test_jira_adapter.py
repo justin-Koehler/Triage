@@ -377,10 +377,33 @@ def test_create_skips_kind_and_create_false_fields(runtime, monkeypatch):
     fields = captured["json"]["fields"]
     assert "customfield_17203" not in fields
     assert "customfield_19652" not in fields
+    assert fields.get("customfield_24101") == [{"name": "someone"}]
     assert fields.get("customfield_17200") == 3
     assert fields.get("customfield_10709") == 24181.79
     desc = json.dumps(fields["description"])
     assert "Ist die verantwortliche Person aus der IT" in desc or "Alice" in desc
+
+
+def test_create_sends_additional_assignees(runtime, monkeypatch):
+    captured = {}
+
+    def fake_request(self, method, path, **kwargs):
+        captured["json"] = kwargs.get("json")
+        request = httpx.Request(method, "https://example.atlassian.net" + path)
+        return httpx.Response(201, json={"key": "TRI-90", "id": "90"}, request=request)
+
+    def fake_resolve(self, raw, *, user_token=None, user_email=None):
+        return {"name": str(raw).strip().split("(")[0].strip()}
+
+    monkeypatch.setattr(JiraRestV3, "_request", fake_request)
+    monkeypatch.setattr(JiraRestV3, "resolve_user", fake_resolve)
+    JiraRestV3(runtime=runtime).create_issue(
+        _payload(fields={"change_team": "anna, ben"})
+    )
+    assert captured["json"]["fields"]["customfield_24101"] == [
+        {"name": "anna"},
+        {"name": "ben"},
+    ]
 
 
 def test_create_retries_without_screen_rejected_fields(runtime, monkeypatch):

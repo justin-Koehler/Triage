@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Kostenkalkulation — CRITR</title>
-    <link rel="stylesheet" href="/styles.css?v=effort-tidy-v1" />
+    <link rel="stylesheet" href="/styles.css?v=v0-2-4" />
   </head>
   <body class="effort-sheet-page">
     <header class="effort-sheet-chrome">
@@ -13,18 +13,18 @@
     </header>
     <main class="effort-sheet-main">
       <header class="effort-sheet-head">
-        <p class="effort-sheet-kicker">Kosten</p>
-        <h1>Kalkulation</h1>
+        <p class="effort-sheet-kicker" id="kalk-for">Change</p>
+        <h1>Kosten Kalkulation</h1>
+        <p class="effort-sheet-note">Personentage und Sach-/Lizenzkosten je Phase eintragen.</p>
         <p class="effort-sheet-note">
-          SCS (inkl. andere Schwarz-Gruppen) und CIT je Phase. Speichern übernimmt die Summen ins Ticket.
+          Speichern übernimmt Kosten, Sachkosten und Gesamtsumme ins Ticket.
         </p>
       </header>
       <div id="kalk" class="kalk"></div>
       <div class="kalk-bar">
-        <button type="button" class="btn btn-ghost" id="kalk-csv">Sheet herunterladen</button>
         <button type="button" class="btn btn-primary" id="kalk-save">Speichern und schließen</button>
       </div>
     </main>
-    <script src="/effort-sheet.js?v=effort-tidy-v1"></script>
+    <script src="/effort-sheet.js?v=v0-2-4"></script>
   </body>
 </html>

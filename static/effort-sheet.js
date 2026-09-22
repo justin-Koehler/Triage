@@ -1,11 +1,17 @@
 (function () {
   const TYPE = "critr-effort-sheet-v1";
+  const PARAMS = new URLSearchParams(location.search);
   const SHARE =
-    new URLSearchParams(location.search).get("share") ||
+    PARAMS.get("share") ||
     (location.pathname.match(/\/aufwand\/([0-9a-fA-F-]{36})/i) || [])[1] ||
     "";
   const host = document.getElementById("kalk");
   if (!host) return;
+
+  // Zeigt, zu welchem Change diese Kalkulation gehört.
+  const forEl = document.getElementById("kalk-for");
+  const forTitle = String(PARAMS.get("for") || "").trim();
+  if (forEl && forTitle) forEl.textContent = `Change: ${forTitle}`;
 
   const SCS_RATE = 750;
   const CIT_RATE = 665;
@@ -13,13 +19,17 @@
   const CIT_PROFIT = 0.05;
   const EMPTY = 4;
 
+  const SCS_TITLE = "Kalkulation SCS";
+  const SCS_EXTRA = "inklusive weiterer Schwarzfirmen";
+  const CIT_TITLE = "Kalkulation IT";
+
   const BLOCKS = [
     {
       id: "concept-scs",
       phase: "konzeption",
       rolle: "scs",
       title: "Konzeption & Einführung — SCS",
-      hint: "SCS-Satz; gilt auch für andere Schwarz-Gruppen (ohne CIT). Sachkosten netto.",
+      hint: "",
       rate: SCS_RATE,
       cit: false,
     },
@@ -28,7 +38,7 @@
       phase: "konzeption",
       rolle: "cit",
       title: "Konzeption & Einführung — CIT",
-      hint: "Nur von CIT auszufüllen (kalkulieren). Sachkosten netto.",
+      hint: "Nur von CIT auszufüllen.",
       rate: CIT_RATE,
       cit: true,
     },
@@ -37,7 +47,7 @@
       phase: "betrieb",
       rolle: "scs",
       title: "Betrieb — SCS",
-      hint: "SCS-Satz; gilt auch für andere Schwarz-Gruppen (ohne CIT). Sachkosten netto.",
+      hint: "",
       rate: SCS_RATE,
       cit: false,
     },
@@ -46,7 +56,7 @@
       phase: "betrieb",
       rolle: "cit",
       title: "Betrieb — CIT",
-      hint: "Nur von CIT auszufüllen (kalkulieren). Sachkosten netto.",
+      hint: "Nur von CIT auszufüllen.",
       rate: CIT_RATE,
       cit: true,
     },
@@ -156,11 +166,13 @@
       const oh = spec.cit ? laborNet * CIT_OH : 0;
       const profit = spec.cit ? (laborNet + oh) * CIT_PROFIT : 0;
       const phaseTitle =
-        spec.phase === "betrieb" ? "Betriebs-Phase" : "Konzeptions & Einführungs-Phase";
+        spec.phase === "betrieb" ? "Betrieb" : "Konzeption & Einführung";
       if (index === 0 || spec.phase === "betrieb") lines.push(row([phaseTitle, "", "", ""]));
-      lines.push(row([spec.cit ? "Kalkulation IT" : "Kalkulation SCS + andere Schwarz-Gruppen", "", "", ""]));
+      lines.push(
+        row([spec.cit ? CIT_TITLE : `${SCS_TITLE} ${SCS_EXTRA}`, "", "", ""])
+      );
       lines.push(row(["", "", "", ""]));
-      lines.push(row([pt || "", "Gesamt-Personentage (Summe aus der PT-Aufschlüsselung)", "", ""]));
+      lines.push(row([pt || "", "Gesamt Personentage", "", ""]));
       lines.push(row(["", "", "", ""]));
       lines.push(row(["Personentage", "Aufschlüsselung / Beschreibung", "", ""]));
       padLines(rowsOf(block, "pt").map(lineValues)).forEach((item) => {
@@ -176,43 +188,21 @@
         lines.push(row(["Kosten-Kalkulation IT", "Sätze", "Teilsummen", "Berechnungen"]));
         lines.push(row(["Tagessatz PT", `${de(CIT_RATE)} €`, "", ""]));
         lines.push(row(["Freigegebene PT", String(pt || ""), "", ""]));
-        lines.push(row(["Summe PT Netto", "", "", `${de(laborNet)} €`]));
+        lines.push(row(["Gesamt Personentage", "", "", `${de(laborNet)} €`]));
         lines.push(row(["+ Gemeinkosten %", "15,44", "", `${de(oh)} €`]));
         lines.push(row(["+ Gewinnzuschlag %", "5,00", "", `${de(profit)} €`]));
-        lines.push(row(["Sachkosten Summe", "", "", `${de(sach)} €`]));
-        lines.push(row(["Summe Brutto", "", "", `${de(brutto)} €`]));
+        lines.push(row(["Summe Sachkosten", "", "", `${de(sach)} €`]));
+        lines.push(row(["Gesamtsumme", "", "", `${de(brutto)} €`]));
       } else {
         lines.push(row(["Kosten-Kalkulation", "Sätze", "Teilsummen", "Berechnungen"]));
         lines.push(row(["Tarifsatz (SCS)", "750,00", "", `${de(laborNet)} €`]));
         lines.push(row(["+ Sach-/Lizenzkosten", de(sach), "", `${de(sach)} €`]));
         lines.push(row(["+ Sonstiges", "0,00", "", "0,00 €"]));
-        lines.push(row(["Summe Brutto", "", "", `${de(brutto)} €`]));
+        lines.push(row(["Gesamtsumme", "", "", `${de(brutto)} €`]));
       }
       lines.push(row(["", "", "", ""]));
     });
     return `\uFEFF${lines.join("\r\n")}`;
-  }
-
-  async function downloadExcel() {
-    const csv = toCsv();
-    if (SHARE) {
-      location.href = `/aufwand/${SHARE}/xlsx`;
-      return;
-    }
-    const res = await fetch("/api/sessions/effort-sheet/xlsx", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ csv }),
-    });
-    if (!res.ok) return;
-    const blob = await res.blob();
-    const href = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = href;
-    a.download = "kalkulation.xlsx";
-    a.click();
-    URL.revokeObjectURL(href);
   }
 
   let dirty = false;
@@ -251,12 +241,15 @@
       section.className = `kalk-block ${spec.cit ? "is-cit" : "is-scs"}`;
       section.dataset.block = spec.id;
       const phase = spec.phase === "betrieb" ? "Betrieb" : "Konzeption & Einführung";
+      const title = spec.cit
+        ? CIT_TITLE
+        : `${SCS_TITLE} <span class="kalk-plus">${SCS_EXTRA}</span>`;
       section.innerHTML =
         `<header>` +
-        `<div><p class="kalk-phase">${phase}</p><h2>${spec.cit ? "Kalkulation IT" : 'Kalkulation SCS <span class="kalk-plus">+ andere Schwarz-Gruppen</span>'}</h2></div>` +
+        `<div class="kalk-head"><p class="kalk-phase">${phase}</p><h2>${title}</h2></div>` +
         `<span class="kalk-badge">${spec.cit ? "CIT" : "SCS"}</span>` +
         `</header>` +
-        `<p class="kalk-rate">${spec.hint}<br>Satz ${spec.rate.toLocaleString("de-DE")} € / PT` +
+        `<p class="kalk-rate">${spec.hint ? `${spec.hint}<br>` : ""}Satz ${spec.rate.toLocaleString("de-DE")} € / PT` +
         (spec.cit ? ` · Gemeinkosten ${(CIT_OH * 100).toLocaleString("de-DE")} % · Gewinn ${(CIT_PROFIT * 100).toLocaleString("de-DE")} %` : "") +
         `</p>`;
       const pt = table("pt", "Personentage");
@@ -266,9 +259,9 @@
       const foot = document.createElement("dl");
       foot.className = "kalk-totals";
       foot.innerHTML =
-        `<div><dt>Gesamt-PT</dt><dd data-total="pt">0</dd></div>` +
-        `<div><dt>Sachkosten netto</dt><dd data-total="sach">0,00 €</dd></div>` +
-        `<div><dt>Summe Brutto</dt><dd data-total="brutto">0,00 €</dd></div>`;
+        `<div><dt>Gesamt Personentage</dt><dd data-total="pt">0</dd></div>` +
+        `<div><dt>Summe Sachkosten</dt><dd data-total="sach">0,00 €</dd></div>` +
+        `<div class="is-sum"><dt>Gesamtsumme</dt><dd data-total="brutto">0,00 €</dd></div>`;
       section.appendChild(foot);
       host.appendChild(section);
       const ptBody = pt.querySelector("tbody");
@@ -314,7 +307,7 @@
     let phase = "konzeption";
     let rolle = "scs";
     let mode = "";
-    const skip = /^(personentage|sach-|kosten-kalkulation|gesamt-|tarifsatz|tagessatz|freigegebene|summe |gemeinkosten|gewinn|sachkosten summe|\+ )/i;
+    const skip = /^(personentage|sach-|kosten-kalkulation|gesamt|tarifsatz|tagessatz|freigegebene|summe |gemeinkosten|gewinn|sachkosten summe|\+ )/i;
     rows.forEach((cols) => {
       const first = String(cols[0] || "").trim();
       const joined = cols.join(" ").toLowerCase();
@@ -342,7 +335,7 @@
       }
       if (mode !== "pt" && mode !== "sach") return;
       if (!first && !cols[1]) return;
-      if (skip.test(first) || /bitte trage/i.test(cols[1] || "")) return;
+      if (skip.test(first) || /bitte trage|^gesamt(summe|[- ]?pt| personentage)/i.test(cols[1] || "")) return;
       const spec = BLOCKS.find((b) => b.phase === phase && b.rolle === rolle);
       if (!spec) return;
       data[spec.id][mode].push({ menge: first, beschreibung: cols[1] || "" });
@@ -367,9 +360,6 @@
   });
   window.addEventListener("pagehide", flush);
   window.addEventListener("beforeunload", flush);
-  document.getElementById("kalk-csv")?.addEventListener("click", () => {
-    void downloadExcel();
-  });
   document.getElementById("kalk-save")?.addEventListener("click", () => {
     dirty = true;
     flush();

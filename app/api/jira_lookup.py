@@ -242,7 +242,9 @@ def webhook_sync_comments(
         issue_key = str(issue.get("key") or payload.get("key") or "").strip()
     if not issue_key:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Issue-Key fehlt")
-    stats = sync_comments_batch(db, _inbox_port(db), keys=[issue_key], limit=1)
+    stats = sync_comments_batch(
+        db, _inbox_port(db), keys=[issue_key], limit=1, summarize=True
+    )
     return {"ok": True, "key": issue_key, **stats}
 
 
