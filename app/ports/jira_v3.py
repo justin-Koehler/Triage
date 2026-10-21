@@ -12,10 +12,30 @@ import yaml
 
 from app.config import Settings, get_settings
 from app.domain.types import KIND_LABELS, Priority, RequestKind
-from app.ports.ticket_port import ExternalIssueRef, IssuePayload, TicketPortError
+from app.ports.ticket_port import (
+    DESCRIPTION_OMIT_KEYS,
+    ExternalIssueRef,
+    IssuePayload,
+    TicketPortError,
+    clean_description_lead,
+)
 from app.services.settings_service import RuntimeConfig
 
 _OAUTH_CACHE: dict[str, tuple[str, float]] = {}
+_ISSUE_KEY = re.compile(r"[A-Z][A-Z0-9]+-\d+", re.IGNORECASE)
+
+
+def public_browse_url(url: str | None, key: str | None = None) -> str:
+    """Link, den ein Browser öffnen kann. Das API-Gateway ist keine Jira-Seite."""
+    raw = (url or "").strip()
+    issue = (key or "").strip()
+    if not issue:
+        found = _ISSUE_KEY.search(raw)
+        issue = found.group(0) if found else ""
+    gateway = "live.api.schwarz" in raw.lower()
+    if issue and (gateway or not raw):
+        return f"https://jira.schwarz/browse/{issue}"
+    return raw
 
 
 def _oauth_cache_key(runtime: RuntimeConfig) -> str:
@@ -130,16 +150,156 @@ def adf_to_text(value: Any) -> str:
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
+_URL = re.compile(r"https?://[^\s\]|]+")
+
+
+def _wiki_description(text: str) -> str:
+    """API2/Wiki: URLs als [Text|url], damit Links nicht an ? abbrechen."""
+    out: list[str] = []
+    for line in str(text or "").splitlines():
+        raw = line.strip()
+        match = re.match(
+            r"^(CRITR\s+(?:Ticket|Status update|Aufwand Sheet)|"
+            r"Ticket|Status update|Aufwand Sheet)\s*:\s*(https?://\S+)\s*$",
+            raw,
+            re.IGNORECASE,
+        )
+        if match:
+            label = match.group(1).strip()
+            url = match.group(2).rstrip(").,;")
+            out.append(f"[{label}|{url}]")
+            continue
+        # Sonstige nackte URLs in der Zeile ebenfalls verlinken.
+        def _wrap(m: re.Match[str]) -> str:
+            url = m.group(0).rstrip(").,;")
+            return f"[{url}|{url}]"
+
+        out.append(_URL.sub(_wrap, line))
+    return "\n".join(out)
+
+
+def _adf_inline(line: str) -> list[dict]:
+    content: list[dict] = []
+    pos = 0
+    for match in _URL.finditer(line):
+        if match.start() > pos:
+            content.append({"type": "text", "text": line[pos : match.start()]})
+        url = match.group(0)
+        content.append(
+            {
+                "type": "text",
+                "text": url,
+                "marks": [{"type": "link", "attrs": {"href": url}}],
+            }
+        )
+        pos = match.end()
+    if pos < len(line):
+        content.append({"type": "text", "text": line[pos:]})
+    return content
+
+
 def _adf_paragraph(text: str) -> dict:
     lines = (text or "").split("\n")
     content = [
-        {
-            "type": "paragraph",
-            "content": [{"type": "text", "text": line}] if line else [],
-        }
+        {"type": "paragraph", "content": _adf_inline(line) if line else []}
         for line in lines
     ] or [{"type": "paragraph", "content": []}]
     return {"type": "doc", "version": 1, "content": content}
+
+
+def _critr_public_base() -> str:
+    """Öffentliche CRITR-URL für Links in Jira (nicht localhost)."""
+    from urllib.parse import urlparse
+
+    from app.config import get_settings
+
+    settings = get_settings()
+    base = (settings.public_base_url or "").strip().rstrip("/")
+    if base and "127.0.0.1" not in base and "localhost" not in base:
+        return base
+    redirect = (settings.cidaas_redirect_url or "").strip()
+    if redirect.startswith("http"):
+        parsed = urlparse(redirect)
+        if parsed.scheme and parsed.netloc:
+            return f"{parsed.scheme}://{parsed.netloc}"
+    return base or "http://127.0.0.1:8787"
+
+
+def _critr_link_block(request_id: str) -> str:
+    rid = str(request_id or "").strip()
+    if not rid:
+        return ""
+    base = _critr_public_base()
+    # Status-update ohne Query — Jira-Wiki bricht URLs sonst an „?“ ab.
+    return (
+        f"CRITR Ticket: {base}/workspace/{rid}\n"
+        f"CRITR Status update: {base}/status-update/{rid}"
+    )
+
+
+_EFFORT_URL_RE = re.compile(
+    r"(https?://[^\s\]|]+/aufwand/[0-9a-fA-F-]{36}|https?://docs\.google\.com/spreadsheets/d/[^\s\]|]+)",
+    re.IGNORECASE,
+)
+_EFFORT_LINE_RE = re.compile(
+    r"^(?:CRITR\s+)?Aufwand\s*Sheet\s*:\s*\S+",
+    re.IGNORECASE,
+)
+_CRITR_LINK_LINE_RE = re.compile(
+    r"^(?:CRITR\s+)?(?:Ticket|Status update)\s*:\s*\S+",
+    re.IGNORECASE,
+)
+
+
+def _resolve_effort_url(text: str, effort_url: str = "") -> str:
+    """Effort-Sheet-URL aus Parameter oder bestehendem Beschreibungstext."""
+    direct = str(effort_url or "").strip()
+    if direct:
+        return direct
+    body = str(text or "")
+    match = _EFFORT_URL_RE.search(body)
+    if match:
+        return match.group(1).rstrip(").,;")
+    sid = re.search(r"/aufwand/([0-9a-fA-F-]{36})", body)
+    if sid:
+        return f"{_critr_public_base()}/aufwand/{sid.group(1)}"
+    return ""
+
+
+def _with_critr_links(text: str, request_id: str, *, effort_url: str = "") -> str:
+    rid = str(request_id or "").strip()
+    body = (text or "").strip()
+    base = _critr_public_base()
+    effort = _resolve_effort_url(body, effort_url)
+
+    # Alte Link-/Aufwand-Zeilen entfernen — unten einheitlich neu anhängen.
+    cleaned: list[str] = []
+    for line in body.splitlines():
+        raw = line.strip()
+        if _CRITR_LINK_LINE_RE.match(raw) or _EFFORT_LINE_RE.match(raw):
+            continue
+        if effort and effort in raw and ("aufwand" in raw.casefold() or "effort" in raw.casefold()):
+            continue
+        if rid and (
+            f"/workspace/{rid}" in raw
+            or f"/status-update/{rid}" in raw
+            or f"/status-update?id={rid}" in raw
+            or f"status-update?id={rid}" in raw
+        ):
+            continue
+        cleaned.append(line)
+    body = "\n".join(cleaned).strip()
+
+    lines: list[str] = []
+    if rid:
+        lines.append(f"CRITR Ticket: {base}/workspace/{rid}")
+        lines.append(f"CRITR Status update: {base}/status-update/{rid}")
+    if effort:
+        lines.append(f"CRITR Aufwand Sheet: {effort}")
+    if not lines:
+        return body
+    block = "\n".join(lines)
+    return f"{body}\n\n{block}".strip() if body else block
 
 
 def _load_field_map(settings: Settings) -> dict:
@@ -159,6 +319,37 @@ def _jira_username(raw: str) -> str | None:
     return None
 
 
+def mapped_custom_fields_for_update(
+    field_map: dict[str, Any],
+    fields: dict[str, str],
+    *,
+    format_value,
+) -> dict[str, Any]:
+    """Domain-Felder → Jira customfield-Payload.
+
+    Leerer String im Payload setzt das Jira-Feld auf null (löschen).
+    Fehlt der Key im Payload, wird das Jira-Feld nicht angefasst.
+    """
+    out: dict[str, Any] = {}
+    meta_fields = (field_map.get("fields") or {}) if isinstance(field_map, dict) else {}
+    for name, value in (fields or {}).items():
+        meta = meta_fields.get(name) or {}
+        if not isinstance(meta, dict):
+            continue
+        jira_id = meta.get("jira")
+        if not jira_id or jira_id in ("summary", "description"):
+            continue
+        if meta.get("create") is False:
+            continue
+        raw = str(value or "").strip()
+        formatted = format_value(meta, value)
+        if formatted is not None:
+            out[str(jira_id)] = formatted
+        elif raw == "":
+            out[str(jira_id)] = None
+    return out
+
+
 def _format_jira_field_value(
     meta: dict[str, Any],
     value: object,
@@ -175,10 +366,11 @@ def _format_jira_field_value(
     jira_type = str(meta.get("jira_type") or "string").lower()
     jira_id = str(meta.get("jira") or "")
     if jira_type == "date":
-        from app.domain.dates import normalize_date_value
+        from app.domain.dates import parse_german_date
 
-        iso = normalize_date_value(raw)
-        return iso if re.fullmatch(r"\d{4}-\d{2}-\d{2}", iso) else raw
+        # Nur echte ISO-Daten — „bald“/„test“ dürfen Create nicht sprengen.
+        iso = parse_german_date(raw)
+        return iso if iso and re.fullmatch(r"\d{4}-\d{2}-\d{2}", iso) else None
     if jira_type == "number":
         from app.domain.calc import parse_money_amount
 
@@ -337,7 +529,107 @@ class JiraRestV3:
     def _project_key(self) -> str:
         return self._runtime.jira_project_key or self._field_map.get("project_key") or "CHANGE"
 
-    def search_assignable_users(
+    def _user_row_from_jira(self, row: dict[str, Any]) -> dict[str, str] | None:
+        name = str(
+            row.get("name") or row.get("key") or row.get("accountId") or ""
+        ).strip()
+        if not name:
+            return None
+        avatars = row.get("avatarUrls") if isinstance(row.get("avatarUrls"), dict) else {}
+        avatar = str(
+            row.get("avatarUrl")
+            or avatars.get("48x48")
+            or avatars.get("32x32")
+            or avatars.get("24x24")
+            or ""
+        ).strip()
+        return {
+            "name": name,
+            "displayName": str(row.get("displayName") or name).strip(),
+            "emailAddress": str(row.get("emailAddress") or "").strip(),
+            "avatarUrl": avatar,
+        }
+
+    @staticmethod
+    def _user_match_rank(row: dict[str, str], needle: str) -> int:
+        """Niedriger = besser. Volle Namen und Display-Treffer vor Username-Prefix."""
+        n = (needle or "").strip().casefold()
+        if not n:
+            return 50
+        display = (row.get("displayName") or "").casefold()
+        name = (row.get("name") or "").casefold()
+        email = (row.get("emailAddress") or "").casefold()
+        if display == n or name == n:
+            return 0
+        tokens = [t for t in n.split() if t]
+        if tokens and all(t in display for t in tokens):
+            if display.startswith(tokens[0]) and tokens[-1] in display:
+                return 1
+            return 2
+        if display.startswith(n) or name.startswith(n):
+            return 3
+        if n in display or n in name or (email and n in email):
+            return 4
+        return 40
+
+    def _search_users_picker(
+        self,
+        query: str,
+        *,
+        limit: int,
+        user_token: str | None = None,
+        user_email: str | None = None,
+    ) -> list[dict[str, str]]:
+        """User-Picker: findet Personen per Anzeigename (nicht nur Assignable/Username)."""
+        needle = (query or "").strip()
+        if not needle:
+            return []
+        want = max(1, min(int(limit or 10), 100))
+        # Mehrere Varianten: voller Text, Nachname, Vorname — dann ranken.
+        variants = [needle]
+        parts = needle.split()
+        if len(parts) >= 2:
+            variants.append(parts[-1])
+            variants.append(parts[0])
+        seen: set[str] = set()
+        out: list[dict[str, str]] = []
+        for variant in variants:
+            params = {
+                "query": variant,
+                "maxResults": min(50, max(want, 20)),
+                "showAvatar": "true",
+            }
+            try:
+                response = self._request(
+                    "GET",
+                    "/user/picker",
+                    params=params,
+                    user_token=user_token,
+                    user_email=user_email,
+                )
+            except TicketPortError:
+                continue
+            data = response.json()
+            rows = (
+                data.get("users")
+                if isinstance(data, dict)
+                else (data if isinstance(data, list) else [])
+            ) or []
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                parsed = self._user_row_from_jira(row)
+                if not parsed:
+                    continue
+                key = parsed["name"].casefold()
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(parsed)
+        out.sort(key=lambda row: (self._user_match_rank(row, needle), row["displayName"].casefold()))
+        return out[:want]
+
+    def _search_users_assignable(
         self,
         query: str = "",
         *,
@@ -345,7 +637,7 @@ class JiraRestV3:
         user_token: str | None = None,
         user_email: str | None = None,
     ) -> list[dict[str, str]]:
-        # Jira liefert oft max. 50 pro Seite — paginieren bis limit oder leer.
+        # Nur Assignable im Projekt — ergänzt Picker, reicht allein nicht für alle Personen.
         want = max(1, min(int(limit or 10), 5000))
         page_size = 50
         needle = (query or "").strip()
@@ -385,33 +677,62 @@ class JiraRestV3:
             for row in rows:
                 if not isinstance(row, dict):
                     continue
-                name = str(row.get("name") or row.get("key") or row.get("accountId") or "").strip()
-                if not name or name.lower() in seen:
+                parsed = self._user_row_from_jira(row)
+                if not parsed:
                     continue
-                seen.add(name.lower())
-                avatars = row.get("avatarUrls") if isinstance(row.get("avatarUrls"), dict) else {}
-                avatar = (
-                    str(avatars.get("48x48") or avatars.get("32x32") or avatars.get("24x24") or "")
-                    .strip()
-                )
-                out.append(
-                    {
-                        "name": name,
-                        "displayName": str(row.get("displayName") or name).strip(),
-                        "emailAddress": str(row.get("emailAddress") or "").strip(),
-                        "avatarUrl": avatar,
-                    }
-                )
+                key = parsed["name"].casefold()
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(parsed)
                 added += 1
                 if len(out) >= want:
                     break
-            # Gateway ignoriert startAt oft → dieselbe Seite endlos. Dann stoppen.
             if added == 0 or len(rows) < batch:
                 break
             start += len(rows)
             if start >= 10000:
                 break
         return out
+
+    def search_assignable_users(
+        self,
+        query: str = "",
+        *,
+        limit: int = 10,
+        user_token: str | None = None,
+        user_email: str | None = None,
+    ) -> list[dict[str, str]]:
+        """Personensuche für UI: Picker (Anzeigename) + Assignable zusammenführen."""
+        want = max(1, min(int(limit or 10), 5000))
+        needle = (query or "").strip()
+        if not needle:
+            return self._search_users_assignable(
+                "", limit=want, user_token=user_token, user_email=user_email
+            )
+        picked = self._search_users_picker(
+            needle, limit=want, user_token=user_token, user_email=user_email
+        )
+        # Assignable nur nachziehen, wenn Picker wenig liefert (kurze Queries).
+        if len(picked) >= min(want, 5):
+            return picked[:want]
+        try:
+            assignable = self._search_users_assignable(
+                needle, limit=want, user_token=user_token, user_email=user_email
+            )
+        except TicketPortError:
+            assignable = []
+        seen = {row["name"].casefold() for row in picked}
+        for row in assignable:
+            key = row["name"].casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            picked.append(row)
+        picked.sort(
+            key=lambda row: (self._user_match_rank(row, needle), row["displayName"].casefold())
+        )
+        return picked[:want]
 
     def list_component_records(
         self,
@@ -485,22 +806,39 @@ class JiraRestV3:
         text = (raw or "").strip()
         if not text:
             return None
-        needle = text.lower()
         hits = self.search_assignable_users(
-            text, limit=10, user_token=user_token, user_email=user_email
+            text, limit=20, user_token=user_token, user_email=user_email
         )
+        if not hits:
+            return None
+        needle = text.casefold()
+        tokens = [t for t in needle.split() if t]
+        best = hits[0]
+        rank = self._user_match_rank(best, text)
+        # Exakt / Vor+Nachname sicher; einzelnes Token nur bei eindeutigem Treffer.
+        if rank <= 1:
+            return {"name": best["name"]}
+        if rank == 2 and len(tokens) >= 2:
+            return {"name": best["name"]}
         for row in hits:
-            name = row["name"]
-            display = row.get("displayName", "").lower()
-            if needle == name.lower() or needle == display:
-                return {"name": name}
+            if (
+                row["name"].casefold() == needle
+                or (row.get("displayName") or "").casefold() == needle
+            ):
+                return {"name": row["name"]}
         direct = _jira_username(text)
         if direct:
-            for row in self.search_assignable_users(
-                direct, limit=5, user_token=user_token, user_email=user_email
-            ):
-                if row["name"].lower() == direct.lower():
+            for row in hits:
+                if row["name"].casefold() == direct.casefold():
                     return {"name": row["name"]}
+        if tokens:
+            token_hits = [
+                row
+                for row in hits
+                if all(t in (row.get("displayName") or "").casefold() for t in tokens)
+            ]
+            if len(token_hits) == 1:
+                return {"name": token_hits[0]["name"]}
         return None
 
     def resolve_components(
@@ -747,7 +1085,8 @@ class JiraRestV3:
 
     def _description_body(self, text: str) -> dict | str:
         if self._uses_api2():
-            return text
+            # Wiki-Markup: klickbare Links inkl. Query/?-freie Pfade.
+            return _wiki_description(text)
         return _adf_paragraph(text)
 
     def _comment_body(self, text: str) -> dict | str:
@@ -898,27 +1237,39 @@ class JiraRestV3:
                 jira_fields["reporter"] = resolved
                 break
 
-        description_parts: list[str] = []
-        primary = (payload.description or "").strip()
-        if primary and "description" not in mapped_keys:
-            description_parts.append(primary)
-        description_parts.append(f"Interne Referenz: {payload.reference}")
-        if payload.created_by:
-            description_parts.append(f"Erstellt von: {payload.created_by}")
-        for key, value in payload.fields.items():
-            if key in mapped_keys or not str(value or "").strip():
-                continue
-            label = meta_for(key).get("label") or key
-            description_parts.append(f"{label}: {value}")
-        if "description" in mapped_keys:
-            extra = "\n".join(description_parts[1:] if primary else description_parts)
-            if extra.strip():
-                base = payload.description or ""
-                jira_fields["description"] = self._description_body(
-                    f"{base}\n\n{extra}".strip() if base else extra
+        # Gesamtprojektleiter (change_lead) ist Create-Pflicht — Fallback Autor/Reporter.
+        lead_meta = meta_for("change_lead")
+        lead_id = str(lead_meta.get("jira") or "").strip()
+        if lead_id and lead_id not in jira_fields and field_applies("change_lead"):
+            for candidate in (
+                str(payload.fields.get("change_lead") or "").strip(),
+                str(payload.fields.get("author") or "").strip(),
+                str(payload.fields.get("assignee") or "").strip(),
+                str(payload.reporter_hint or "").strip(),
+                str(payload.created_by or "").strip(),
+            ):
+                if not candidate or len(candidate) < 2:
+                    continue
+                resolved = self.resolve_user(
+                    candidate,
+                    user_token=payload.user_jira_token,
+                    user_email=payload.user_jira_email,
                 )
-        else:
-            jira_fields["description"] = self._description_body("\n".join(description_parts))
+                if resolved:
+                    jira_fields[lead_id] = resolved
+                    mapped_keys.add("change_lead")
+                    break
+
+        # Jira-Beschreibung = nur Freitext + CRITR-Links (keine Feld-Fallbacks).
+        effort_url = str(payload.fields.get("effort_sheet_url") or "").strip()
+        desc_source = str(payload.fields.get("description") or payload.description or "").strip()
+        jira_fields["description"] = self._description_body(
+            _with_critr_links(
+                clean_description_lead(desc_source),
+                payload.request_id,
+                effort_url=effort_url,
+            )
+        )
 
         attempt = dict(jira_fields)
         protected = {
@@ -964,11 +1315,12 @@ class JiraRestV3:
     def _browse_url(self, key: str, issue_self: str | None = None) -> str:
         self_url = str(issue_self or "").strip()
         if self_url.startswith("http") and "/rest/api/" in self_url:
-            return self_url.split("/rest/api/", 1)[0] + f"/browse/{key}"
-        base = (self._runtime.jira_base_url or "https://jira.schwarz").rstrip("/")
-        if "live.api.schwarz" in base:
-            return f"https://jira.schwarz/browse/{key}"
-        return f"{base}/browse/{key}"
+            origin = self_url.split("/rest/api/", 1)[0]
+            candidate = f"{origin}/browse/{key}"
+        else:
+            base = (self._runtime.jira_base_url or "https://jira.schwarz").rstrip("/")
+            candidate = f"{base}/browse/{key}" if base else ""
+        return public_browse_url(candidate, key)
 
     def add_comment(self, key: str, body: str, author: str) -> str | None:
         text = f"{author}: {body}" if author else body
@@ -1315,30 +1667,64 @@ class JiraRestV3:
         *,
         user_token: str | None = None,
         user_email: str | None = None,
+        request_id: str | None = None,
     ) -> None:
         jira_fields: dict[str, Any] = {}
         if "summary" in fields or "title" in fields:
             jira_fields["summary"] = fields.get("summary") or fields.get("title")
-        if "description" in fields:
-            jira_fields["description"] = self._description_body(fields["description"])
+        if "description" in fields or request_id or fields.get("effort_sheet_url"):
+            jira_fields["description"] = self._description_body(
+                _with_critr_links(
+                    str(fields.get("description") or ""),
+                    request_id or "",
+                    effort_url=str(fields.get("effort_sheet_url") or "").strip(),
+                )
+            )
         if priority:
             jira_fields["priority"] = {"name": self._priority_name(priority)}
-        for name, value in fields.items():
-            meta = (self._field_map.get("fields") or {}).get(name) or {}
-            jira_id = meta.get("jira")
-            if not jira_id or jira_id in ("summary", "description"):
-                continue
-            formatted = self._format_domain_value(
-                meta,
-                value,
-                user_token=user_token,
-                user_email=user_email,
+        jira_fields.update(
+            mapped_custom_fields_for_update(
+                self._field_map,
+                fields,
+                format_value=lambda meta, value: self._format_domain_value(
+                    meta,
+                    value,
+                    user_token=user_token,
+                    user_email=user_email,
+                ),
             )
-            if formatted is not None:
-                jira_fields[jira_id] = formatted
+        )
         if not jira_fields:
             return
-        self._request("PUT", self._issue_path(f"/{key}"), json={"fields": jira_fields})
+        # Wie Create: ungültige Optionen entfernen, Rest trotzdem schreiben.
+        attempt = dict(jira_fields)
+        protected = {"summary", "description", "priority"}
+        last_error: TicketPortError | None = None
+        for _ in range(6):
+            try:
+                self._request(
+                    "PUT",
+                    self._issue_path(f"/{key}"),
+                    json={"fields": dict(attempt)},
+                    user_token=user_token,
+                    user_email=user_email,
+                )
+                return
+            except TicketPortError as err:
+                last_error = err
+                rejected = [
+                    field_id
+                    for field_id in err.rejected_fields
+                    if field_id in attempt and field_id not in protected
+                ]
+                if not rejected:
+                    raise
+                for field_id in rejected:
+                    attempt.pop(field_id, None)
+                if not attempt:
+                    raise
+        if last_error:
+            raise last_error
 
     def _search_raw(
         self,
@@ -1346,10 +1732,11 @@ class JiraRestV3:
         fields: str,
         limit: int,
         *,
+        start_at: int = 0,
         user_token: str | None = None,
         user_email: str | None = None,
     ) -> dict[str, Any]:
-        params = {"jql": jql, "maxResults": limit, "fields": fields}
+        params = {"jql": jql, "maxResults": limit, "startAt": start_at, "fields": fields}
         if self._rest_root():
             response = self._request(
                 "GET",
@@ -1399,6 +1786,7 @@ class JiraRestV3:
             "status",
             "priority",
             "issuetype",
+            "created",
             "updated",
             "assignee",
             "reporter",
@@ -1491,7 +1879,6 @@ class JiraRestV3:
             if "it request" in type_name.lower() or type_name.lower().startswith("it ")
             else "change_request"
         )
-        base = (self._runtime.jira_base_url or "").rstrip("/")
         assignee = self._jira_field_text(fields.get("assignee"))
         reporter = self._jira_field_text(fields.get("reporter"))
         if reporter:
@@ -1502,8 +1889,9 @@ class JiraRestV3:
             "status": status_name or "Offen",
             "priority": prio,
             "kind": kind,
+            "createdAt": str(fields.get("created") or ""),
             "updatedAt": str(fields.get("updated") or ""),
-            "url": f"{base}/browse/{key}" if base and key else "",
+            "url": self._browse_url(key, str(issue.get("self") or "")) if key else "",
             "assignee": assignee,
             "reporter": reporter,
             "values": values,
@@ -1514,27 +1902,50 @@ class JiraRestV3:
         *,
         query: str = "",
         limit: int = 50,
+        include_closed: bool = False,
         user_token: str | None = None,
         user_email: str | None = None,
     ) -> list[dict[str, Any]]:
         project = self._project_key()
-        jql = f"project = {project} ORDER BY updated DESC"
+        # Hub: keine abgeschlossenen/abgebrochenen Tickets (u. a. CRITR-Tests).
+        # Auswertung: abgeschlossene und abgelehnte bleiben, nur Abbruch fällt weg.
+        if include_closed:
+            scope = "status not in (Canceled, Cancelled, Abgebrochen)"
+        else:
+            scope = (
+                "statusCategory != Done AND status not in "
+                "(Canceled, Cancelled, Abgebrochen, Closed, Done, Rejected, Abgelehnt)"
+            )
+        jql = f"project = {project} AND {scope} ORDER BY created DESC"
         needle = (query or "").replace('"', " ").strip()[:80]
         if needle:
-            # Titel/Text und Personenfelder (Assignee/Reporter) durchsuchen
             jql = (
-                f"project = {project} AND ("
+                f"project = {project} AND {scope} AND ("
                 f'text ~ "{needle}" OR assignee ~ "{needle}" OR reporter ~ "{needle}"'
-                f") ORDER BY updated DESC"
+                f") ORDER BY created DESC"
             )
-        data = self._search_raw(
-            jql,
-            ",".join(self._mapped_jira_ids()),
-            limit,
-            user_token=user_token,
-            user_email=user_email,
-        )
-        return [self._inbox_from_issue(row) for row in (data.get("issues") or [])]
+        want = max(1, min(int(limit), 500))
+        fields = ",".join(self._mapped_jira_ids())
+        collected: list[dict[str, Any]] = []
+        start = 0
+        while len(collected) < want:
+            page = min(100, want - len(collected))
+            data = self._search_raw(
+                jql,
+                fields,
+                page,
+                start_at=start,
+                user_token=user_token,
+                user_email=user_email,
+            )
+            batch = data.get("issues") or []
+            if not batch:
+                break
+            collected.extend(batch)
+            if len(batch) < page:
+                break
+            start += len(batch)
+        return [self._inbox_from_issue(row) for row in collected]
 
     def inbox_issue(
         self,
@@ -1555,7 +1966,7 @@ class JiraRestV3:
         if not needle:
             return []
         project = self._project_key()
-        jql = f'project = {project} AND text ~ "{needle}" ORDER BY updated DESC'
+        jql = f'project = {project} AND text ~ "{needle}" ORDER BY created DESC'
         data = self._search_raw(
             jql,
             "key,summary",

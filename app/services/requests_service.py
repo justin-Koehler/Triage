@@ -36,6 +36,8 @@ from app.models import (
     User,
     created_at_utc,
 )
+from app.ports.jira_v3 import public_browse_url
+from app.ports.ticket_port import DESCRIPTION_OMIT_KEYS, clean_description_lead
 from app.sync.outbox import enqueue, enqueue_effort_attachment
 from app.services.effort_sheet import EFFORT_SYNC_KEYS
 from app.config import get_settings
@@ -116,7 +118,9 @@ def _sync_view(request: Request) -> dict:
         "label": SYNC_LABELS.get(SyncState(state), str(state)),
         "system": ref.system if ref else None,
         "externalKey": ref.external_key if ref else None,
-        "externalUrl": ref.external_url if ref else None,
+        "externalUrl": (
+            public_browse_url(ref.external_url, ref.external_key) if ref else None
+        ),
         "lastError": ref.last_error if ref else None,
         "syncedAt": ref.synced_at.isoformat() if ref and ref.synced_at else None,
     }
@@ -240,6 +244,7 @@ def to_list_item(request: Request, actor: User | None = None) -> dict:
         "statusSummary": _status_blurb(request),
         "waitingOnMe": waiting,
         "waitingTodo": waiting_todo(request, actor) if waiting else "",
+        "nextStep": str(hub_next_step(request, actor).get("nextStep") or ""),
         "company": request.company,
         "changeLead": request.change_lead,
         "notes": request.field_values().get("other"),
@@ -646,29 +651,127 @@ def _upsert_field(db: Session, request: Request, key: str, label: str, value: ob
     request.fields.append(item)
 
 
-def _render_description_for_jira(request: Request, field_meta: dict) -> str:
-    """Deterministischer Jira-Fallback für `jira: null` Felder."""
-    values = request.field_values()
-    lead_raw = str(values.get("description") or request.description or "").strip()
-    lead = lead_raw.split("\nSteckbrief-Name:", 1)[0].strip()
-    parts = [lead] if lead else []
-    parts.extend(
-        [
-            f"Steckbrief-Name: {request.steckbrief_name}",
-            f"Interne Referenz: {request.reference}",
-        ]
-    )
-    for key, meta in field_meta.items():
+def _fallback_description_labels(field_meta: dict) -> set[str]:
+    labels: set[str] = set()
+    for key, meta in (field_meta or {}).items():
+        if not isinstance(meta, dict):
+            continue
         if key in {"summary", "title", "description", "steckbrief_name"}:
+            continue
+        if key in DESCRIPTION_OMIT_KEYS:
             continue
         if meta.get("jira") is not None:
             continue
-        value = str(values.get(key) or "").strip()
-        if not value:
+        label = str(meta.get("label") or key).strip()
+        if label:
+            labels.add(label.casefold())
+    return labels
+
+
+def _strip_fallback_field_lines(text: str, field_meta: dict) -> str:
+    """Vorher angehängte `Label: Wert`-Zeilen entfernen, bevor neu gerendert wird."""
+    labels = _fallback_description_labels(field_meta)
+    if not labels:
+        return str(text or "").strip()
+    kept: list[str] = []
+    for line in str(text or "").splitlines():
+        raw = line.strip()
+        if ":" in raw:
+            left = raw.split(":", 1)[0].strip().casefold()
+            if left in labels:
+                continue
+        kept.append(line)
+    return "\n".join(kept).strip()
+
+
+def ensure_effort_url(db: Session, request: Request) -> str:
+    """Jedes Ticket bekommt ein Aufwand-Sheet; URL zurückgeben."""
+    from app.services.effort_sheet import (
+        commit_effort_csv,
+        empty_kalkulation_csv,
+        ensure_effort_share,
+        share_id_from_url,
+    )
+
+    values = request.field_values()
+    url = str(values.get("effort_sheet_url") or "").strip()
+    settings = get_settings()
+    base = (settings.public_base_url or "https://scscm.stackit.gg").rstrip("/")
+    if "127.0.0.1" in base or "localhost" in base:
+        base = "https://scscm.stackit.gg"
+    sid = share_id_from_url(url) if url else None
+    if sid:
+        ensure_effort_share(db, sid, public_base=base)
+        if not url.startswith(base):
+            url = f"{base}/aufwand/{sid}"
+            _upsert_field(db, request, "effort_sheet_url", "Aufwand Sheet", url)
+        return url
+    parsed = commit_effort_csv(db, empty_kalkulation_csv(), base)
+    url = str(parsed.get("effort_sheet_url") or "").strip()
+    if url:
+        _upsert_field(db, request, "effort_sheet_url", "Aufwand Sheet", url)
+    return url
+
+
+def _render_description_for_jira(
+    request: Request,
+    field_meta: dict,
+    *,
+    db: Session | None = None,
+) -> str:
+    """Nur Freitext-Beschreibung + immer drei CRITR-Links (Ticket, Status, Aufwand)."""
+    from app.ports.jira_v3 import _with_critr_links
+
+    values = request.field_values()
+    # Freitext-Feld bevorzugen — request.description kann schon Fallbacks/Links enthalten.
+    lead_source = str(values.get("description") or "").strip() or str(
+        request.description or ""
+    )
+    lead = _strip_fallback_field_lines(
+        clean_description_lead(lead_source), field_meta
+    )
+    # Alte Link-/Meta-Zeilen und Feld-Fallbacks aus dem Lead entfernen.
+    lead_lines: list[str] = []
+    for line in lead.splitlines():
+        raw = line.strip()
+        if re.match(
+            r"^(?:CRITR\s+)?(?:Ticket|Status update|Aufwand\s*Sheet)\s*:",
+            raw,
+            re.I,
+        ):
             continue
-        label = meta.get("label") or key
-        parts.append(f"{label}: {value}")
-    return "\n".join(parts).strip()
+        if re.match(r"^\[CRITR\s+", raw, re.I):
+            continue
+        # Alte Workspace-/Status-Links mit fremder UUID entfernen.
+        if "/workspace/" in raw or "/status-update/" in raw or "/aufwand/" in raw:
+            continue
+        lead_lines.append(line)
+    lead = "\n".join(lead_lines).strip()
+    effort = str(values.get("effort_sheet_url") or "").strip()
+    if db is not None:
+        effort = ensure_effort_url(db, request) or effort
+    return _with_critr_links(lead, request.id, effort_url=effort)
+
+
+# UI-Keys ↔ Domain-Keys (Übersicht u. a.) — beide in der DB halten, Domain nach Jira.
+_FIELD_ALIASES: dict[str, str] = {
+    "reason": "problem",
+    "problem": "reason",
+    "solution": "solution_goals",
+    "solution_goals": "solution",
+    "risks": "risks_obstacles",
+    "risks_obstacles": "risks",
+    "benefit": "benefit_savings",
+    "benefit_savings": "benefit",
+    "nonprofit": "nonprofit_dss",
+    "nonprofit_dss": "nonprofit",
+    "lead": "change_lead",
+    "start": "start_date",
+    "end": "end_date",
+    "it_owner": "responsible_sit",
+    "effort_fb": "concept_scs_pt",
+    "effort_it": "concept_cit_pt",
+}
 
 
 def update_request(
@@ -683,27 +786,45 @@ def update_request(
     spec = rules.spec(parse_kind(request.kind) or RequestKind.CHANGE_REQUEST)
     field_labels = spec.field_map()
     synced_fields: dict[str, str] = {}
+    before_values = request.field_values()
+    before_description = str(request.description or "")
     before_lead = str(request.change_lead or "").strip()
     before_status = RequestStatus(request.status)
     before_priority = Priority(request.priority)
-
     for key, value in changes.items():
+        # UI-Alias → Domain, damit Übersicht-Felder immer im field_map landen.
+        alias = _FIELD_ALIASES.get(key)
+        if key not in field_labels and alias and alias in field_labels:
+            key = alias
         if key in EDITABLE_SCALARS:
             if key == "status":
-                request.status = RequestStatus(value)
+                new_status = RequestStatus(value)
+                if new_status == request.status:
+                    continue
+                request.status = new_status
                 # Jira kennt keine Feldzuordnung dafuer, der Fake protokolliert es.
                 synced_fields["status"] = request.status.value
             elif key == "priority":
-                request.priority = Priority(value)
+                new_priority = Priority(value)
+                if new_priority == request.priority:
+                    continue
+                request.priority = new_priority
             else:
+                new_text = str(value or "")
+                old_text = str(getattr(request, key, "") or "")
+                if new_text == old_text:
+                    continue
                 setattr(request, key, value)
                 if key in ("title", "description"):
-                    synced_fields[key] = str(value)
+                    synced_fields[key] = new_text
             # Spalten wie change_lead stehen auch im Steckbrief. Beides ziehen,
             # sonst zeigt die Detailseite nach dem Edit zwei Wahrheiten.
             if key in field_labels:
+                new_text = str(value or "")
+                if str(before_values.get(key) or "") == new_text and key not in synced_fields:
+                    continue
                 _upsert_field(db, request, field_labels[key].key, field_labels[key].label, value)
-                synced_fields[key] = str(value or "")
+                synced_fields[key] = new_text
             continue
 
         if key in {
@@ -722,33 +843,54 @@ def update_request(
             from app.services.stand_summary import normalize_stand_health
 
             health = normalize_stand_health(value)
+            if str(before_values.get("stand_health") or "") == health:
+                continue
             _upsert_field(db, request, "stand_health", "Stand-Ampel", health)
             continue
         if key not in field_labels and key not in EFFORT_SYNC_KEYS:
             continue
         text = str(value or "")
+        if str(before_values.get(key) or "").strip() == text.strip():
+            continue
         label = field_labels[key].label if key in field_labels else key
         _upsert_field(db, request, key, label, text)
         synced_fields[key] = text
+        mirror = _FIELD_ALIASES.get(key)
+        if mirror:
+            mirror_label = (
+                field_labels[mirror].label if mirror in field_labels else mirror
+            )
+            _upsert_field(db, request, mirror, mirror_label, text)
+        # Rückrichtung: concept_cit_pt ↔ effort_it (UI „Aufwand IT“)
+        for alias, target in _FIELD_ALIASES.items():
+            if target == key and alias != mirror:
+                alias_label = (
+                    field_labels[alias].label if alias in field_labels else alias
+                )
+                _upsert_field(db, request, alias, alias_label, text)
 
-    # Jira kennt keine Custom-Fields mit `jira: null`. Dafür schreiben wir die
-    # Jira-Description deterministisch aus dem lokalen Zustand neu.
+    # Jira-Description nur neu bauen/pushen, wenn sich wirklich etwas geändert hat.
     jira_meta = _jira_field_map_meta()
     field_meta = jira_meta.get("fields") or {}
-    null_changed = [
-        k
-        for k in changes.keys()
-        if field_meta.get(k, {}).get("jira") is None
-    ]
-    null_changed = [k for k in null_changed if k not in {"description"}]
-    if null_changed or "description" in synced_fields:
-        request.description = _render_description_for_jira(request, field_meta)
-        synced_fields["description"] = request.description
+    real_change = bool(synced_fields) or before_priority != Priority(request.priority)
+    if real_change:
+        request.description = _render_description_for_jira(request, field_meta, db=db)
+        if request.description != before_description or "description" in synced_fields:
+            synced_fields["description"] = request.description
+        effort_url = str(request.field_values().get("effort_sheet_url") or "").strip()
+        if effort_url and (
+            effort_url != str(before_values.get("effort_sheet_url") or "").strip()
+            or "description" in synced_fields
+            or any(k in synced_fields for k in EFFORT_SYNC_KEYS)
+        ):
+            synced_fields["effort_sheet_url"] = effort_url
 
     totals = compute(request.field_values() | synced_fields)
     for key, value in totals.items():
         spec_field = field_labels.get(key)
         if spec_field and spec_field.fill == "computed":
+            if str(before_values.get(key) or "").strip() == str(value or "").strip():
+                continue
             _upsert_field(db, request, key, spec_field.label, value)
             synced_fields[key] = value
 
@@ -772,13 +914,20 @@ def update_request(
     for note in notes:
         add_system_comment(db, request, note, sync=True)
 
-    if synced_fields or "priority" in changes:
-        enqueue(
+    if synced_fields or Priority(request.priority) != before_priority:
+        job = enqueue(
             db,
             request.id,
             OutboxOperation.UPDATE_FIELDS,
             {"fields": synced_fields, "priority": Priority(request.priority).value},
         )
+        if job is None and any(k in synced_fields for k in EFFORT_SYNC_KEYS):
+            import logging
+
+            logging.getLogger("triage.sync").error(
+                "effort fields changed but update_fields not enqueued (pause/budget) for %s",
+                request.id,
+            )
     if any(key in synced_fields for key in EFFORT_SYNC_KEYS):
         enqueue_effort_attachment(db, request)
     return request

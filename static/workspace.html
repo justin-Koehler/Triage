@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>CRITR</title>
-    <link rel="stylesheet" href="/styles.css?v=v0-2-4" />
+    <link rel="stylesheet" href="/styles.css?v=v0-3-52" />
   </head>
   <body class="gated">
     <header class="chrome">
@@ -12,38 +12,9 @@
         <div class="brand-row">
           <a class="brand" href="/" id="brand">CRITR</a>
           <div class="app-version" id="app-version">
-            <button type="button" class="app-version-label" id="app-version-info" aria-expanded="false" aria-controls="app-version-pop" title="Was ist neu">
-              v0.2.4
-            </button>
-            <div class="app-version-pop" id="app-version-pop" hidden role="dialog" aria-labelledby="app-version-pop-title">
-              <p class="app-version-pop-kicker">Release</p>
-              <h2 class="app-version-pop-title" id="app-version-pop-title">Was neu ist in v0.2.4</h2>
-              <p class="app-version-pop-lead">Der aktuelle Stand steht jetzt in jedem Ticket — auch ohne Kommentar, bei Tickets aus Jira und bei älteren Changes.</p>
-              <section>
-                <h3>Kalkulation und Change</h3>
-                <p>Im Kopf der Kalkulation steht der Change, zu dem sie gehört. Beim Schließen gehen die Summen immer an genau diesen Change — auch wenn du zwischenzeitlich ein anderes Ticket geöffnet hast. Beim Wechsel zwischen Tickets bleiben keine Werte des vorherigen Changes mehr stehen.</p>
-              </section>
-              <section>
-                <h3>Neue Frage</h3>
-                <p>„Benötigst du Hilfe?“ ist eine Pflichtfrage. Bei „Ja“ kommt die Rückfrage, bei was genau — die Antwort landet automatisch unten in der Beschreibung und geht so mit nach Jira.</p>
-              </section>
-              <section>
-                <h3>Kosten im Ticket</h3>
-                <p>Neben Aufwand, Kosten und IT-Kosten stehen jetzt auch Sachkosten und die Gesamtsumme. Die Felder stehen schlicht nebeneinander und brechen auf schmalen Fenstern in die nächste Zeile um.</p>
-              </section>
-              <section>
-                <h3>Kosten Kalkulation</h3>
-                <p>Die Phase „Konzeption &amp; Einführung“ bzw. „Betrieb“ steht jetzt als gleichwertige Überschrift über dem Block. Der SCS-Block heißt „Kalkulation SCS inklusive weiterer Schwarzfirmen“. Tabellen, Abstände und Summen sind ruhiger gesetzt, die Gesamtsumme tritt hervor.</p>
-              </section>
-              <section>
-                <h3>Status</h3>
-                <p>Im Ticket ist der Stand wieder sichtbar, auch bei Changes, in denen noch Fragen offen sind. Fehlt er, wird er beim Öffnen nachgebaut, und im Hintergrund werden ältere Changes nachgezogen. Der aktuelle Stand braucht keinen Kommentar mehr. Gibt es weder Kommentare noch Status-Einträge, beschreibt er den Change aus den Ticketdaten und sagt offen, dass noch keine Rückmeldung vorliegt. Sobald Kommentare kommen, zählen die letzten fünf plus die Status-Einträge. Beim Import aus Jira und bei jedem Abgleich wird er angelegt und nachgezogen; im Tooltip steht, woraus er entstanden ist.</p>
-              </section>
-              <section>
-                <h3>Version</h3>
-                <p>Die Zählung läuft jetzt nach dem Muster x.x.x. Bis zur allgemeinen Freigabe bleibt CRITR unter 1.0.0; Version 1.0.0 gibt es erst, wenn die Seite für alle verfügbar ist.</p>
-              </section>
-            </div>
+            <a class="app-version-label" id="app-version-info" href="/was-neu" title="Was neu ist">
+              v0.3.52
+            </a>
           </div>
         </div>
         <div class="account" id="account" hidden></div>
@@ -54,6 +25,10 @@
       <main class="ticket-view" id="ticket-view">
         <article id="ticket" class="ticket-sheet" hidden aria-label="Change">
           <header class="ticket-head">
+            <nav class="ticket-nav" id="ticket-nav" aria-label="Navigation">
+              <button type="button" class="ticket-back" id="ticket-back">← Changes</button>
+              <span class="ticket-nav-context" id="ticket-nav-context" hidden></span>
+            </nav>
             <div class="ticket-hero">
               <p class="ticket-eyebrow">
                 <span class="ticket-jira" id="ticket-jira" hidden>
@@ -65,22 +40,14 @@
               <h2 class="ticket-headline" id="ticket-headline" hidden></h2>
             </div>
             <aside class="comment-stand" id="comment-stand" hidden>
-              <header class="comment-stand-head">
-                <p class="comment-stand-label">Status</p>
-                <label class="comment-stand-health-wrap">
-                  <span class="visually-hidden">Status</span>
-                  <select class="comment-stand-health" id="comment-stand-health" aria-label="Status">
-                    <option value="green">Im Plan</option>
-                    <option value="blue">Im Blick behalten</option>
-                    <option value="yellow">Kritisch</option>
-                    <option value="red">Überzogen</option>
-                    <option value="white">On hold</option>
-                    <option value="done">Done</option>
-                  </select>
-                </label>
-                <p class="comment-stand-meta" id="comment-stand-meta"></p>
-              </header>
-              <p class="comment-ablauf" id="comment-ablauf"></p>
+              <div class="comment-stand-lead">
+                <header class="comment-stand-head">
+                  <p class="comment-stand-label">Status</p>
+                  <button type="button" class="comment-stand-health status-update-open" id="status-update-open">Status update</button>
+                  <p class="comment-stand-meta" id="comment-stand-meta"></p>
+                </header>
+                <p class="comment-ablauf" id="comment-ablauf"></p>
+              </div>
             </aside>
             <div class="ticket-aside" hidden>
               <p class="ticket-author ticket-priority" id="ticket-priority-cell" data-key="priority">
@@ -100,6 +67,10 @@
               Bitte alles nochmal überprüfen. KI kann Fehler machen.
             </p>
           </section>
+          <section class="ticket-section" id="ticket-context" hidden>
+            <h3 class="ticket-section-title">Unterstützung und Bezug</h3>
+            <dl class="ticket-team ticket-context" id="ticket-context-fields"></dl>
+          </section>
           <div class="ticket-split">
             <section class="ticket-section" id="ticket-costs" hidden>
               <h3 class="ticket-section-title">Kosten</h3>
@@ -114,17 +85,24 @@
               <h3 class="ticket-section-title">Team und Beteiligte</h3>
               <dl class="ticket-team" id="ticket-team-fields"></dl>
             </section>
+            <section class="ticket-section" id="ticket-solution" hidden>
+              <h3 class="ticket-section-title">Solution</h3>
+              <dl class="ticket-team ticket-solution" id="ticket-solution-fields"></dl>
+            </section>
           </div>
           <section class="ticket-section" id="ticket-files" hidden>
             <h3 class="ticket-section-title">Anhänge</h3>
             <div class="ticket-file-gallery" id="ticket-file-gallery" hidden></div>
             <ul class="ticket-file-list" id="ticket-file-list"></ul>
             <p class="ticket-file-empty" id="ticket-file-empty" hidden>
-              Noch keine Anhänge aus Jira.
+              Noch keine Anhänge.
             </p>
             <button type="button" class="file-add" id="ticket-file-add">Datei hinzufügen</button>
             <input type="file" id="ticket-file-input" hidden multiple />
           </section>
+          <button type="button" class="jira-create ticket-jira-create" id="jira-create-ticket" hidden>
+            In Jira Anlegen
+          </button>
           <section class="ticket-comments" id="ticket-comments" hidden>
             <div class="ticket-comments-head">
               <h3 class="ticket-section-title">Kommentare</h3>
@@ -150,6 +128,191 @@
               </div>
             </form>
           </section>
+          <a
+            class="jira-create ticket-jira-create ticket-finish-open"
+            id="ticket-open-jira-end"
+            href="#"
+            target="_blank"
+            rel="noopener"
+            hidden
+            >In Jira öffnen</a
+          >
+          <dl class="ticket-fields" id="ticket-fields" hidden></dl>
+        </article>
+      </main>
+
+      <section class="hub" id="hub" aria-label="Jira-Tickets">
+        <div class="hub-bar">
+          <p class="hub-kicker">Changes</p>
+          <div class="hub-view-switch" role="group" aria-label="Ansicht">
+            <button type="button" class="hub-view-btn is-active" id="hub-view-chat" data-view="chat">
+              Chat
+            </button>
+            <button type="button" class="hub-view-btn" id="hub-view-list" data-view="list">
+              Liste
+            </button>
+            <button type="button" class="hub-view-btn" id="hub-view-board" data-view="board">
+              Board
+            </button>
+            <button type="button" class="hub-view-btn" id="hub-view-report" data-view="report">
+              Auswertung
+            </button>
+          </div>
+          <label class="search hub-search" for="hub-search">
+            <span class="search-icon" aria-hidden="true">/</span>
+            <input
+              type="search"
+              id="hub-search"
+              placeholder="Suche"
+              autocomplete="off"
+              aria-label="Suche"
+            />
+          </label>
+          <span class="hub-offline" id="hub-offline" hidden>Offline</span>
+        </div>
+        <div class="table-wrap" id="table-wrap">
+          <table class="grid" id="grid">
+            <thead>
+              <tr>
+                <th data-sort="title"><button type="button">Change</button></th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+          <div class="state" id="state" hidden></div>
+        </div>
+        <div class="hub-report" id="hub-report" hidden>
+          <div class="hub-report-kpis" id="hub-report-kpis"></div>
+          <div class="table-wrap hub-report-wrap">
+            <table class="grid hub-report-table" id="hub-report-owners">
+              <thead>
+                <tr>
+                  <th data-sort="name">Verantwortlich</th>
+                  <th data-sort="projects">Projekte</th>
+                  <th data-sort="conceptPt">Konzeption</th>
+                  <th data-sort="totalPt" class="is-total">Gesamt</th>
+                  <th data-sort="approvedPt">Freigegeben</th>
+                  <th data-sort="openPt">Offen</th>
+                  <th data-sort="holdPt">Hold</th>
+                  <th data-sort="donePt">Abgeschlossen</th>
+                  <th data-sort="rejectedPt">Abgelehnt</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="hub-report-head">
+            <h2 class="hub-report-title" id="hub-report-changes-title">Changes</h2>
+            <button type="button" class="hub-report-clear" id="hub-report-clear" hidden>Alle</button>
+          </div>
+          <div class="table-wrap hub-report-wrap">
+            <table class="grid hub-report-table" id="hub-report-changes">
+              <thead>
+                <tr>
+                  <th data-sort="title">Change</th>
+                  <th data-sort="statusLabel">Status</th>
+                  <th data-sort="owner">Verantwortlich</th>
+                  <th data-sort="conceptPt">Konzeption</th>
+                  <th data-sort="operatePt">Betrieb</th>
+                  <th data-sort="totalPt" class="is-total">Gesamt</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="state" id="hub-report-state" hidden></p>
+        </div>
+        <div class="hub-board" id="hub-board" hidden></div>
+        <div class="hub-board-fade" id="hub-board-fade" aria-hidden="true"></div>
+        <p class="hub-board-hint" id="hub-board-hint" hidden>Weiter</p>
+        <div class="hub-chat" id="hub-chat" hidden>
+          <div class="hub-chat-panel is-empty" id="hub-chat-panel">
+            <div class="hub-chat-toolbar">
+              <div class="hub-chat-tools">
+                <div class="hub-chat-history-wrap">
+                  <button type="button" class="hub-chat-tool" id="hub-chat-history" aria-haspopup="menu" aria-expanded="false" title="Verlauf">
+                    Verlauf
+                  </button>
+                  <div class="hub-chat-history-menu" id="hub-chat-history-menu" role="menu" hidden></div>
+                </div>
+                <button type="button" class="hub-chat-tool" id="hub-chat-reset" title="Neuer Chat">Neu</button>
+              </div>
+            </div>
+            <div class="hub-chat-thread" id="hub-chat-thread" aria-live="polite"></div>
+            <div class="hub-chat-dock">
+            <button type="button" class="hub-chat-jump" id="hub-chat-jump" hidden>Nach unten</button>
+            <div class="hub-chat-draft" id="hub-chat-draft" hidden>
+              <p class="hub-chat-draft-kicker">Entwurf</p>
+              <p class="hub-chat-draft-title" id="hub-chat-draft-title"></p>
+              <p class="hub-chat-draft-body" id="hub-chat-draft-body"></p>
+              <button type="button" class="hub-chat-draft-create" id="hub-chat-draft-create" hidden>
+                Change anlegen
+              </button>
+            </div>
+            <div class="hub-chat-suggest" id="hub-chat-suggest" hidden>
+              <button type="button" class="hub-chat-chip" data-prompt="Ich möchte einen Change anlegen">
+                Change anlegen
+              </button>
+              <button type="button" class="hub-chat-chip" data-prompt="Was wartet gerade auf mich?">
+                Was wartet auf mich?
+              </button>
+            </div>
+            <form class="hub-chat-form" id="hub-chat-form">
+              <p class="hub-chat-edit-hint" id="hub-chat-edit-hint" hidden>Ersetzt die letzte Nachricht</p>
+              <label class="hub-chat-composer" for="hub-chat-input">
+                <textarea
+                  id="hub-chat-input"
+                  rows="1"
+                  placeholder="Nachricht schreiben"
+                  autocomplete="off"
+                ></textarea>
+                <button type="submit" class="hub-chat-send" id="hub-chat-send" aria-label="Senden" disabled>
+                  <svg class="hub-chat-send-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M3.4 20.6 21 12 3.4 3.4l-.1 6.8L15 12 3.3 13.8z"
+                    />
+                  </svg>
+                  <svg class="hub-chat-stop-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                    <rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" />
+                  </svg>
+                </button>
+              </label>
+            </form>
+            </div>
+          </div>
+        </div>
+        <div class="hub-foot">
+          <span class="count" id="count"></span>
+          <span class="hub-sync" id="hub-sync" hidden></span>
+        </div>
+      </section>
+
+      <footer class="dock">
+        <div class="dock-guide">
+          <div class="field-prompt" id="effort-sheet-hint" hidden>
+            <p class="field-prompt-text">Bitte das Effort Sheet ausfüllen.</p>
+          </div>
+          <div class="field-prompt" id="intro-prompt" hidden>
+            <p class="field-prompt-meta">
+              <span class="field-prompt-kicker" id="intro-prompt-kicker">Neuer Change</span>
+              <span class="field-prompt-step" id="intro-prompt-step" hidden></span>
+            </p>
+            <p class="field-prompt-text" id="intro-prompt-text"></p>
+          </div>
+        </div>
+        <div class="dock-inner">
+          <div class="choice-row" id="choice-row" hidden></div>
+          <div class="choice-row jira-suggest" id="jira-suggest" hidden></div>
+          <div id="date-wrap" class="date-wrap" hidden>
+            <div id="date-cal" class="cal"></div>
+          </div>
+          <button type="button" class="jira-create" id="start-change">
+            Neuen Change anlegen
+          </button>
+          <button type="button" class="jira-create" id="ai-review-ok" hidden>
+            Ich habe alles geprüft
+          </button>
           <button type="button" class="jira-create" id="jira-create" hidden>
             In Jira Anlegen
           </button>
@@ -166,70 +329,6 @@
               Weiteren Change anlegen
             </button>
           </div>
-          <dl class="ticket-fields" id="ticket-fields" hidden></dl>
-        </article>
-      </main>
-
-      <section class="hub" id="hub" aria-label="Jira-Tickets">
-        <div class="hub-bar">
-          <label class="search" for="hub-search">
-            <span class="search-icon" aria-hidden="true">/</span>
-            <input
-              type="search"
-              id="hub-search"
-              placeholder="Suche"
-              autocomplete="off"
-              aria-label="Suche"
-            />
-          </label>
-          <div class="hub-view-switch" role="group" aria-label="Ansicht">
-            <button type="button" class="hub-view-btn is-active" id="hub-view-list" data-view="list">
-              Liste
-            </button>
-            <button type="button" class="hub-view-btn" id="hub-view-board" data-view="board">
-              Board
-            </button>
-          </div>
-          <span class="hub-offline" id="hub-offline" hidden>Offline</span>
-        </div>
-        <div class="table-wrap" id="table-wrap">
-          <table class="grid" id="grid">
-            <thead>
-              <tr>
-                <th data-sort="title"><button type="button">Change</button></th>
-              </tr>
-            </thead>
-            <tbody id="rows"></tbody>
-          </table>
-          <div class="state" id="state" hidden></div>
-        </div>
-        <div class="hub-board" id="hub-board" hidden></div>
-        <div class="hub-board-fade" id="hub-board-fade" aria-hidden="true"></div>
-        <p class="hub-board-hint" id="hub-board-hint" hidden>Weiter</p>
-        <div class="hub-foot">
-          <span class="count" id="count"></span>
-          <span class="hub-sync" id="hub-sync" hidden></span>
-        </div>
-      </section>
-
-      <footer class="dock">
-        <div class="dock-guide">
-          <p class="field-prompt" id="intro-prompt" hidden>
-            <span class="field-prompt-text" id="intro-prompt-text"></span>
-          </p>
-        </div>
-        <div class="dock-inner">
-          <div class="choice-row" id="choice-row" hidden></div>
-          <div class="choice-row jira-suggest" id="jira-suggest" hidden></div>
-          <div id="date-wrap" class="date-wrap" hidden>
-            <div id="date-cal" class="cal"></div>
-          </div>
-          <button type="button" class="jira-create" id="start-change">
-            Neuen Change anlegen
-          </button>
-          <button type="button" class="jira-create" id="ai-review-ok" hidden>
-            Ich habe alles geprüft
-          </button>
           <form id="form" class="composer composer-card hidden">
             <div class="composer-main">
               <textarea
@@ -274,8 +373,8 @@
       <p class="file-lightbox-caption" id="file-lightbox-caption"></p>
     </div>
 
-    <script src="/auth.js?v=whats-new-v2"></script>
-    <script src="/app.js?v=multi-user-v1"></script>
-    <script src="/workspace.js?v=v0-2-4"></script>
+    <script src="/auth.js?v=v0-3-33"></script>
+    <script src="/app.js?v=v0-3-33"></script>
+    <script src="/workspace.js?v=v0-3-52"></script>
   </body>
 </html>

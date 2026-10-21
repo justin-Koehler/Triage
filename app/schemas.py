@@ -17,6 +17,8 @@ class ClientContext(BaseModel):
     language: str | None = Field(default=None, max_length=40)
     timezone: str | None = Field(default=None, max_length=60)
     page: str | None = Field(default=None, max_length=200)
+    mode: str | None = Field(default=None, max_length=40)
+    turn: str | None = Field(default=None, max_length=20)
 
 
 class MessageIn(BaseModel):

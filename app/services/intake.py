@@ -42,6 +42,7 @@ from app.models import (
     User,
 )
 from app.ports import get_ticket_port
+from app.ports.jira_v3 import public_browse_url
 from app.services import collab
 from app.services.settings_service import get_runtime_config
 from app.services.similarity import find_similar
@@ -113,7 +114,7 @@ UI_FIELDS = {
 }
 DATE_KEYS = {"start_date", "end_date"}
 PT_KEYS = {"concept_scs_pt", "concept_cit_pt", "operate_scs_pt", "operate_cit_pt"}
-MONEY_KEYS = {"costs", "it_costs", "cost_savings"}
+MONEY_KEYS = {"costs", "it_costs", "cost_savings", "total_costs", "material_costs"}
 
 
 def _jira_identity(user: User | None) -> str:
@@ -618,7 +619,9 @@ class IntakeService:
             process_request(self.db, get_ticket_port(), request.id)
         ref = next((item for item in request.external_refs), None)
         jira_key = (ref.external_key if ref else None) or None
-        jira_url = (ref.external_url if ref else None) or None
+        jira_url = (
+            public_browse_url(ref.external_url, ref.external_key) if ref else None
+        ) or None
         sync_state = (
             ref.sync_state.value
             if ref and hasattr(ref.sync_state, "value")
@@ -962,11 +965,15 @@ class IntakeService:
             "reference": request.reference,
             "ticketKey": display_key,
             "jiraKey": jira_key,
-            "jiraUrl": ref.external_url if ref else None,
+            "jiraUrl": (
+                public_browse_url(ref.external_url, ref.external_key) if ref else None
+            ),
             "url": f"/workspace/{request.id}",
             "steckbriefName": request.steckbrief_name,
             "title": request.title,
             "fields": {f.label: f.value for f in sorted(request.fields, key=lambda f: f.position)},
             "externalKey": jira_key,
-            "externalUrl": ref.external_url if ref else None,
+            "externalUrl": (
+                public_browse_url(ref.external_url, ref.external_key) if ref else None
+            ),
         }

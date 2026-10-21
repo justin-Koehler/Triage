@@ -27,6 +27,7 @@ from app.models import (
     created_at_utc,
     utcnow,
 )
+from app.ports.jira_v3 import public_browse_url
 from app.ports.ticket_port import TicketPort, TicketPortError
 from app.services.requests_service import hub_next_step, to_detail
 
@@ -62,17 +63,38 @@ SKIP_VALUES = {"title", "description", "priority", "kind"}
 
 
 def _status_from_jira(name: str) -> RequestStatus:
+    """Jira-Status → CRITR-Workflow. Unbekannte Werte fallen auf Steckbrief."""
     low = (name or "").strip().lower()
     if any(token in low for token in ("done", "fertig", "geschlossen", "abgeschlossen")):
         return RequestStatus.DONE
     if any(token in low for token in ("reject", "ablehn")):
         return RequestStatus.REJECTED
-    if any(token in low for token in ("progress", "umsetzung", "in arbeit")):
+    # „In Progess“ (Tippfehler in Jira) mit abfangen
+    if any(
+        token in low
+        for token in ("progress", "progess", "umsetzung", "in arbeit", "in progress")
+    ):
         return RequestStatus.IN_PROGRESS
-    if "qg2" in low:
+    if "qg2" in low or "quality gate 2" in low:
         return RequestStatus.QG2
-    if "qg1" in low:
+    if "qg1" in low or "quality gate" in low:
         return RequestStatus.QG1
+    if any(
+        token in low
+        for token in (
+            "final version",
+            "freigegeben",
+            "approved",
+            "conception finalized",
+            "konzeption final",
+        )
+    ):
+        return RequestStatus.APPROVED
+    if any(
+        token in low
+        for token in ("approval", "freigabe", "review", "abstimmung", "approval required")
+    ):
+        return RequestStatus.IT_REVIEW
     return RequestStatus.STECKBRIEF
 
 
@@ -200,9 +222,10 @@ def list_inbox(
                 "priority": prio.value,
                 "priorityLabel": PRIORITY_LABELS[prio],
                 "kind": item.get("kind") or "change_request",
+                "createdAt": item.get("createdAt") or "",
                 "updatedAt": item.get("updatedAt") or "",
                 "activityAt": activity,
-                "url": item.get("url") or "",
+                "url": public_browse_url(item.get("url"), key) or "",
                 "requestId": request.id if request else None,
                 "reference": request.reference if request else key,
                 "statusSummary": stand,
@@ -227,6 +250,15 @@ def list_inbox(
 
 
 _PREFIX_BODY = re.compile(r"^([^:\n]{1,80}):\s+([\s\S]+)$")
+
+
+def _as_utc(dt: datetime | None) -> datetime | None:
+    """Immer UTC. Naive Werte sind bereits UTC (so schreibt die App)."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
 
 
 def _parse_jira_created(raw: str) -> datetime | None:
@@ -293,11 +325,15 @@ def sync_comments_from_jira(
         if not body:
             continue
         remote_ids.add(eid)
+        created = _as_utc(created)
         existing = by_ext.get(eid)
         if existing:
             if existing.body != body or existing.author_name != author:
                 existing.body = body
                 existing.author_name = author
+                changed += 1
+            if created and _as_utc(existing.created_at) != created:
+                existing.created_at = created
                 changed += 1
             continue
         plain = str(item.get("body") or "").strip()
@@ -317,7 +353,9 @@ def sync_comments_from_jira(
         )
         if orphan:
             orphan.external_id = eid
-            if created and (not orphan.created_at or orphan.created_at > created):
+            if created and (
+                not orphan.created_at or _as_utc(orphan.created_at) > created
+            ):
                 orphan.created_at = created
             changed += 1
             by_ext[eid] = orphan
@@ -513,6 +551,340 @@ def refresh_stand_after_sync(db: Session, request: Request, *, changed: bool, ll
         return False
 
 
+
+def apply_effort_share_to_request(db: Session, request: Request) -> bool:
+    """Lokales Aufwand-Sheet (/aufwand/…) in CRITR-Felder übernehmen (ohne Outbox)."""
+    from app.services.effort_sheet import (
+        EFFORT_SYNC_KEYS,
+        effort_sync_fields,
+        load_share_csv,
+        parse_effort_csv,
+        share_id_from_url,
+    )
+
+    values = request.field_values()
+    url = str(values.get("effort_sheet_url") or "").strip()
+    if not url:
+        return False
+    sid = share_id_from_url(url)
+    if not sid:
+        return False
+    csv_text = load_share_csv(db, sid)
+    if not csv_text:
+        return False
+    parsed = effort_sync_fields(parse_effort_csv(csv_text))
+    # URL behalten (öffentliche Adresse aus dem Ticket)
+    parsed["effort_sheet_url"] = url
+    changed = False
+    current = request.field_values()
+    # effort_it/effort_fb mitziehen, sonst bleibt „Aufwand IT“ lokal stehen.
+    aliases = {"concept_scs_pt": "effort_fb", "concept_cit_pt": "effort_it"}
+    for key in EFFORT_SYNC_KEYS:
+        text = str(parsed.get(key) or "").strip()
+        if str(current.get(key) or "").strip() == text:
+            continue
+        # Leer = Feld leeren (nicht überspringen — sonst bleiben alte PT/Kosten).
+        _upsert_field(request, key, text)
+        alias = aliases.get(key)
+        if alias:
+            _upsert_field(request, alias, text)
+        changed = True
+    return changed
+
+
+def find_request_by_effort_share(db: Session, share_id: str) -> Request | None:
+    from app.models import RequestField
+
+    sid = str(share_id or "").strip()
+    if not sid:
+        return None
+    needle = f"/aufwand/{sid}"
+    field = db.scalar(
+        select(RequestField)
+        .where(
+            RequestField.key == "effort_sheet_url",
+            RequestField.value.ilike(f"%{needle}%"),
+        )
+        .limit(1)
+    )
+    if not field:
+        return None
+    return db.scalar(
+        select(Request)
+        .options(
+            selectinload(Request.fields),
+            selectinload(Request.external_refs),
+            selectinload(Request.comments),
+            selectinload(Request.attachments),
+            selectinload(Request.status_updates),
+        )
+        .where(Request.id == field.request_id)
+    )
+
+
+def _canonical_jira_description(text: str) -> str:
+    """Vergleichbar machen: Wiki-[Label|url] und „Label: url“ sowie Whitespace vereinheitlichen."""
+    out: list[str] = []
+    for line in str(text or "").splitlines():
+        raw = line.strip().replace("\xa0", " ")
+        if not raw:
+            continue
+        wiki = re.match(r"^\[([^\]|]+)\|(https?://[^\]\s]+)\]\s*$", raw)
+        if wiki:
+            label = re.sub(r"^CRITR\s+", "", wiki.group(1).strip(), flags=re.I)
+            out.append(f"CRITR {label}: {wiki.group(2).rstrip(').,;')}")
+            continue
+        plain = re.match(
+            r"^((?:CRITR\s+)?(?:Ticket|Status update|Aufwand\s*Sheet))\s*:\s*(https?://\S+)\s*$",
+            raw,
+            re.I,
+        )
+        if plain:
+            label = re.sub(r"^CRITR\s+", "", plain.group(1).strip(), flags=re.I)
+            out.append(f"CRITR {label}: {plain.group(2).rstrip(').,;')}")
+            continue
+        out.append(re.sub(r"\s+", " ", raw))
+    return "\n".join(out).strip()
+
+
+def _descriptions_equivalent(a: str, b: str) -> bool:
+    """True, wenn Inhalt inkl. CRITR-Links gleich ist (Wiki- und Plain-Form zählen gleich)."""
+    from app.ports.jira_v3 import _wiki_description
+
+    ca = _canonical_jira_description(a)
+    cb = _canonical_jira_description(b)
+    if ca == cb:
+        return True
+    # Einmal Wiki-gerendert vergleichen (so landet es in Jira API2).
+    return (
+        _canonical_jira_description(_wiki_description(a)) == cb
+        or ca == _canonical_jira_description(_wiki_description(b))
+        or _canonical_jira_description(_wiki_description(a))
+        == _canonical_jira_description(_wiki_description(b))
+    )
+
+
+_JIRA_DESC_FP = "jira_description_fp"
+# Harte Bremse: max. so viele Beschreibungs-Updates in dieses Fenster — sonst keine Mails mehr.
+_DESC_PUSH_WINDOW_MINUTES = 10
+_DESC_PUSH_MAX_PER_WINDOW = 5
+
+
+def _description_fingerprint(text: str) -> str:
+    import hashlib
+
+    return hashlib.sha256(_canonical_jira_description(text).encode("utf-8")).hexdigest()[:32]
+
+
+def _critr_links_incomplete(request: Request) -> bool:
+    """True, wenn Ticket-/Status-/Aufwand-Link mit der aktuellen Request-ID fehlen."""
+    rid = str(request.id or "").strip()
+    blob = str(request.description or "")
+    if not rid:
+        return True
+    has_ticket = f"/workspace/{rid}" in blob
+    has_status = f"/status-update/{rid}" in blob
+    has_effort = "/aufwand/" in blob or "docs.google.com/spreadsheets" in blob.lower()
+    return not (has_ticket and has_status and has_effort)
+
+
+def _description_push_budget_ok(db: Session) -> bool:
+    """Verhindert Massen-Updates (Mail-Flut): max. N Beschreibungs-Jobs im Zeitfenster."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import text
+
+    since = datetime.now(UTC) - timedelta(minutes=_DESC_PUSH_WINDOW_MINUTES)
+    # payload::text enthält bei UPDATE_FIELDS typischerweise "description"
+    n = db.execute(
+        text(
+            """
+            SELECT count(*) FROM sync_outbox
+            WHERE operation = 'update_fields'
+              AND created_at >= :since
+              AND (
+                state IN ('pending', 'synced', 'failed')
+              )
+              AND coalesce(payload::text, '') ILIKE '%description%'
+            """
+        ),
+        {"since": since},
+    ).scalar()
+    return int(n or 0) < _DESC_PUSH_MAX_PER_WINDOW
+
+
+def _apply_critr_description(
+    db: Session,
+    request: Request,
+    *,
+    force: bool = False,
+) -> None:
+    """Lokale Beschreibung = Freitext + drei CRITR-Links; Sync nach Jira nur bei echter Änderung."""
+    import logging
+    import os
+
+    log = logging.getLogger("triage.sync")
+
+    # Not-Stop: keine Jira-Feld-Updates (Mails), bis CRITR_PAUSE_JIRA_PUSH wieder aus ist.
+    if os.environ.get("CRITR_PAUSE_JIRA_PUSH", "").strip().lower() in {"1", "true", "yes", "on"}:
+        return
+    from app.domain.types import OutboxOperation, Priority
+    from app.services.requests_service import _jira_field_map_meta, _render_description_for_jira
+    from app.sync.outbox import enqueue
+
+    meta = (_jira_field_map_meta().get("fields") or {})
+    previous = str(request.description or "").strip()
+    prose = previous
+    cleaned = "\n".join(
+        line
+        for line in prose.splitlines()
+        if not re.match(
+            r"^(?:CRITR\s+)?(?:Ticket|Status update|Aufwand\s*Sheet)\s*:",
+            line.strip(),
+            re.I,
+        )
+        and not re.match(r"^\[CRITR\s+", line.strip(), re.I)
+        and "/workspace/" not in line
+        and "/status-update/" not in line
+        and "/aufwand/" not in line
+    ).strip()
+    if cleaned:
+        _upsert_field(request, "description", cleaned)
+        request.description = cleaned
+    desc = _render_description_for_jira(request, meta, db=db)
+    effort = str(request.field_values().get("effort_sheet_url") or "").strip()
+    fp = _description_fingerprint(desc)
+    stored_fp = str(request.field_values().get(_JIRA_DESC_FP) or "").strip()
+    # Gleicher Inhalt wie zuletzt geschrieben / wie in Jira → kein Update, keine Mail.
+    if not force and (stored_fp == fp or _descriptions_equivalent(desc, previous)):
+        request.description = desc
+        if stored_fp != fp:
+            _upsert_field(request, _JIRA_DESC_FP, fp)
+        return
+    if not _description_push_budget_ok(db):
+        # Nicht lokal „fertig“ machen — sonst greift der Incomplete-Check nicht mehr.
+        # Nächster Sync versucht erneut, sobald Budget frei ist.
+        log.warning(
+            "description-push budget exhausted (max %s / %s min) — skip Jira update for %s",
+            _DESC_PUSH_MAX_PER_WINDOW,
+            _DESC_PUSH_WINDOW_MINUTES,
+            request.id,
+        )
+        request.description = previous
+        return
+    fields = {"description": desc}
+    if effort:
+        fields["effort_sheet_url"] = effort
+    request.description = desc
+    _upsert_field(request, _JIRA_DESC_FP, fp)
+    enqueue(
+        db,
+        request.id,
+        OutboxOperation.UPDATE_FIELDS,
+        {"fields": fields, "priority": Priority(request.priority).value},
+    )
+
+
+def mirror_jira_issue(
+    db: Session,
+    port: TicketPort,
+    key: str,
+    *,
+    user: User | None = None,
+    user_token: str | None = None,
+    user_email: str | None = None,
+    summarize: bool = False,
+) -> dict[str, object]:
+    """Ein Jira-Ticket nach CRITR spiegeln (neu anlegen oder aktualisieren)."""
+    existed = _find_ref(db, port.system, key.strip()) is not None
+    request = import_issue(
+        db,
+        port,
+        key.strip(),
+        user=user,
+        user_token=user_token,
+        user_email=user_email,
+        defer_enrich=True,
+    )
+    db.refresh(request, attribute_names=["fields", "external_refs", "comments", "attachments"])
+    effort_hit = apply_effort_share_to_request(db, request)
+    n = sync_comments_from_jira(
+        db,
+        port,
+        request,
+        user_token=user_token,
+        user_email=user_email,
+        summarize=False,
+    )
+    a = sync_attachments_from_jira(
+        db, port, request, user_token=user_token, user_email=user_email
+    )
+    # Beschreibung nach Jira nur bei Neuanlage oder fehlenden CRITR-Links —
+    # nicht bei jedem Kommentar-Sync (sonst Mail-Flut).
+    if (not existed) or _critr_links_incomplete(request):
+        _apply_critr_description(db, request)
+    stand = 1 if refresh_stand_after_sync(
+        db, request, changed=bool(n or a or effort_hit or not existed), llm=summarize
+    ) else 0
+    return {
+        "key": key.strip(),
+        "requestId": request.id,
+        "created": not existed,
+        "updated": bool(n or a or effort_hit or existed),
+        "stand": stand,
+    }
+
+
+def pull_new_jira_issues(
+    db: Session,
+    port: TicketPort,
+    *,
+    limit: int = 30,
+    user_token: str | None = None,
+    user_email: str | None = None,
+) -> dict[str, int]:
+    """Neue Jira-Tickets ohne CRITR-Spiegelung importieren."""
+    created = 0
+    updated = 0
+    failed = 0
+    try:
+        issues = port.list_issues(
+            query="", limit=max(1, min(limit, 50)), user_token=user_token, user_email=user_email
+        )
+    except TicketPortError:
+        return {"created": 0, "updated": 0, "failed": 1}
+    keys = [str(item.get("key") or "").strip() for item in issues if item.get("key")]
+    if not keys:
+        return {"created": 0, "updated": 0, "failed": 0}
+    known = {
+        ref.external_key
+        for ref in db.scalars(
+            select(ExternalRef).where(ExternalRef.external_key.in_(keys))
+        ).all()
+        if ref.external_key
+    }
+    for key in keys:
+        if key in known:
+            continue
+        try:
+            stats = mirror_jira_issue(
+                db,
+                port,
+                key,
+                user_token=user_token,
+                user_email=user_email,
+                summarize=False,
+            )
+            if stats.get("created"):
+                created += 1
+            else:
+                updated += 1
+            known.add(key)
+        except Exception:
+            failed += 1
+    return {"created": created, "updated": updated, "failed": failed}
+
+
 def sync_comments_batch(
     db: Session,
     port: TicketPort,
@@ -523,68 +895,82 @@ def sync_comments_batch(
     user_email: str | None = None,
     summarize: bool = False,
 ) -> dict[str, int]:
-    """Kommentare für bekannte Jira-Keys nachziehen (Hub / Hintergrund)."""
+    """Jira → CRITR: bekannte Keys spiegeln; unbekannte Keys neu anlegen."""
     synced = 0
     updated = 0
     failed = 0
     stand = 0
-    targets: list[ExternalRef] = []
-    if keys:
-        clean = [k.strip() for k in keys if str(k or "").strip()][: max(1, min(limit, 50))]
-        if clean:
-            targets = list(
-                db.scalars(
-                    select(ExternalRef)
-                    .options(
-                        selectinload(ExternalRef.request).selectinload(Request.comments),
-                        selectinload(ExternalRef.request).selectinload(Request.fields),
-                        selectinload(ExternalRef.request).selectinload(Request.external_refs),
-                        selectinload(ExternalRef.request).selectinload(Request.attachments),
-                        selectinload(ExternalRef.request).selectinload(Request.status_updates),
-                    )
-                    .where(ExternalRef.external_key.in_(clean))
-                ).all()
-            )
-    else:
-        targets = list(
-            db.scalars(
-                select(ExternalRef)
-                .options(
-                    selectinload(ExternalRef.request).selectinload(Request.comments),
-                    selectinload(ExternalRef.request).selectinload(Request.fields),
-                    selectinload(ExternalRef.request).selectinload(Request.external_refs),
-                    selectinload(ExternalRef.request).selectinload(Request.attachments),
-                    selectinload(ExternalRef.request).selectinload(Request.status_updates),
+    created = 0
+    clean = [k.strip() for k in (keys or []) if str(k or "").strip()][: max(1, min(limit, 50))]
+
+    if clean:
+        # Explizite Keys: auch ohne ExternalRef importieren (Webhook Create).
+        for key in clean:
+            try:
+                stats = mirror_jira_issue(
+                    db,
+                    port,
+                    key,
+                    user_token=user_token,
+                    user_email=user_email,
+                    summarize=summarize,
                 )
-                .where(ExternalRef.external_key.is_not(None))
-                .order_by(ExternalRef.synced_at.desc().nulls_last())
-                .limit(max(1, min(limit, 50)))
-            ).all()
-        )
+                synced += 1
+                if stats.get("created"):
+                    created += 1
+                if stats.get("updated"):
+                    updated += 1
+                stand += int(stats.get("stand") or 0)
+            except Exception:
+                failed += 1
+        return {
+            "synced": synced,
+            "updated": updated,
+            "failed": failed,
+            "stand": stand,
+            "created": created,
+        }
+
+    targets = list(
+        db.scalars(
+            select(ExternalRef)
+            .options(
+                selectinload(ExternalRef.request).selectinload(Request.comments),
+                selectinload(ExternalRef.request).selectinload(Request.fields),
+                selectinload(ExternalRef.request).selectinload(Request.external_refs),
+                selectinload(ExternalRef.request).selectinload(Request.attachments),
+                selectinload(ExternalRef.request).selectinload(Request.status_updates),
+            )
+            .where(ExternalRef.external_key.is_not(None))
+            .order_by(ExternalRef.synced_at.desc().nulls_last())
+            .limit(max(1, min(limit, 50)))
+        ).all()
+    )
     for ref in targets:
-        request = ref.request
-        if not request or not ref.external_key:
+        if not ref.request or not ref.external_key:
             continue
         try:
-            n = sync_comments_from_jira(
+            stats = mirror_jira_issue(
                 db,
                 port,
-                request,
+                ref.external_key,
                 user_token=user_token,
                 user_email=user_email,
-                summarize=False,
+                summarize=summarize,
             )
-            a = sync_attachments_from_jira(
-                db, port, request, user_token=user_token, user_email=user_email
-            )
-            if refresh_stand_after_sync(db, request, changed=bool(n), llm=summarize):
-                stand += 1
             synced += 1
-            if n or a:
+            if stats.get("updated"):
                 updated += 1
+            stand += int(stats.get("stand") or 0)
         except Exception:
             failed += 1
-    return {"synced": synced, "updated": updated, "failed": failed, "stand": stand}
+    return {
+        "synced": synced,
+        "updated": updated,
+        "failed": failed,
+        "stand": stand,
+        "created": created,
+    }
 
 
 def import_issue(
@@ -595,6 +981,7 @@ def import_issue(
     user: User | None = None,
     user_token: str | None = None,
     user_email: str | None = None,
+    defer_enrich: bool = False,
 ) -> Request:
     issue = port.inbox_issue(
         key.strip(), user_token=user_token, user_email=user_email
@@ -608,7 +995,9 @@ def import_issue(
     if reporter:
         values["author"] = reporter
     title = (values.get("title") or issue.get("title") or jira_key).strip()[:200]
-    description = str(values.get("description") or "")
+    from app.ports.ticket_port import clean_description_lead
+
+    description = clean_description_lead(str(values.get("description") or ""))
     kind = parse_kind(issue.get("kind")) or RequestKind.CHANGE_REQUEST
     priority = parse_priority(issue.get("priority") or values.get("priority")) or Priority.MEDIUM
     status = _status_from_jira(str(issue.get("status") or ""))
@@ -646,7 +1035,9 @@ def import_issue(
         request.external_refs.append(ref)
 
     ref.external_key = jira_key
-    ref.external_url = str(issue.get("url") or "") or ref.external_url
+    ref.external_url = (
+        public_browse_url(issue.get("url"), jira_key) or ref.external_url
+    )
     ref.sync_state = SyncState.SYNCED
     ref.synced_at = utcnow()
     ref.last_error = None
@@ -658,7 +1049,28 @@ def import_issue(
         if not text:
             continue
         _upsert_field(request, field_key, text)
+    # Aufwand-Link aus Beschreibung, falls Feld leer
+    from app.services.effort_sheet import ensure_effort_share, share_id_from_url
+
+    sheet_url = str(values.get("effort_sheet_url") or "").strip()
+    if not sheet_url:
+        blob = f"{description}\n{str(values.get('description') or '')}"
+        match = re.search(r"/aufwand/([0-9a-fA-F-]{36})", blob)
+        if match:
+            from app.config import get_settings
+
+            base = (get_settings().public_base_url or "https://scscm.stackit.gg").rstrip("/")
+            if "127.0.0.1" in base or "localhost" in base:
+                base = "https://scscm.stackit.gg"
+            sheet_url = f"{base}/aufwand/{match.group(1)}"
+            _upsert_field(request, "effort_sheet_url", sheet_url)
+    sid = share_id_from_url(sheet_url) if sheet_url else None
+    if sid:
+        ensure_effort_share(db, sid)
     db.flush()
+    if defer_enrich:
+        # Schnelles Öffnen: Felder sofort, Kommentare/Anhänge im Hintergrund.
+        return request
     # Kommentare nachladen, damit relationship aktuell ist
     db.refresh(request, attribute_names=["comments", "external_refs"])
     sync_comments_from_jira(
@@ -671,6 +1083,7 @@ def import_issue(
     sync_attachments_from_jira(
         db, port, request, user_token=user_token, user_email=user_email
     )
+    apply_effort_share_to_request(db, request)
     # Stand sofort ohne LLM setzen, damit das Feld direkt nach dem Import steht.
     refresh_stand_after_sync(db, request, changed=True, llm=False)
     return request
@@ -684,6 +1097,7 @@ def import_issue_view(
     user: User | None = None,
     user_token: str | None = None,
     user_email: str | None = None,
+    defer_enrich: bool = False,
 ) -> dict:
     request = import_issue(
         db,
@@ -692,6 +1106,7 @@ def import_issue_view(
         user=user,
         user_token=user_token,
         user_email=user_email,
+        defer_enrich=defer_enrich,
     )
     db.refresh(request)
     loaded = db.scalar(

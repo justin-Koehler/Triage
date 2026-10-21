@@ -2,8 +2,10 @@
   const intro = document.getElementById("intro-prompt");
   const introText = document.getElementById("intro-prompt-text");
   const jiraBtn = document.getElementById("jira-create");
+  const jiraCreateTicket = document.getElementById("jira-create-ticket");
   const ticketFinish = document.getElementById("ticket-finish");
   const openJiraLink = document.getElementById("ticket-open-jira");
+  const openJiraEnd = document.getElementById("ticket-open-jira-end");
   const newChangeBtn = document.getElementById("ticket-new-change");
   const startChangeBtn = document.getElementById("start-change");
   const aiReviewOk = document.getElementById("ai-review-ok");
@@ -18,13 +20,18 @@
   const overviewMeta = document.getElementById("ticket-overview-meta");
   const overviewAiHint = document.getElementById("overview-ai-hint");
   const AI_REVIEW_HINT = "Bitte alles nochmal überprüfen. KI kann Fehler machen.";
+  const context = document.getElementById("ticket-context");
+  const contextFields = document.getElementById("ticket-context-fields");
   const costs = document.getElementById("ticket-costs");
   const costFields = document.getElementById("ticket-cost-fields");
   const effortSheetOpen = document.getElementById("effort-sheet-open");
+  const statusUpdateOpen = document.getElementById("status-update-open");
   let effortSheetTemplateUrl = "";
   let effortSheetOpenUrl = "";
   const team = document.getElementById("ticket-team");
   const teamFields = document.getElementById("ticket-team-fields");
+  const solution = document.getElementById("ticket-solution");
+  const solutionFields = document.getElementById("ticket-solution-fields");
   const filesSection = document.getElementById("ticket-files");
   const fileList = document.getElementById("ticket-file-list");
   const fileGallery = document.getElementById("ticket-file-gallery");
@@ -39,7 +46,11 @@
   const commentStand = document.getElementById("comment-stand");
   const commentAblauf = document.getElementById("comment-ablauf");
   const commentStandMeta = document.getElementById("comment-stand-meta");
-  const commentStandHealth = document.getElementById("comment-stand-health");
+  const standSection = document.getElementById("ticket-stand");
+  const standForm = document.getElementById("ticket-stand-form");
+  const standAdd = document.getElementById("ticket-stand-add");
+  const standError = document.getElementById("ticket-stand-error");
+  const standPtFields = document.getElementById("stand-pt-fields");
   const commentList = document.getElementById("comment-list");
   const commentCount = document.getElementById("comment-count");
   const commentForm = document.getElementById("comment-form");
@@ -60,10 +71,14 @@
     !kindEl ||
     !overview ||
     !overviewFields ||
+    !context ||
+    !contextFields ||
     !costs ||
     !costFields ||
     !team ||
     !teamFields ||
+    !solution ||
+    !solutionFields ||
     !filesSection ||
     !fileList ||
     !fileAdd ||
@@ -87,6 +102,7 @@
       label: "Start",
       kind: "meta",
       date: true,
+      choices: ["Weiß ich noch nicht"],
     },
     {
       key: "end",
@@ -95,6 +111,7 @@
       label: "Ende",
       kind: "meta",
       date: true,
+      choices: ["Weiß ich noch nicht"],
     },
     {
       key: "components",
@@ -104,8 +121,9 @@
       kind: "meta",
       jiraLookup: "components",
       multi: true,
+      optional: true,
       hint:
-        "Stichwörter beschreiben Systeme, Themen oder Bereiche — z. B. SAP, Schul-App oder Digitalisierung. Mehrere auswählbar.",
+        "Stichwörter beschreiben Systeme, Themen oder Bereiche — z. B. SAP, Schul-App oder Digitalisierung. Mehrere auswählbar. Leer lassen geht auch.",
     },
     {
       key: "sponsor",
@@ -146,27 +164,18 @@
       prompt: "Sind dir ähnliche Lösungen bei Schwarz bekannt?",
       placeholder: "Ähnliche Lösung nennen…",
       label: "Bezug",
-      kind: "overview",
+      kind: "context",
       choices: ["Nein"],
       keepForm: true,
     },
     {
       key: "help_needed",
-      prompt: "Benötigst du Hilfe?",
-      placeholder: "Hilfe benötigt",
-      label: "Hilfe benötigt",
-      kind: "overview",
-      choices: ["Ja", "Nein"],
-    },
-    {
-      key: "help_topic",
-      prompt: "Bei was genau brauchst du Hilfe?",
-      placeholder: "z. B. Abstimmung mit der IT",
-      label: "Hilfe bei",
-      kind: "overview",
-      long: true,
-      onlyIf: () => String(values.help_needed || "").trim().toLowerCase() === "ja",
-      hint: "Der Punkt wird unten in der Beschreibung ergänzt.",
+      prompt: "Benötigst du Unterstützung bei dem Projekt? Wenn ja welche?",
+      placeholder: "z. B. Projektmanagement, methodisch oder personell",
+      label: "Unterstützung",
+      kind: "context",
+      choices: ["Projektmanagement", "Methodisch", "Personell"],
+      keepForm: true,
     },
     {
       key: "cost_savings",
@@ -196,6 +205,8 @@
       label: "Projektleitung",
       kind: "team",
       jiraLookup: "user",
+      choices: ["Ich weiß es noch nicht"],
+      keepForm: true,
     },
     {
       key: "it_owner",
@@ -215,7 +226,7 @@
       optional: true,
       multi: true,
       jiraLookup: "user",
-      choices: ["Keine"],
+      choices: ["Gar keiner"],
       keepForm: true,
     },
     {
@@ -251,22 +262,13 @@
       keepForm: true,
     },
     {
-      key: "solution_category",
-      prompt: "Welche Solution Category?",
-      placeholder: "Solution Category",
-      label: "Solution Category",
-      kind: "team",
-      onlyKind: "it_request",
-      jiraLookup: "option:solution_category",
-    },
-    {
-      key: "solution_name",
-      prompt: "Welche Solution?",
-      placeholder: "Solution",
-      label: "Solution",
-      kind: "team",
-      onlyKind: "it_request",
-      jiraLookup: "option:solution_name",
+      key: "attachments_ask",
+      prompt: "Möchtest du einen Anhang hochladen?",
+      placeholder: "Anhang",
+      label: "Anhang",
+      kind: "files",
+      ephemeral: true,
+      choices: ["Ja", "Nein"],
     },
   ];
 
@@ -361,7 +363,7 @@
       .toLowerCase()
       .replace(/[.!?]+$/g, "");
     if (!raw) return false;
-    if (raw === "keine" || raw === "niemand" || raw === "keiner") return true;
+    if (raw === "keine" || raw === "niemand" || raw === "keiner" || raw === "gar keiner" || raw === "gar keine") return true;
     const phrases = [
       "keine ahnung",
       "keine idee",
@@ -404,12 +406,24 @@
   function confirmAiReview() {
     aiReviewPending = false;
     if (aiReviewOk) aiReviewOk.hidden = true;
-    revealCostsAfterReview = true;
-    const costIdx = STEPS.findIndex((item) => item.kind === "cost" && stepVisible(item));
-    if (costIdx !== -1 && stepIndex < costIdx) stepIndex = costIdx;
-    prepareCostFields();
-    openEffortTemplate();
     syncPrompt();
+  }
+
+  function syncIntroChrome() {
+    const kicker = document.getElementById("intro-prompt-kicker");
+    const stepEl = document.getElementById("intro-prompt-step");
+    if (kicker) kicker.textContent = "Neuer Change";
+    if (!stepEl) return;
+    const step = currentStep();
+    if (!step) {
+      stepEl.hidden = true;
+      stepEl.textContent = "";
+      return;
+    }
+    const visible = STEPS.filter(stepVisible);
+    const idx = visible.findIndex((s) => s.key === step.key);
+    stepEl.textContent = idx >= 0 ? `${idx + 1} · ${step.label}` : step.label;
+    stepEl.hidden = false;
   }
 
   function setIntro(text) {
@@ -419,6 +433,7 @@
       introText.textContent = "";
       return;
     }
+    syncIntroChrome();
     introText.textContent = raw;
     intro.hidden = false;
   }
@@ -431,14 +446,82 @@
   window.intakeIdle = function () {
     return !intakeStarted && !document.body.classList.contains("ticket-active");
   };
+  function isCreatingChange() {
+    return intakeStarted && !loadedTicket;
+  }
+
+  function jiraCreateButtons() {
+    return [jiraBtn, jiraCreateTicket].filter(Boolean);
+  }
+
+  function hideJiraCreate() {
+    jiraCreateButtons().forEach((btn) => {
+      btn.hidden = true;
+    });
+  }
+
+  function showJiraCreate() {
+    jiraCreateButtons().forEach((btn) => {
+      btn.hidden = false;
+    });
+  }
+
+  function resetJiraCreate() {
+    jiraCreateButtons().forEach((btn) => {
+      btn.hidden = true;
+      btn.disabled = false;
+      btn.textContent = "In Jira Anlegen";
+    });
+  }
+
+  function setJiraCreateBusy(label) {
+    jiraCreateButtons().forEach((btn) => {
+      btn.disabled = true;
+      btn.textContent = label;
+    });
+  }
+
+  function setJiraCreateIdle() {
+    jiraCreateButtons().forEach((btn) => {
+      btn.disabled = false;
+      btn.textContent = "In Jira Anlegen";
+    });
+  }
+
+  function syncTicketModeClass() {
+    document.body.classList.toggle("ticket-creating", isCreatingChange());
+    document.body.classList.toggle("ticket-open", loadedTicket);
+    document.body.classList.toggle(
+      "ticket-ready",
+      isCreatingChange() &&
+        !currentStep() &&
+        Boolean(String(values.title || "").trim() && String(values.description || "").trim())
+    );
+  }
   window.startNewChange = function () {
     intakeStarted = true;
+    loadedTicket = false;
+    syncedRequestId = null;
+    stepIndex = 0;
+    autoFillBusy = false;
+    aiReviewPending = false;
+    revealCostsAfterReview = false;
+    document.body.classList.remove("hub-chat-view");
+    resetTicketState();
     if (startChangeBtn) startChangeBtn.hidden = true;
+    if (aiReviewOk) aiReviewOk.hidden = true;
+    if (ticketFinish) ticketFinish.hidden = true;
+    if (openJiraEnd) openJiraEnd.hidden = true;
+    resetJiraCreate();
     const hub = document.getElementById("hub");
     if (hub) hub.hidden = true;
+    ticket.hidden = true;
+    document.body.classList.remove("ticket-active");
+    syncTicketModeClass();
     syncPrompt();
   };
   let syncedRequestId = null;
+  let standUpdates = [];
   const values = {};
   const labels = {};
   const UI_TO_DOMAIN = {
@@ -965,7 +1048,9 @@
   }
 
   function requiredSteps() {
-    return STEPS.filter(stepVisible).concat(autoSteps().filter(stepVisible));
+    return STEPS.filter(stepVisible)
+      .filter((step) => !step.ephemeral)
+      .concat(autoSteps().filter(stepVisible));
   }
 
   function fieldFilled(step) {
@@ -975,10 +1060,17 @@
     return !/konnte nicht ermittelt werden\.?$/i.test(raw);
   }
 
+  function userFieldsDone() {
+    if (autoFillBusy || aiReviewPending) return false;
+    return STEPS.filter(stepVisible)
+      .filter((step) => !step.ephemeral)
+      .every(fieldFilled);
+  }
+
   function ticketComplete() {
     if (autoFillBusy || aiReviewPending) return false;
     if (currentStep()) return false;
-    return requiredSteps().every(fieldFilled);
+    return userFieldsDone();
   }
 
   function finishVisible() {
@@ -1006,32 +1098,76 @@
     return false;
   }
 
+  function commentsAllowed() {
+    return Boolean(loadedTicket && syncedRequestId && !isCreatingChange());
+  }
+
+  function filesAskedYes() {
+    return /^ja$/i.test(String(values.attachments_ask || "").trim());
+  }
+
   function syncIntakePanels() {
     const tail = intakeTailOpen();
     if (team) team.hidden = !intakeKindReached("team");
     if (costs) costs.hidden = !intakeKindReached("cost");
-    if (filesSection) filesSection.hidden = !tail;
+    if (solution) {
+      solution.hidden =
+        ticketKind() !== "it_request" || !intakeKindReached("solution");
+    }
+    if (context) context.hidden = !intakeKindReached("context");
+    if (filesSection) {
+      filesSection.hidden = !(loadedTicket || finishVisible() || filesAskedYes());
+    }
     if (fieldsRoot) {
       fieldsRoot.hidden = !tail || !fieldsRoot.children.length;
     }
-    if (commentsSection) commentsSection.hidden = !(tail && syncedRequestId);
-    if (commentStand && (!tail || !syncedRequestId)) {
+    if (standSection) standSection.hidden = true;
+    if (commentsSection) commentsSection.hidden = !commentsAllowed();
+    if (commentStand && !commentsAllowed()) {
       commentStand.hidden = true;
     }
   }
 
-  function showFinishActions(key, jiraUrl) {
-    if (!ticketFinish || !openJiraLink || !newChangeBtn) return;
-    jiraBtn.hidden = true;
-    ticketFinish.hidden = false;
-    if (jiraUrl) {
-      openJiraLink.href = jiraUrl;
-      openJiraLink.classList.remove("is-disabled");
-      openJiraLink.removeAttribute("aria-disabled");
+  function jiraBrowseUrl(key, url) {
+    const raw = String(url || "").trim();
+    let issue = String(key || "").trim();
+    if (!issue) {
+      const found = raw.match(/\/browse\/([A-Z][A-Z0-9]+-\d+)/i);
+      issue = found ? found[1] : "";
+    }
+    if (issue && (!raw || /live\.api\.schwarz/i.test(raw))) {
+      return `https://jira.schwarz/browse/${issue}`;
+    }
+    return raw;
+  }
+
+  function bindOpenJira(link, jiraUrl) {
+    if (!link) return;
+    const url = String(jiraUrl || "").trim();
+    if (!url) {
+      link.hidden = true;
+      link.removeAttribute("href");
+      return;
+    }
+    link.hidden = false;
+    link.href = url;
+    link.classList.remove("is-disabled");
+    link.removeAttribute("aria-disabled");
+  }
+
+  function showFinishActions(key, jiraUrl, { newChange = false } = {}) {
+    hideJiraCreate();
+    const url = jiraBrowseUrl(key, jiraUrl);
+    if (newChange) {
+      if (ticketFinish) ticketFinish.hidden = false;
+      if (newChangeBtn) newChangeBtn.hidden = false;
+      bindOpenJira(openJiraLink, url);
+      if (openJiraEnd) openJiraEnd.hidden = true;
     } else {
-      openJiraLink.href = "#";
-      openJiraLink.classList.add("is-disabled");
-      openJiraLink.setAttribute("aria-disabled", "true");
+      if (ticketFinish) ticketFinish.hidden = true;
+      if (openJiraLink) openJiraLink.hidden = true;
+      if (newChangeBtn) newChangeBtn.hidden = true;
+      bindOpenJira(openJiraEnd, url);
     }
     setIntro("");
     syncIntakePanels();
@@ -1040,11 +1176,12 @@
   function syncJiraButton() {
     if (finishVisible()) return;
     if (autoFillBusy) {
-      jiraBtn.hidden = true;
+      hideJiraCreate();
       return;
     }
-    const done = !currentStep() && ticketComplete();
-    jiraBtn.hidden = !done;
+    const done = ticketComplete();
+    if (done) showJiraCreate();
+    else hideJiraCreate();
     if (!done) return;
     setIntro("Bitte alle Felder noch einmal prüfen");
     intro.classList.add("field-prompt-in");
@@ -1081,6 +1218,7 @@
   }
 
   function ensureFieldShell(step) {
+    if (step.ephemeral || step.kind === "files") return null;
     if (step.kind === "headline") {
       headline.dataset.key = step.key;
       return headline;
@@ -1099,6 +1237,23 @@
         metaRoot.appendChild(cell);
       }
       cell.hidden = false;
+      return document.getElementById(`ticket-${step.key}-value`);
+    }
+
+    if (step.kind === "context") {
+      let cell = contextFields.querySelector(`[data-key="${step.key}"]`);
+      if (!cell) {
+        cell = document.createElement("div");
+        cell.className = "ticket-meta-item";
+        cell.dataset.key = step.key;
+        cell.innerHTML = `<dt>${esc(step.label)}</dt><dd><span id="ticket-${esc(
+          step.key
+        )}-value" class="ticket-row-value"></span></dd>`;
+        contextFields.appendChild(cell);
+      }
+      cell.hidden = false;
+      orderContextFields();
+      syncIntakePanels();
       return document.getElementById(`ticket-${step.key}-value`);
     }
 
@@ -1144,6 +1299,25 @@
       return document.getElementById(`ticket-${step.key}-value`);
     }
 
+    if (step.kind === "solution") {
+      let cell = solutionFields.querySelector(`[data-key="${step.key}"]`);
+      if (!cell) {
+        cell = document.createElement("div");
+        cell.className = "ticket-meta-item";
+        cell.dataset.key = step.key;
+        cell.innerHTML = `<dt>${esc(step.label)}</dt><dd><span id="ticket-${esc(
+          step.key
+        )}-value" class="ticket-row-value"></span></dd>`;
+        solutionFields.appendChild(cell);
+      }
+      const dt = cell.querySelector("dt");
+      if (dt) dt.textContent = step.label;
+      cell.hidden = false;
+      orderSolutionFields();
+      syncIntakePanels();
+      return document.getElementById(`ticket-${step.key}-value`);
+    }
+
     if (step.kind === "cost") {
       let cell = costFields.querySelector(`[data-key="${step.key}"]`);
       if (!cell) {
@@ -1178,8 +1352,15 @@
 
   function revealCurrentField() {
     const step = currentStep();
-    if (!step || step.kind === "headline") return;
+    if (!step || step.kind === "headline" || step.ephemeral) return;
     ensureFieldShell(step);
+  }
+
+  function orderContextFields() {
+    ["similar_solution", "help_needed"].forEach((key) => {
+      const cell = contextFields.querySelector(`[data-key="${key}"]`);
+      if (cell) contextFields.appendChild(cell);
+    });
   }
 
   function orderTeamFields() {
@@ -1190,13 +1371,18 @@
       "author",
       "process_owner",
       "solution_owner",
-      "solution_category",
-      "solution_name",
       "change_team",
       "stakeholder",
     ].forEach((key) => {
       const cell = teamFields.querySelector(`[data-key="${key}"]`);
       if (cell) teamFields.appendChild(cell);
+    });
+  }
+
+  function orderSolutionFields() {
+    ["solution_category", "solution_name"].forEach((key) => {
+      const cell = solutionFields.querySelector(`[data-key="${key}"]`);
+      if (cell) solutionFields.appendChild(cell);
     });
   }
 
@@ -1230,8 +1416,14 @@
     if (step.kind === "overview") {
       return overviewFields.querySelector(`[data-key="${step.key}"]`);
     }
+    if (step.kind === "context") {
+      return contextFields.querySelector(`[data-key="${step.key}"]`);
+    }
     if (step.kind === "team") {
       return teamFields.querySelector(`[data-key="${step.key}"]`);
+    }
+    if (step.kind === "solution") {
+      return solutionFields.querySelector(`[data-key="${step.key}"]`);
     }
     if (step.kind === "cost") {
       return costFields.querySelector(`[data-key="${step.key}"]`);
@@ -1265,7 +1457,7 @@
     const showIt = ticketKind() === "it_request";
 
     // Verantwortliche Person aus der IT + Solution Owner
-    for (const key of ["it_owner", "solution_owner", "solution_category", "solution_name"]) {
+    for (const key of ["it_owner", "solution_owner"]) {
       const cell = teamFields.querySelector(`[data-key="${key}"]`);
       if (cell) cell.hidden = !showIt;
       else if (showIt) {
@@ -1276,8 +1468,7 @@
         }
       }
     }
-
-    // Solution Category + Solution bei IT Request
+    if (solution) solution.hidden = true;
   }
 
   function displayFor(key) {
@@ -1293,29 +1484,6 @@
       .map((chip) => chip.textContent.trim())
       .filter(Boolean)
       .join(", ");
-  }
-
-  const HELP_MARK = "Hilfe benötigt bei:";
-
-  /** Antwort auf „Bei was brauchst du Hilfe?“ wandert unten in die Beschreibung. */
-  function mergeHelpIntoDescription() {
-    const topic = String(values.help_topic || "").trim();
-    if (!topic) return;
-    const step = stepByKey("description");
-    if (!step) return;
-    const base = String(values.description || "")
-      .replace(/\n*Hilfe benötigt bei:[\s\S]*$/i, "")
-      .trim();
-    const next = `${base}\n\n${HELP_MARK} ${topic}`.trim();
-    if (next === String(values.description || "").trim()) return;
-    values.description = next;
-    const el = ensureFieldShell(step);
-    if (el) {
-      writeFieldValue(el, step, next);
-      el.classList.remove("ticket-row-value-pending");
-      el.classList.add("ticket-row-value-in");
-    }
-    persistField("description", next);
   }
 
   function writeFieldValue(el, step, raw) {
@@ -1388,6 +1556,7 @@
 
   function persistField(uiKey, raw) {
     if (!syncedRequestId) return;
+    if (uiKey === "attachments_ask") return;
     const step = stepByKey(uiKey);
     const domain = UI_TO_DOMAIN[uiKey] || uiKey;
     let value = String(raw ?? "").trim();
@@ -1475,7 +1644,6 @@
     void refreshKind();
     syncJiraButton();
     persistField(key, values[key] || text);
-    if (key === "help_topic") mergeHelpIntoDescription();
     if (step?.kind === "overview") refreshOverviewChrome();
   }
 
@@ -1969,6 +2137,7 @@
 
   function syncPrompt() {
     if (window.intakeIdle?.()) {
+      document.body.classList.remove("field-flow");
       setIntro("");
       if (startChangeBtn) startChangeBtn.hidden = false;
       if (aiReviewOk) aiReviewOk.hidden = true;
@@ -1987,26 +2156,39 @@
       Boolean(step) || clarifyDescription
     );
 
-    if (!step) {
+    if (!step || step.ephemeral) {
       if (finishVisible()) {
         window.syncTicketInput?.();
         syncIntakePanels();
+        syncTicketModeClass();
         return;
       }
       if (ticketComplete()) {
+        showJiraCreate();
         setIntro("Bitte alle Felder noch einmal prüfen");
         intro.classList.add("field-prompt-in");
-        jiraBtn.hidden = false;
+      } else if (step?.ephemeral) {
+        hideJiraCreate();
+        setIntro(step.prompt);
+        intro.classList.remove("field-prompt-in");
+        void intro.offsetWidth;
+        intro.classList.add("field-prompt-in");
       } else {
-        jiraBtn.hidden = true;
-        setIntro("");
+        hideJiraCreate();
+        if (!step) setIntro("");
       }
-    window.syncTicketInput?.();
-    syncIntakePanels();
-    return;
+      window.syncTicketInput?.();
+      syncIntakePanels();
+      syncTicketModeClass();
+      return;
     }
 
-    if (!finishVisible()) jiraBtn.hidden = true;
+    if (!finishVisible()) hideJiraCreate();
+    if (step.kind === "cost" && !revealCostsAfterReview) {
+      revealCostsAfterReview = true;
+      prepareCostFields();
+      openEffortTemplate();
+    }
     revealCurrentField();
     syncIntakePanels();
     setIntro(step.prompt);
@@ -2014,6 +2196,7 @@
     void intro.offsetWidth;
     intro.classList.add("field-prompt-in");
     window.syncTicketInput?.();
+    syncTicketModeClass();
   }
 
   window.getTicketStep = currentStep;
@@ -2033,8 +2216,17 @@
     document.body.classList.add("ticket-active");
     showAuthor({ preferActor: true });
     refreshPriority();
-    showFiles();
+    if (!step.ephemeral) showFiles();
     syncIntakePanels();
+
+    if (step.ephemeral) {
+      values[step.key] = text;
+      if (step.key === "attachments_ask" && /^ja$/i.test(String(text || "").trim())) {
+        if (filesSection) filesSection.hidden = false;
+        fileInput?.click();
+      }
+      return introText;
+    }
 
     const valueEl = ensureFieldShell(step);
     if (!valueEl) return null;
@@ -2083,6 +2275,13 @@
     const step = currentStep();
     if (!step) return;
 
+    if (step.ephemeral) {
+      stepIndex += 1;
+      syncIntakePanels();
+      syncPrompt();
+      return;
+    }
+
     const valueEl = fieldHost(step);
     const cell = fieldCell(step);
     valueEl?.classList.remove("ticket-row-value-pending");
@@ -2119,7 +2318,6 @@
 
     armEdit(step);
     stepIndex += 1;
-    if (step.key === "help_topic") mergeHelpIntoDescription();
     syncIntakePanels();
     void refreshPriority();
     void refreshKind();
@@ -2525,6 +2723,34 @@
     }
   }
 
+  function watchEffortPopup(popup, ownerId, share, url, dummy) {
+    const waitHint = document.getElementById("effort-sheet-hint");
+    if (waitHint) waitHint.hidden = false;
+    let pendingCsv = "";
+    const onMsg = (event) => {
+      if (event.origin !== location.origin) return;
+      if (event.data?.type !== "critr-effort-sheet-v1") return;
+      pendingCsv = String(event.data.csv || "");
+    };
+    window.addEventListener("message", onMsg);
+    const timer = setInterval(() => {
+      if (popup && !popup.closed) return;
+      clearInterval(timer);
+      window.removeEventListener("message", onMsg);
+      if (waitHint) waitHint.hidden = true;
+      const run = pendingCsv.trim()
+        ? commitEffortCsv(pendingCsv, ownerId, share)
+        : dummy
+          ? Promise.resolve()
+          : importEffortSheet(effortSheetTemplateUrl || url, ownerId);
+      run.catch((err) => {
+        const hintEl = costHintEl();
+        if (hintEl) hintEl.textContent = err.message || "Sheet konnte nicht übernommen werden.";
+      });
+    }, 250);
+  }
+  openEffortTemplate._watchTab = watchEffortPopup;
+
   function openEffortTemplate() {
     // Ticket und Share beim Öffnen festhalten — ein Ticketwechsel darf nichts verschieben.
     const ownerId = syncedRequestId || null;
@@ -2549,30 +2775,25 @@
     );
     if (!popup) {
       const hintEl = costHintEl();
-      if (hintEl) hintEl.textContent = "Popup blockiert — bitte Popups erlauben.";
+      if (hintEl) {
+        hintEl.textContent =
+          "Popup blockiert — Vorlage per Klick im neuen Tab öffnen.";
+      }
+      flash("Popup blockiert — Vorlage öffnen?", true, {
+        label: "Vorlage öffnen",
+        duration: 8000,
+        onClick: () => {
+          const tab = window.open(url, "_blank", "noopener");
+          if (!tab) {
+            flash("Bitte Popups erlauben oder den Link unter Einstellungen nutzen.", true);
+            return;
+          }
+          openEffortTemplate._watchTab?.(tab, ownerId, share, url, dummy);
+        },
+      });
       return;
     }
-    let pendingCsv = "";
-    const onMsg = (event) => {
-      if (event.origin !== location.origin) return;
-      if (event.data?.type !== "critr-effort-sheet-v1") return;
-      pendingCsv = String(event.data.csv || "");
-    };
-    window.addEventListener("message", onMsg);
-    const timer = setInterval(() => {
-      if (popup && !popup.closed) return;
-      clearInterval(timer);
-      window.removeEventListener("message", onMsg);
-      const run = pendingCsv.trim()
-        ? commitEffortCsv(pendingCsv, ownerId, share)
-        : dummy
-          ? Promise.resolve()
-          : importEffortSheet(effortSheetTemplateUrl || url, ownerId);
-      run.catch((err) => {
-        const hintEl = costHintEl();
-        if (hintEl) hintEl.textContent = err.message || "Sheet konnte nicht übernommen werden.";
-      });
-    }, 250);
+    watchEffortPopup(popup, ownerId, share, url, dummy);
   }
 
   /** KI prüft Nutzer-PT, sucht online und schlägt Spanne + Begründung vor. */
@@ -3023,6 +3244,15 @@
     }
   }
 
+  async function flushLocalAttachments(requestId) {
+    const pending = attachments.filter((item) => item.file);
+    if (!requestId || !pending.length) return;
+    syncedRequestId = requestId;
+    const files = pending.map((item) => item.file);
+    attachments.length = 0;
+    await addFiles(files);
+  }
+
   async function openAttachmentById(previewId) {
     const [source, rawId] = String(previewId || "").split(":");
     if (source === "local") {
@@ -3290,6 +3520,7 @@
 
   async function createViaLegacyPublish(kind, priority, waitSync = true) {
     const fields = { ...values };
+    delete fields.attachments_ask;
     for (const [key, raw] of Object.entries(fields)) {
       if (isUnknownFieldValue(raw)) delete fields[key];
     }
@@ -3318,8 +3549,6 @@
       ["it_owner", "user"],
       ["author", "user"],
       ["components", "components"],
-      ["solution_category", "option:solution_category"],
-      ["solution_name", "option:solution_name"],
     ];
     const failed = [];
     await Promise.all(
@@ -3355,12 +3584,21 @@
     const badge = document.getElementById("ticket-jira");
     const badgeKey = document.getElementById("ticket-jira-key");
     const sep = document.getElementById("ticket-eyebrow-sep");
-    if (!key || !badge || !badgeKey) return;
+    if (!badge || !badgeKey) return;
+    if (!key) {
+      badge.hidden = true;
+      if (sep) sep.hidden = true;
+      badgeKey.textContent = "";
+      badgeKey.removeAttribute("href");
+      badgeKey.removeAttribute("title");
+      return;
+    }
     badge.hidden = false;
     if (sep) sep.hidden = false;
     badgeKey.textContent = key;
-    if (jiraUrl) {
-      badgeKey.href = jiraUrl;
+    const browse = jiraBrowseUrl(key, jiraUrl);
+    if (browse) {
+      badgeKey.href = browse;
       badgeKey.setAttribute("title", `In Jira öffnen: ${key}`);
     } else {
       badgeKey.removeAttribute("href");
@@ -3368,8 +3606,14 @@
     }
   }
 
-  async function pollJiraKey(requestId, attempts = 40) {
+  let jiraFollowId = null;
+  let jiraFollowGen = 0;
+
+  async function pollJiraKey(requestId, attempts = 40, gen = 0) {
     for (let i = 0; i < attempts; i += 1) {
+      if (gen && gen !== jiraFollowGen) {
+        return { jiraKey: null, reference: null, jiraUrl: "", syncError: null, cancelled: true };
+      }
       await new Promise((resolve) => setTimeout(resolve, 750));
       try {
         const r = await fetch(`/api/requests/${requestId}`);
@@ -3384,12 +3628,18 @@
             syncError: sync.lastError || null,
           };
         }
-        if (sync.state === "dead" || sync.state === "failed") {
+        const err = String(sync.lastError || "").trim();
+        const permanent =
+          /is required|parsing date|does not exist|could not find usernames|option id/i.test(
+            err
+          );
+        // Endgültig oder klarer Jira-400: nicht bis Timeout warten.
+        if (sync.state === "dead" || (err && (permanent || (sync.state === "failed" && i >= 2)))) {
           return {
             jiraKey: null,
             reference: body.reference || null,
             jiraUrl: "",
-            syncError: sync.lastError || "Jira-Anlage fehlgeschlagen",
+            syncError: err || "Jira-Anlage fehlgeschlagen",
           };
         }
       } catch {
@@ -3404,28 +3654,70 @@
     };
   }
 
-  jiraBtn.addEventListener("click", async () => {
-    if (publishing || jiraBtn.disabled) return;
+  function followJiraSync(detail) {
+    const id = detail?.id;
+    if (!id) return;
+    const sync = detail.sync || {};
+    const key = sync.externalKey || detail.externalKey || "";
+    const url = sync.externalUrl || detail.externalUrl || detail.jiraUrl || "";
+    if (key) {
+      showJiraBadge(key, url);
+      jiraFollowId = null;
+      return;
+    }
+    const state = String(sync.state || "").toLowerCase();
+    // Kein Sync erwartet / aus — nicht 30s pollen.
+    if (state === "disabled" || state === "synced") {
+      if (detail.reference) showJiraBadge(detail.reference, "");
+      return;
+    }
+    const localRef = detail.reference || "Ticket";
+    showJiraBadge(localRef, "");
+    if (state === "dead") {
+      if (sync.lastError) flash(String(sync.lastError), true);
+      return;
+    }
+    if (jiraFollowId === id) return; // schon am Nachziehen
+    jiraFollowId = id;
+    const gen = ++jiraFollowGen;
+    setIntro(`${localRef} — Jira sync…`);
+    void pollJiraKey(id, 40, gen).then((polled) => {
+      if (polled.cancelled || syncedRequestId !== id || gen !== jiraFollowGen) return;
+      jiraFollowId = null;
+      if (polled.jiraKey) {
+        showJiraBadge(polled.jiraKey, polled.jiraUrl || "");
+        showFinishActions(polled.jiraKey, polled.jiraUrl || "", { newChange: true });
+        flash(`${polled.jiraKey} in Jira angelegt`);
+        setIntro(`${polled.jiraKey} in Jira`);
+        return;
+      }
+      if (polled.reference) showJiraBadge(polled.reference, "");
+      if (polled.syncError) {
+        flash(String(polled.syncError), true);
+        setIntro(`${localRef}: ${polled.syncError}`);
+      }
+    });
+  }
+
+  async function publishToJira() {
+    if (publishing) return;
     if (!values.title || !values.description) {
       flash("Titel und Beschreibung fehlen.", true);
       return;
     }
-    if (attachments.length) {
-      flash("Anhänge werden noch nicht nach Jira übertragen — nur lokal sichtbar.", true);
-    }
     publishing = true;
-    jiraBtn.disabled = true;
-    jiraBtn.textContent = "Wird angelegt…";
+    setJiraCreateBusy("Wird angelegt…");
     const kind = ticketKind() === "it_request" ? "it_request" : "change_request";
     const priority = "medium";
     try {
       await normalizeJiraLookupFields();
       const body = await createViaLegacyPublish(kind, priority, false);
       const localRef = body.reference || body.ticketKey || "lokal";
+      if (body.requestId) syncedRequestId = body.requestId;
       showJiraBadge(localRef, "");
       setIntro(`${localRef} lokal angelegt — Jira-Nummer folgt…`);
       flash(`${localRef} lokal angelegt`);
-      jiraBtn.textContent = "Jira sync…";
+      setJiraCreateBusy("Jira sync…");
 
       let key = body.jiraKey || body.externalKey || null;
       let jiraUrl = body.jiraUrl || body.externalUrl || "";
@@ -3439,22 +3731,26 @@
       }
       if (!key) {
         publishing = false;
-        jiraBtn.disabled = false;
-        jiraBtn.textContent = "In Jira Anlegen";
+        setJiraCreateIdle();
         const err = syncError || "Jira-Anlage fehlgeschlagen";
         setIntro(`${localRef}: ${err}`);
         flash(err, true);
         return;
       }
+      if (body.requestId) await flushLocalAttachments(body.requestId);
       showJiraBadge(key, jiraUrl);
-      showFinishActions(key, jiraUrl);
+      showFinishActions(key, jiraUrl, { newChange: true });
       flash(`${key} in Jira angelegt`);
+      publishing = false;
     } catch (err) {
       publishing = false;
-      jiraBtn.disabled = false;
-      jiraBtn.textContent = "In Jira Anlegen";
+      setJiraCreateIdle();
       flash(String(err.message || err), true);
     }
+  }
+
+  jiraCreateButtons().forEach((btn) => {
+    btn.addEventListener("click", publishToJira);
   });
 
   aiReviewOk?.addEventListener("click", () => {
@@ -3839,17 +4135,18 @@
     });
   }
 
+  window.applyStandHealth = function (requestId, key) {
+    if (!requestId || requestId !== syncedRequestId || !commentStand) return;
+    const value = String(key || "green").toLowerCase();
+    commentStand.dataset.health = value;
+  };
+
   function paintStandHealth(detail) {
     if (!commentStand) return;
     const health = detail?.standHealth || {};
-    const key = String(health.key || commentStandHealth?.value || "green").toLowerCase();
-    commentStand.dataset.health = key;
-    if (commentStandHealth) {
-      const allowed = new Set(
-        [...commentStandHealth.options].map((opt) => opt.value)
-      );
-      commentStandHealth.value = allowed.has(key) ? key : "green";
-    }
+    const allowed = new Set(["green", "blue", "yellow", "red", "white", "done"]);
+    const key = String(health.key || "green").toLowerCase();
+    commentStand.dataset.health = allowed.has(key) ? key : "green";
   }
 
   function paintStandMeta(_detail, { waiting = false } = {}) {
@@ -3878,10 +4175,21 @@
       }
       return;
     }
-    commentsSection.hidden = !(intakeTailOpen() && syncedRequestId);
+    commentsSection.hidden = !commentsAllowed();
+    if (!commentsAllowed()) {
+      if (commentStand) {
+        commentStand.hidden = true;
+        commentStand.classList.remove("is-waiting");
+        delete commentStand.dataset.health;
+      }
+      return;
+    }
     const ablauf = (detail.commentAblauf || "").trim();
     const statusAblauf = (detail.statusAblauf || "").trim();
-    const standBody = standWithoutTodoEcho(ablauf || statusAblauf);
+    // Gleicher Stand wie in der Liste: Ablauf, sonst Kurzzeile (standSummary).
+    const standBody = standWithoutTodoEcho(
+      ablauf || statusAblauf || String(detail.standSummary || detail.commentSummary || "").trim()
+    );
     const waiting = Boolean(detail.waitingOnMe);
     if (commentStand && commentAblauf) {
       if (intakeTailOpen() && (standBody || syncedRequestId)) {
@@ -4059,7 +4367,7 @@
 
   async function submitComment(event) {
     event.preventDefault();
-    if (!syncedRequestId || !commentInput) return;
+    if (!commentsAllowed() || !syncedRequestId || !commentInput) return;
     const body = commentInput.value.trim();
     if (!body) return;
     const tempId = `tmp-${Date.now()}`;
@@ -4098,7 +4406,9 @@
     for (const key of Object.keys(labels)) delete labels[key];
     costFields.replaceChildren();
     overviewFields.replaceChildren();
+    contextFields.replaceChildren();
     teamFields.replaceChildren();
+    solutionFields.replaceChildren();
     metaRoot.querySelectorAll("[data-key]").forEach((cell) => {
       const el = cell.querySelector(".ticket-row-value");
       if (el) writeFieldValue(el, stepByKey(cell.dataset.key), "");
@@ -4106,12 +4416,387 @@
     });
     fieldsRoot.querySelectorAll(".ticket-row").forEach((row) => row.remove());
     headline.textContent = "";
+    showJiraBadge("");
+    attachments.length = 0;
+    remoteAttachments = [];
+    standUpdates = [];
+    if (standForm) {
+      standForm.hidden = true;
+      standForm.reset();
+    }
+    if (standError) standError.hidden = true;
     if (effortSheetOpen) effortSheetOpen.textContent = "Vorlage öffnen";
     const hintEl = costHintEl();
     if (hintEl) hintEl.textContent = "Vorlage öffnen, Kalkulation ausfüllen, Fenster schließen.";
   }
 
-  function applyRequest(detail, { animate = true } = {}) {
+  function ptLines(blob) {
+    const rows = [];
+    const re = /(\d+(?:[.,]\d+)?)\s*PT\s+([^;]+)/gi;
+    const text = String(blob || "");
+    let match = re.exec(text);
+    while (match) {
+      const name = match[2].trim();
+      if (name) rows.push({ name, plan: parsePt(match[1]) });
+      match = re.exec(text);
+    }
+    const merged = [];
+    for (const row of rows) {
+      const hit = merged.find((item) => item.name.toLowerCase() === row.name.toLowerCase());
+      if (hit) hit.plan += row.plan;
+      else merged.push({ ...row });
+    }
+    return merged;
+  }
+
+  function scsPlanPt() {
+    const effort = parsePt(values.effort_fb);
+    if (effort) return effort;
+    return parsePt(values.concept_scs_pt) + parsePt(values.operate_scs_pt);
+  }
+
+  function itPlanPt() {
+    const effort = parsePt(values.effort_it);
+    if (effort) return effort;
+    return parsePt(values.concept_cit_pt) + parsePt(values.operate_cit_pt);
+  }
+
+  function planPeople() {
+    const named = ptLines(
+      [values.concept_scs_pt_detail, values.operate_scs_pt_detail].filter(Boolean).join("; ")
+    );
+    const rows = named.length ? named : [];
+    if (!rows.length && scsPlanPt()) rows.push({ name: "SCS", plan: scsPlanPt() });
+    if (itPlanPt()) rows.push({ name: "IT", plan: itPlanPt() });
+    return rows;
+  }
+
+  function fieldDateIso(key) {
+    return dateIso(values[key] || values[`${key}_date`] || "");
+  }
+
+  function dateIso(raw) {
+    const s = String(raw || "").trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    return deToIso(s);
+  }
+
+  function showDate(raw) {
+    const iso = dateIso(raw);
+    if (iso) return isoToDe(iso);
+    return String(raw || "").trim();
+  }
+
+  function fmtPt(n) {
+    const value = Number(n);
+    if (!value) return "—";
+    return value.toLocaleString("de-DE", { maximumFractionDigits: 2 });
+  }
+
+  function moneyOrNull(raw) {
+    const s = String(raw ?? "").trim();
+    if (!s) return null;
+    return parseMoney(s);
+  }
+
+  function fmtEuro(n) {
+    if (n == null) return "—";
+    return `${Number(n).toLocaleString("de-DE", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })} €`;
+  }
+
+  function moneyTriple(fb, it, lic) {
+    const parts = [fb, it, lic].filter((n) => n != null);
+    return {
+      fb,
+      it,
+      lic,
+      sum: parts.length ? parts.reduce((a, b) => a + b, 0) : null,
+    };
+  }
+
+  function planMoney() {
+    return moneyTriple(
+      moneyOrNull(values.costs),
+      moneyOrNull(values.it_costs),
+      moneyOrNull(values.material_costs)
+    );
+  }
+
+  function actualMoney(update) {
+    if (!update) return moneyTriple(null, null, null);
+    return moneyTriple(
+      moneyOrNull(update.costActualFb),
+      moneyOrNull(update.costActualIt),
+      moneyOrNull(update.costActualLicense)
+    );
+  }
+
+  function sortedStands() {
+    return [...standUpdates].sort((a, b) =>
+      String(a.reportedOn || a.createdAt || "").localeCompare(
+        String(b.reportedOn || b.createdAt || "")
+      )
+    );
+  }
+
+  function latestStand() {
+    const list = sortedStands();
+    return list.length ? list[list.length - 1] : null;
+  }
+
+  function actualPtMap(update) {
+    const map = {};
+    for (const row of update?.milestones || []) {
+      if (!row || row.kind !== "pt") continue;
+      const name = String(row.name || "").trim();
+      if (!name) continue;
+      map[name.toLowerCase()] = parsePt(row.actual);
+    }
+    return map;
+  }
+
+  function computeScheduleRag(planEnd, actualEnd, planPt, actualPt, hasIst) {
+    if (!hasIst) return "blue";
+    const late = Boolean(planEnd && actualEnd && actualEnd > planEnd);
+    const over = planPt > 0 && actualPt > planPt + 0.001;
+    return late || over ? "red" : "green";
+  }
+
+  function computeCostRag(plan, actual) {
+    if (actual.sum == null) return "blue";
+    if (plan.sum != null && actual.sum > plan.sum + 0.001) return "red";
+    return "green";
+  }
+
+  function shownRag(stored, reason, computed) {
+    const key = String(stored || "").toLowerCase();
+    if (String(reason || "").trim() && (key === "red" || key === "green")) return key;
+    return computed;
+  }
+
+  function ragLabel(key) {
+    if (key === "red") return "Überzogen";
+    if (key === "green") return "Im Plan";
+    return "Offen";
+  }
+
+  function protocolText(update) {
+    const reason = String(update.scheduleReason || "").trim();
+    if (reason) return reason;
+    const bits = (update.milestones || [])
+      .filter((row) => row && row.kind === "pt" && String(row.actual || "").trim())
+      .map((row) => `${row.name} ${fmtPt(parsePt(row.actual))}`);
+    if (!bits.length) return "";
+    const date = showDate(update.reportedOn) || "Stand";
+    return `PT Stand ${date}: ${bits.join(" · ")}`;
+  }
+
+  function standRows(pairs, { html = false } = {}) {
+    return pairs
+      .map(
+        ([name, value]) =>
+          `<div class="stand-line${name === "Summe" ? " is-sum" : ""}"><span>${esc(
+            name
+          )}</span><span>${html ? value : esc(value)}</span></div>`
+      )
+      .join("");
+  }
+
+  function istControl(key, value, mode) {
+    const type = mode === "date" ? "date" : "text";
+    return `<input class="stand-ist" data-stand-key="${esc(key)}" type="${type}" value="${esc(
+      value || ""
+    )}" placeholder="—" />`;
+  }
+
+  function noteLines() {
+    const out = [];
+    for (const update of sortedStands()) {
+      const reason = String(update.scheduleReason || "").trim();
+      if (reason) {
+        out.push(...reason.split("\n").map((line) => line.trim()).filter(Boolean));
+        continue;
+      }
+      const line = protocolText(update);
+      if (line) out.push(line);
+    }
+    return out;
+  }
+
+  function renderStandBoard() {
+    // Changebeschreibung/Entscheidungen/Risiken/Nächste Schritte nur noch in Status update.
+  }
+
+  function standField(id) {
+    return document.getElementById(id);
+  }
+
+  function fillStandFields(latest) {
+    const summary = standField("stand-summary");
+    const decisions = standField("stand-decisions");
+    const risks = standField("stand-risks");
+    const next = standField("stand-live-next");
+    if (summary && document.activeElement !== summary && summary.dataset.user !== "1") {
+      summary.value = String(latest?.summary || "");
+    }
+    if (decisions && document.activeElement !== decisions && decisions.dataset.user !== "1") {
+      decisions.value = String(latest?.decisions || "");
+    }
+    if (risks && document.activeElement !== risks && risks.dataset.user !== "1") {
+      const saved = String(latest?.risks || "").trim();
+      const known = String(values.risks || values.risks_obstacles || "").trim();
+      if (saved && saved !== known) risks.value = saved;
+      else void fillRiskFromStatus();
+    }
+    if (next && document.activeElement !== next && next.dataset.user !== "1") {
+      const saved = String(latest?.nextSteps || "").trim();
+      const text = saved || nextFromComments();
+      next.placeholder = "";
+      if (text) next.value = text;
+    }
+    for (const field of [summary, decisions, risks, next]) fitStandField(field);
+  }
+
+  function nextFromComments() {
+    const list = liveComments
+      .filter((row) => {
+        const body = String(row?.body || "").replace(/\s+/g, " ").trim();
+        return body.length > 2;
+      })
+      .sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
+    const body = String((list.length ? list[list.length - 1].body : "") || "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!body) return "";
+    const match = body.match(/\b((?:es |man )?muss\b.+)$/i);
+    let text = (match ? match[1] : body).trim();
+    if (text[0] && text[0] === text[0].toLowerCase()) text = text[0].toUpperCase() + text.slice(1);
+    if (!/[.!?]$/.test(text)) text += ".";
+    return text;
+  }
+
+  function fitStandField(field) {
+    if (!field) return;
+    field.style.height = "auto";
+    field.style.height = `${field.scrollHeight}px`;
+  }
+
+  async function saveStandTexts() {
+    if (!syncedRequestId || !commentsAllowed()) return;
+    const summary = standField("stand-summary")?.value.trim() || "";
+    const decisions = standField("stand-decisions")?.value.trim() || "";
+    const risks = standField("stand-risks")?.value.trim() || "";
+    const nextSteps = standField("stand-live-next")?.value.trim() || "";
+    const latest = latestStand();
+    const payload = { summary, decisions, risks, nextSteps };
+    const response = latest?.id
+      ? await fetch(`/api/requests/${syncedRequestId}/status-updates/${latest.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+      : await fetch(`/api/requests/${syncedRequestId}/status-updates`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+    if (!response.ok) return;
+    const saved = await response.json();
+    const idx = standUpdates.findIndex((item) => item.id === saved.id);
+    if (idx >= 0) standUpdates[idx] = saved;
+    else standUpdates.push(saved);
+  }
+
+  async function fillRiskFromStatus() {
+    const box = standField("stand-risks");
+    if (!box || !commentsAllowed() || !syncedRequestId) return;
+    if (box.dataset.user === "1" || box.dataset.loading === syncedRequestId) return;
+    box.dataset.loading = syncedRequestId;
+    const ticketId = syncedRequestId;
+    try {
+      const response = await fetch(`/api/requests/${ticketId}/status-risks`, { method: "POST" });
+      if (!response.ok || ticketId !== syncedRequestId || box.dataset.user === "1") return;
+      const data = await response.json();
+      const text = String(data.risks || "").trim();
+      if (!text) return;
+      box.value = text;
+      fitStandField(box);
+      await saveStandTexts();
+    } catch {
+      /* Feld bleibt leer */
+    } finally {
+      if (box.dataset.loading === ticketId) delete box.dataset.loading;
+    }
+  }
+
+  async function fillNextFromTicket() {
+    const box = standField("stand-live-next");
+    const hint = standField("stand-next-hint");
+    if (!box || !commentsAllowed() || !syncedRequestId) return;
+    if (!String(box.value || "").trim()) {
+      const local = nextFromComments();
+      if (local) {
+        box.value = local;
+        fitStandField(box);
+      }
+    }
+    if (box.dataset.user === "1" || String(latestStand()?.nextSteps || "").trim() || String(box.value || "").trim()) {
+      if (hint) hint.hidden = true;
+      return;
+    }
+    if (box.dataset.loading === syncedRequestId) return;
+    box.dataset.loading = syncedRequestId;
+    const ticketId = syncedRequestId;
+    try {
+      const response = await fetch(`/api/requests/${ticketId}/next-steps`, { method: "POST" });
+      if (!response.ok || ticketId !== syncedRequestId || box.dataset.user === "1") return;
+      const data = await response.json();
+      const text = String(data.nextSteps || "").trim();
+      if (!text || String(latestStand()?.nextSteps || "").trim()) return;
+      box.value = text;
+      fitStandField(box);
+      if (hint) hint.hidden = false;
+      await saveStandTexts();
+    } catch {
+      /* Ticket bleibt ohne Vorschlag */
+    } finally {
+      if (box.dataset.loading === ticketId) delete box.dataset.loading;
+    }
+  }
+
+  function fillStandForm(people, latest) {
+    if (!standPtFields) return;
+    const actuals = actualPtMap(latest);
+    standPtFields.innerHTML = people
+      .map((row) => {
+        const current = actuals[row.name.toLowerCase()];
+        const shown = current ? String(current).replace(".", ",") : "";
+        return `<label>Ist ${esc(row.name)} PT <input type="text" data-stand-pt="${esc(
+          row.name
+        )}" inputmode="decimal" value="${esc(shown)}" placeholder="Plan ${esc(fmtPt(row.plan))}" /></label>`;
+      })
+      .join("");
+    const start = document.getElementById("stand-actual-start");
+    const end = document.getElementById("stand-actual-end");
+    const fb = document.getElementById("stand-cost-fb");
+    const it = document.getElementById("stand-cost-it");
+    const license = document.getElementById("stand-cost-license");
+    if (start) start.value = dateIso(latest?.actualStart);
+    if (end) end.value = dateIso(latest?.actualEnd);
+    if (fb) fb.value = latest?.costActualFb || "";
+    if (it) it.value = latest?.costActualIt || "";
+    if (license) license.value = latest?.costActualLicense || "";
+    const scheduleSel = document.getElementById("stand-schedule-rag");
+    const costSel = document.getElementById("stand-cost-rag");
+    if (scheduleSel) scheduleSel.value = "";
+    if (costSel) costSel.value = "";
+  }
+
+  function applyRequest(detail, { animate = true, skipSyncFollow = false } = {}) {
+    if (isCreatingChange()) return;
     resetTicketState();
     syncedRequestId = detail.id || null;
     loadedTicket = Boolean(syncedRequestId);
@@ -4122,15 +4807,20 @@
     values.title = detail.title || fieldMap.title || "";
     values.description = detail.description || fieldMap.description || "";
     values.priority = detail.priority || "medium";
+    // Zuerst UI-Keys, danach Domain-Keys — Domain gewinnt bei Abweichung (Jira-Sync).
     for (const [key, raw] of Object.entries(fieldMap)) {
-      if (!raw) continue;
+      if (!raw || DOMAIN_TO_UI[key]) continue;
       values[key] = raw;
       labels[key] = raw;
+    }
+    for (const [key, raw] of Object.entries(fieldMap)) {
+      if (!raw) continue;
       const ui = DOMAIN_TO_UI[key];
-      if (ui) {
-        values[ui] = raw;
-        labels[ui] = raw;
-      }
+      if (!ui) continue;
+      values[key] = raw;
+      labels[key] = raw;
+      values[ui] = raw;
+      labels[ui] = raw;
     }
     if (!String(values.author || "").trim()) {
       const created = String(detail.createdBy || "").trim();
@@ -4146,6 +4836,7 @@
     document.body.classList.add("ticket-active");
     const hub = document.getElementById("hub");
     if (hub) hub.hidden = true;
+    paintTicketNav();
 
     for (const step of requiredSteps()) {
       const shown = step.date
@@ -4166,22 +4857,32 @@
     setPriority(detail.priorityLabel || "Mittel", detail.priority || "medium");
     showAuthor();
     const sync = detail.sync || {};
-    if (sync.externalKey) {
-      showJiraBadge(sync.externalKey, sync.externalUrl || "");
-      showFinishActions(sync.externalKey, sync.externalUrl || "");
+    const jiraKey = sync.externalKey || detail.externalKey || "";
+    const jiraUrl = sync.externalUrl || detail.externalUrl || detail.jiraUrl || "";
+    if (jiraKey) {
+      showJiraBadge(jiraKey, jiraUrl);
+      jiraFollowId = null;
+    } else if (!skipSyncFollow) {
+      followJiraSync(detail);
+    } else if (detail.reference) {
+      showJiraBadge(detail.reference, "");
     }
+    showFinishActions(jiraKey, jiraUrl, { newChange: false });
     showFiles(detail);
     renderComments(detail);
+    standUpdates = Array.isArray(detail.statusUpdates) ? detail.statusUpdates : [];
+    renderStandBoard();
     hydrateCostFields();
     loadDraft(syncedRequestId);
     restoreTicketScroll(syncedRequestId);
     refreshOverviewChrome();
     syncIntakePanels();
-    jiraBtn.hidden = true;
+    hideJiraCreate();
+    syncTicketModeClass();
     window.syncTicketInput?.();
   }
 
-  const HUB_CACHE_KEY = "critr-hub-cache-v1";
+  const HUB_CACHE_KEY = "critr-hub-cache-v4";
 
   function standTooltip(item) {
     const parts = [];
@@ -4251,13 +4952,31 @@
     return needles.some((n) => hay.includes(n));
   }
 
+  function isHubClosedItem(item) {
+    if (item?.completed) return true;
+    const st = String(item?.status || item?.localStatus || "")
+      .toLowerCase()
+      .replace(/\s+/g, " ");
+    return (
+      st.includes("cancel") ||
+      st.includes("abbruch") ||
+      st.includes("abgebrochen") ||
+      st.includes("ablehn") ||
+      st.includes("reject") ||
+      st === "closed" ||
+      st === "done" ||
+      st === "erledigt" ||
+      st === "geschlossen"
+    );
+  }
+
   function filteredHubItems() {
     const q = String(document.getElementById("hub-search")?.value || "")
       .trim()
       .toLowerCase();
-    let list = hubItems;
+    let list = hubItems.filter((item) => !isHubClosedItem(item));
     if (q) {
-      list = hubItems.filter((item) => {
+      list = list.filter((item) => {
         const authors = Array.isArray(item.authors)
           ? item.authors.join(" ")
           : item.authorsText || "";
@@ -4279,14 +4998,12 @@
         return hay.includes(q);
       });
     }
-    // Wartet-auf-mich zuerst, dann eigene, dann Rest
+    // Neueste zuerst nach Erstellungsdatum
     return [...list].sort((a, b) => {
-      const wa = a.waitingOnMe ? 0 : 1;
-      const wb = b.waitingOnMe ? 0 : 1;
-      if (wa !== wb) return wa - wb;
-      const ma = isMineHubItem(a) ? 0 : 1;
-      const mb = isMineHubItem(b) ? 0 : 1;
-      return ma - mb;
+      const ca = String(a.createdAt || "");
+      const cb = String(b.createdAt || "");
+      if (ca !== cb) return cb.localeCompare(ca);
+      return String(b.key || "").localeCompare(String(a.key || ""));
     });
   }
 
@@ -4392,20 +5109,804 @@
     hint.hidden = !show;
   }
 
+
+  const HUB_CHAT_SESSION_KEY = "critr-hub-chat-session-v1";
+  const TICKET_FROM_KEY = "critr-ticket-from-v1";
+  let hubChatSessionId = null;
+  let hubChatBusy = false;
+  let hubChatAbort = null;
+  let hubChatReplace = false;
+  let hubChatStick = true;
+  let ticketOpenedFrom = "";
+
+  function hubChatThread() {
+    return document.getElementById("hub-chat-thread");
+  }
+
+  function hubChatSuggest() {
+    return document.getElementById("hub-chat-suggest");
+  }
+
+  function resizeHubChatInput() {
+    const input = document.getElementById("hub-chat-input");
+    if (!input) return;
+    input.style.height = "auto";
+    input.style.height = `${Math.min(160, Math.max(44, input.scrollHeight))}px`;
+  }
+
+  function setHubChatSuggestVisible(show) {
+    const el = hubChatSuggest();
+    if (el) el.hidden = !show;
+  }
+
+  function paintHubChatProgress() {}
+
+  function paintHubChatActions() {}
+
+  function clearHubChatActions() {}
+
+  function paintHubChatDraft(body) {
+    const card = document.getElementById("hub-chat-draft");
+    const title = document.getElementById("hub-chat-draft-title");
+    const text = document.getElementById("hub-chat-draft-body");
+    const button = document.getElementById("hub-chat-draft-create");
+    if (!card || !title || !text || !button) return;
+    const draft = body?.createDraft || {};
+    const titleText = String(draft.title || "").trim();
+    const bits = [
+      ["Problem", draft.problem],
+      ["Lösung", draft.solution_goals],
+      ["Nutzen", draft.benefit_savings],
+      ["Start", draft.start_date],
+      ["Ende", draft.end_date],
+    ].filter(([, value]) => {
+      const line = String(value || "").trim();
+      return line && line !== titleText;
+    });
+    const show = Boolean(body?.createAssist) && (titleText || bits.length || body?.createReady);
+    card.hidden = !show;
+    title.textContent = titleText;
+    title.hidden = !titleText;
+    text.textContent = bits.map(([label, value]) => `${label}: ${value}`).join("\n");
+    text.hidden = !text.textContent;
+    button.hidden = !body?.createReady;
+    refreshHubChatTurns();
+  }
+
+  function applyHubChatPayload(body) {
+    const reply = String(body.text || body.duplicatePrompt || "").trim() || "Fertig.";
+    const links = [
+      ...(Array.isArray(body.links) ? body.links : []),
+      ...(Array.isArray(body.duplicateLinks) ? body.duplicateLinks : []),
+    ];
+    if ((body.type === "navigate" || body.type === "created") && body.url) {
+      links.push({
+        label: body.reference || body.ticketKey || body.label || "Öffnen",
+        url: body.url,
+      });
+    }
+    appendHubChatBubble("assistant", reply, links);
+    paintHubChatDraft(body);
+    if (body.createAssist === false && !hubChatThread()?.querySelector(".hub-chat-bubble")) {
+      setHubChatSuggestVisible(true);
+    }
+    if (body.hubView === "inbox") {
+      openAccountInbox();
+    }
+    const openId =
+      body.requestId ||
+      ((body.type === "navigate" || body.type === "created") &&
+      body.url &&
+      /\/workspace\//.test(body.url)
+        ? body.url.split("/workspace/")[1]?.split(/[?#]/)[0]
+        : "");
+    if (openId) {
+      const gaps = Array.isArray(body.gaps) ? body.gaps : [];
+      window.setTimeout(() => {
+        void openExisting(openId, { animate: true });
+        if (gaps.length) {
+          const shown = gaps.slice(0, 4).join(", ");
+          const more = gaps.length > 4 ? ` (+${gaps.length - 4})` : "";
+          setIntro(`Steckbrief ergänzen: ${shown}${more}`);
+          intro?.classList.add("field-prompt-in");
+          document.querySelectorAll(".ticket-row.is-gap").forEach((el) => el.classList.remove("is-gap"));
+          gaps.forEach((label) => {
+            const row = [...document.querySelectorAll(".ticket-row")].find((el) =>
+              (el.querySelector(".ticket-row-label")?.textContent || "").includes(String(label))
+            );
+            row?.classList.add("is-gap");
+          });
+        }
+      }, 450);
+    }
+  }
+
+  function renderHubMarkdown(raw) {
+    const esc = String(raw || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    const inline = esc
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(
+        /\[([^\]]+)\]\((https?:\/\/[^)\s]+|\/[^)\s]*)\)/g,
+        '<a href="$2" target="_blank" rel="noopener">$1</a>'
+      );
+    const blocks = inline.split(/\n{2,}/);
+    return blocks
+      .map((block) => {
+        const lines = block.split("\n");
+        const bullet = lines.every((line) => /^[-*]\s+/.test(line.trim()));
+        const numbered = lines.every((line) => /^\d+\.\s+/.test(line.trim()));
+        if (bullet && lines.some((line) => line.trim())) {
+          const items = lines.map((line) => `<li>${line.trim().replace(/^[-*]\s+/, "")}</li>`).join("");
+          return `<ul>${items}</ul>`;
+        }
+        if (numbered && lines.some((line) => line.trim())) {
+          const items = lines
+            .map((line) => `<li>${line.trim().replace(/^\d+\.\s+/, "")}</li>`)
+            .join("");
+          return `<ol>${items}</ol>`;
+        }
+        return `<p>${lines.join("<br>")}</p>`;
+      })
+      .join("");
+  }
+
+  function hubChatNearBottom(thread) {
+    if (!thread) return true;
+    return thread.scrollHeight - thread.scrollTop - thread.clientHeight < 80;
+  }
+
+  function stickHubChat(thread) {
+    if (hubChatStick && thread) thread.scrollTop = thread.scrollHeight;
+    const jump = document.getElementById("hub-chat-jump");
+    if (jump) jump.hidden = hubChatStick || !thread?.querySelector(".hub-chat-bubble");
+  }
+
+  function syncHubChatSend() {
+    const send = document.getElementById("hub-chat-send");
+    const input = document.getElementById("hub-chat-input");
+    const hint = document.getElementById("hub-chat-edit-hint");
+    if (!send) return;
+    send.classList.toggle("is-stop", hubChatBusy);
+    send.disabled = hubChatBusy ? false : !String(input?.value || "").trim();
+    send.setAttribute("aria-label", hubChatBusy ? "Stoppen" : "Senden");
+    if (hint) hint.hidden = !hubChatReplace;
+  }
+
+  function syncHubChatFrame() {
+    const panel = document.getElementById("hub-chat-panel");
+    const thread = hubChatThread();
+    const empty = !thread?.querySelector(".hub-chat-bubble");
+    panel?.classList.toggle("is-empty", empty);
+    if (empty) hubChatReplace = false;
+    syncHubChatSend();
+    stickHubChat(thread);
+  }
+
+  function refreshHubChatTurns() {
+    const thread = hubChatThread();
+    if (!thread) return;
+    const creating = !document.getElementById("hub-chat-draft")?.hidden;
+    thread.querySelectorAll(".hub-chat-turn-tools").forEach((el) => el.remove());
+    const assistants = [...thread.querySelectorAll(".hub-chat-bubble.is-assistant")];
+    const users = [...thread.querySelectorAll(".hub-chat-bubble.is-user")];
+    const lastAssistant = assistants.at(-1);
+    const lastUser = users.at(-1);
+    for (const row of assistants) {
+      const tools = document.createElement("div");
+      tools.className = "hub-chat-turn-tools";
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.textContent = "Kopieren";
+      copy.addEventListener("click", async () => {
+        const raw = row.dataset.raw || "";
+        try {
+          await navigator.clipboard.writeText(raw);
+          copy.textContent = "Kopiert";
+          window.setTimeout(() => {
+            copy.textContent = "Kopieren";
+          }, 1200);
+        } catch (_) {
+          copy.textContent = "Nicht kopiert";
+        }
+      });
+      tools.appendChild(copy);
+      if (row === lastAssistant && !creating) {
+        const again = document.createElement("button");
+        again.type = "button";
+        again.textContent = "Neu erzeugen";
+        again.addEventListener("click", () => {
+          const prompt = lastUser?.dataset.raw || "";
+          if (!prompt || hubChatBusy) return;
+          row.remove();
+          void sendHubChat(prompt, { turn: "regenerate", keepUser: true });
+        });
+        tools.appendChild(again);
+      }
+      row.appendChild(tools);
+    }
+    if (lastUser && !creating) {
+      const tools = document.createElement("div");
+      tools.className = "hub-chat-turn-tools";
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.textContent = "Ändern";
+      edit.addEventListener("click", () => {
+        const input = document.getElementById("hub-chat-input");
+        if (!input || hubChatBusy) return;
+        input.value = lastUser.dataset.raw || "";
+        hubChatReplace = true;
+        resizeHubChatInput();
+        syncHubChatSend();
+        input.focus();
+      });
+      tools.appendChild(edit);
+      lastUser.appendChild(tools);
+    }
+  }
+
+  function hubChatLinks(row, links) {
+    if (!row || !Array.isArray(links) || !links.length) return;
+    const list = document.createElement("div");
+    list.className = "hub-chat-links";
+    for (const link of links) {
+      const url = String(link?.url || "").trim();
+      const label = String(link?.label || url).trim();
+      if (!url) continue;
+      const a = document.createElement("button");
+      a.type = "button";
+      a.className = "hub-chat-link";
+      a.textContent = label;
+      a.addEventListener("click", () => {
+        if (url.includes("/workspace/")) {
+          const id = url.split("/workspace/")[1]?.split(/[?#]/)[0];
+          if (id) {
+            openTicketFromChat(id);
+            return;
+          }
+        }
+        if (url.startsWith("/")) location.assign(url);
+        else window.open(url, "_blank", "noopener");
+      });
+      list.appendChild(a);
+    }
+    const tools = row.querySelector(".hub-chat-turn-tools");
+    if (list.childNodes.length) {
+      if (tools) row.insertBefore(list, tools);
+      else row.appendChild(list);
+    }
+  }
+
+  function appendHubChatBubble(role, text, links, { stream = false } = {}) {
+    const thread = hubChatThread();
+    if (!thread || text == null || text === "") return null;
+    const row = document.createElement("div");
+    row.className = `hub-chat-bubble is-${role}`;
+    row.dataset.raw = String(text);
+    const body = document.createElement(role === "assistant" ? "div" : "p");
+    if (role === "assistant") {
+      body.className = "hub-chat-md";
+      body.innerHTML = renderHubMarkdown(text);
+    } else {
+      body.textContent = text;
+    }
+    row.appendChild(body);
+    thread.appendChild(row);
+    if (role === "assistant") hubChatLinks(row, links);
+    refreshHubChatTurns();
+    syncHubChatFrame();
+    stickHubChat(thread);
+    return { row, body };
+  }
+
+  function startHubChatStreamBubble() {
+    const thread = hubChatThread();
+    if (!thread) return null;
+    const row = document.createElement("div");
+    row.className = "hub-chat-bubble is-assistant";
+    row.dataset.raw = "";
+    const body = document.createElement("div");
+    body.className = "hub-chat-md";
+    row.appendChild(body);
+    thread.appendChild(row);
+    syncHubChatFrame();
+    stickHubChat(thread);
+    return { row, body };
+  }
+
+  function paintHubChatStream(bubble) {
+    if (!bubble?.body) return;
+    bubble.body.innerHTML = renderHubMarkdown(bubble.row?.dataset.raw || "");
+  }
+
+  function appendHubChatThinking() {
+    const thread = hubChatThread();
+    if (!thread) return null;
+    const row = document.createElement("div");
+    row.className = "hub-chat-bubble is-thinking";
+    row.setAttribute("aria-label", "schreibt");
+    const dots = document.createElement("span");
+    dots.className = "hub-chat-dots";
+    dots.setAttribute("aria-hidden", "true");
+    dots.innerHTML = "<span></span><span></span><span></span>";
+    row.appendChild(dots);
+    thread.appendChild(row);
+    stickHubChat(thread);
+    return row;
+  }
+
+  function closeHubChatHistoryMenu() {
+    const menu = document.getElementById("hub-chat-history-menu");
+    const btn = document.getElementById("hub-chat-history");
+    if (menu) menu.hidden = true;
+    btn?.setAttribute("aria-expanded", "false");
+  }
+
+  async function paintHubChatHistoryMenu() {
+    const menu = document.getElementById("hub-chat-history-menu");
+    if (!menu) return;
+    menu.replaceChildren();
+    const empty = document.createElement("p");
+    empty.className = "hub-chat-history-empty";
+    empty.textContent = "Lade…";
+    menu.appendChild(empty);
+    try {
+      const r = await fetch("/api/sessions/hub-chats?limit=8");
+      const body = await r.json().catch(() => ({}));
+      menu.replaceChildren();
+      const items = Array.isArray(body.items) ? body.items : [];
+      if (!items.length) {
+        const msg = document.createElement("p");
+        msg.className = "hub-chat-history-empty";
+        msg.textContent = "Noch keine Chats.";
+        menu.appendChild(msg);
+        return;
+      }
+      for (const item of items) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "hub-chat-history-item";
+        btn.setAttribute("role", "menuitem");
+        if (item.sessionId === hubChatSessionId) btn.classList.add("is-current");
+        const title = document.createElement("span");
+        title.className = "hub-chat-history-item-title";
+        title.textContent = item.preview || "Chat";
+        const meta = document.createElement("span");
+        meta.className = "hub-chat-history-item-meta";
+        meta.textContent = `${item.messages || "?"} Nachrichten`;
+        btn.append(title, meta);
+        btn.addEventListener("click", () => {
+          closeHubChatHistoryMenu();
+          void resumeHubChat(item.sessionId);
+        });
+        menu.appendChild(btn);
+      }
+    } catch (_) {
+      menu.replaceChildren();
+      const msg = document.createElement("p");
+      msg.className = "hub-chat-history-empty";
+      msg.textContent = "Verlauf nicht ladbar.";
+      menu.appendChild(msg);
+    }
+  }
+
+  async function resumeHubChat(sessionId) {
+    const id = String(sessionId || "").trim();
+    if (!id) return;
+    hubChatSessionId = id;
+    try {
+      localStorage.setItem(HUB_CHAT_SESSION_KEY, id);
+    } catch (_) {
+      /* ignore */
+    }
+    const thread = hubChatThread();
+    if (thread) {
+      thread.replaceChildren();
+      thread.dataset.ready = "1";
+    }
+    clearHubChatActions();
+    paintHubChatProgress([]);
+    setHubChatSuggestVisible(false);
+    try {
+      const r = await fetch(`/api/sessions/${id}/history`);
+      const body = await r.json().catch(() => ({}));
+      if (r.status === 404) {
+        clearStaleHubChatSession();
+        resetHubChat();
+        return;
+      }
+      if (!r.ok) throw new Error(body.detail || "Verlauf fehlt");
+      const messages = Array.isArray(body.messages) ? body.messages : [];
+      if (!messages.length) {
+        ensureHubChatWelcome();
+        return;
+      }
+      for (const msg of messages) {
+        const role = msg.role === "user" ? "user" : "assistant";
+        appendHubChatBubble(role, msg.text || "");
+      }
+      setHubChatSuggestVisible(false);
+      refreshHubChatTurns();
+      syncHubChatFrame();
+    } catch (err) {
+      appendHubChatBubble("assistant", String(err.message || err));
+      setHubChatSuggestVisible(true);
+    }
+    document.getElementById("hub-chat-input")?.focus();
+  }
+
+  async function ensureHubChatWelcome() {
+    const thread = hubChatThread();
+    if (!thread || thread.dataset.ready === "1") return;
+    thread.dataset.ready = "1";
+    let restored = false;
+    try {
+      const saved = localStorage.getItem(HUB_CHAT_SESSION_KEY);
+      if (saved) {
+        const r = await fetch(`/api/sessions/${saved}/history`);
+        if (r.ok) {
+          const body = await r.json().catch(() => ({}));
+          const messages = Array.isArray(body.messages) ? body.messages : [];
+          if (messages.length) {
+            hubChatSessionId = saved;
+            for (const msg of messages) {
+              const role = msg.role === "user" ? "user" : "assistant";
+              appendHubChatBubble(role, msg.text || "");
+            }
+            restored = true;
+            setHubChatSuggestVisible(false);
+            clearHubChatActions();
+            paintHubChatProgress([]);
+          }
+        } else if (r.status === 404) {
+          clearStaleHubChatSession();
+        }
+      }
+    } catch (_) {
+      /* welcome fallback */
+    }
+    if (restored) {
+      refreshHubChatTurns();
+      syncHubChatFrame();
+      return;
+    }
+    setHubChatSuggestVisible(true);
+    paintHubChatDraft({});
+    syncHubChatFrame();
+  }
+
+  function resetHubChat() {
+    hubChatAbort?.abort();
+    hubChatSessionId = null;
+    hubChatBusy = false;
+    hubChatReplace = false;
+    closeHubChatHistoryMenu();
+    try {
+      localStorage.removeItem(HUB_CHAT_SESSION_KEY);
+    } catch (_) {
+      /* ignore */
+    }
+    const thread = hubChatThread();
+    if (thread) {
+      thread.replaceChildren();
+      delete thread.dataset.ready;
+    }
+    setHubChatSuggestVisible(true);
+    paintHubChatDraft({});
+    const t = hubChatThread();
+    if (t) t.dataset.ready = "1";
+    syncHubChatFrame();
+    document.getElementById("hub-chat-input")?.focus();
+  }
+
+  function clearStaleHubChatSession() {
+    hubChatSessionId = null;
+    try {
+      localStorage.removeItem(HUB_CHAT_SESSION_KEY);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  async function createHubChatSession() {
+    const r = await fetch("/api/sessions", { method: "POST" });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.detail || "Chat-Session fehlgeschlagen");
+    hubChatSessionId = String(body.sessionId || "");
+    if (!hubChatSessionId) throw new Error("Keine Session-ID");
+    try {
+      localStorage.setItem(HUB_CHAT_SESSION_KEY, hubChatSessionId);
+    } catch (_) {
+      /* ignore */
+    }
+    return hubChatSessionId;
+  }
+
+  async function ensureHubChatSession({ forceNew = false } = {}) {
+    if (forceNew) clearStaleHubChatSession();
+    if (hubChatSessionId) return hubChatSessionId;
+    try {
+      hubChatSessionId = localStorage.getItem(HUB_CHAT_SESSION_KEY) || null;
+    } catch (_) {
+      hubChatSessionId = null;
+    }
+    if (hubChatSessionId) {
+      // Nach Redeploy/DB-Wechsel kann die ID ungültig sein — kurz prüfen.
+      try {
+        const check = await fetch(`/api/sessions/${hubChatSessionId}/history`);
+        if (check.ok) return hubChatSessionId;
+      } catch (_) {
+        /* neu anlegen */
+      }
+      clearStaleHubChatSession();
+    }
+    return createHubChatSession();
+  }
+
+  async function openHubChatStream(sessionId, raw, turn, signal) {
+    const client = { mode: "hub" };
+    if (turn) client.turn = turn;
+    return fetch(`/api/sessions/${sessionId}/message/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+      body: JSON.stringify({ text: raw, client }),
+      signal,
+    });
+  }
+
+  function payloadLinks(body) {
+    const links = [
+      ...(Array.isArray(body?.links) ? body.links : []),
+      ...(Array.isArray(body?.duplicateLinks) ? body.duplicateLinks : []),
+    ];
+    if ((body?.type === "navigate" || body?.type === "created") && body?.url) {
+      links.push({
+        label: body.reference || body.ticketKey || body.label || "Öffnen",
+        url: body.url,
+      });
+    }
+    return links;
+  }
+
+  function openHubChatTarget(body) {
+    if (body?.hubView === "inbox") openAccountInbox();
+    const openId =
+      body?.requestId ||
+      ((body?.type === "navigate" || body?.type === "created") &&
+      body?.url &&
+      /\/workspace\//.test(body.url)
+        ? body.url.split("/workspace/")[1]?.split(/[?#]/)[0]
+        : "");
+    if (openId) window.setTimeout(() => openTicketFromChat(openId), 450);
+  }
+
+  async function sendHubChat(text, opts = {}) {
+    const raw = String(text || "").trim();
+    if (!raw || hubChatBusy) return;
+    const replace = hubChatReplace && !opts.keepUser;
+    if (replace) {
+      const thread = hubChatThread();
+      const users = thread ? [...thread.querySelectorAll(".hub-chat-bubble.is-user")] : [];
+      const lastUser = users.at(-1);
+      let node = lastUser;
+      while (node) {
+        const next = node.nextElementSibling;
+        node.remove();
+        node = next;
+      }
+      hubChatReplace = false;
+    }
+    hubChatBusy = true;
+    hubChatStick = true;
+    hubChatAbort = new AbortController();
+    const input = document.getElementById("hub-chat-input");
+    if (input && !opts.keepUser) {
+      input.value = "";
+      resizeHubChatInput();
+    }
+    syncHubChatSend();
+    setHubChatSuggestVisible(false);
+    if (!opts.keepUser) appendHubChatBubble("user", raw);
+    const thinking = appendHubChatThinking();
+    let streamBubble = null;
+    try {
+      const turn = opts.turn || (replace ? "edit" : "");
+      let sessionId = await ensureHubChatSession();
+      let r = await openHubChatStream(sessionId, raw, turn, hubChatAbort.signal);
+      if (r.status === 404) {
+        clearStaleHubChatSession();
+        sessionId = await ensureHubChatSession({ forceNew: true });
+        r = await openHubChatStream(sessionId, raw, turn, hubChatAbort.signal);
+      }
+      if (!r.ok) {
+        thinking?.remove();
+        if (r.status === 404) clearStaleHubChatSession();
+        const errBody = await r.json().catch(() => ({}));
+        const detail = errBody.detail || `Fehler ${r.status}`;
+        const msg =
+          typeof detail === "string" && /session unbekannt/i.test(detail)
+            ? "Chat neu gestartet — bitte noch einmal senden."
+            : typeof detail === "string"
+              ? detail
+              : "Anfrage fehlgeschlagen.";
+        appendHubChatBubble("assistant", msg);
+        return;
+      }
+      const reader = r.body?.getReader();
+      if (!reader) throw new Error("Kein Stream");
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let sawToken = false;
+      let donePayload = null;
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n");
+        buffer = parts.pop() || "";
+        for (const line of parts) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data:")) continue;
+          let event;
+          try {
+            event = JSON.parse(trimmed.slice(5).trim());
+          } catch (_) {
+            continue;
+          }
+          if (event.event === "token") {
+            if (!sawToken) {
+              thinking?.remove();
+              streamBubble = startHubChatStreamBubble();
+              sawToken = true;
+            }
+            if (streamBubble?.row) {
+              streamBubble.row.dataset.raw += String(event.text || "");
+              paintHubChatStream(streamBubble);
+              stickHubChat(hubChatThread());
+            }
+          } else if (event.event === "done") {
+            donePayload = event.payload || {};
+          }
+        }
+      }
+      thinking?.remove();
+      if (sawToken && donePayload) {
+        if (streamBubble?.row) {
+          const finalText = String(donePayload.text || streamBubble.row.dataset.raw || "").trim();
+          streamBubble.row.dataset.raw = finalText;
+          paintHubChatStream(streamBubble);
+          hubChatLinks(streamBubble.row, payloadLinks(donePayload));
+          refreshHubChatTurns();
+        }
+        paintHubChatDraft(donePayload);
+        openHubChatTarget(donePayload);
+      } else if (donePayload) {
+        streamBubble?.row?.remove();
+        applyHubChatPayload(donePayload);
+      } else if (!streamBubble?.row?.dataset.raw) {
+        appendHubChatBubble("assistant", "Keine Antwort.");
+      } else {
+        refreshHubChatTurns();
+      }
+    } catch (err) {
+      thinking?.remove();
+      if (err?.name === "AbortError") {
+        if (streamBubble?.row?.dataset.raw) {
+          paintHubChatStream(streamBubble);
+          refreshHubChatTurns();
+        } else {
+          streamBubble?.row?.remove();
+        }
+        return;
+      }
+      appendHubChatBubble("assistant", String(err.message || err));
+    } finally {
+      hubChatBusy = false;
+      hubChatAbort = null;
+      syncHubChatFrame();
+      if (!opts.keepUser) input?.focus();
+    }
+  }
+
+  function waitingHubItems() {
+    return hubItems.filter((item) => item?.waitingOnMe);
+  }
+
+  function paintAccountInbox() {
+    const badge = document.getElementById("account-inbox-badge");
+    const empty = document.getElementById("account-inbox-empty");
+    const list = document.getElementById("account-inbox-list");
+    const inboxBtn = document.getElementById("account-inbox");
+    if (!list) return;
+    const waiting = waitingHubItems();
+    if (badge) badge.hidden = waiting.length === 0;
+    if (inboxBtn) {
+      inboxBtn.hidden = waiting.length === 0;
+      inboxBtn.setAttribute(
+        "aria-label",
+        waiting.length ? `Inbox, ${waiting.length} offen` : "Inbox"
+      );
+      if (waiting.length === 0) {
+        const acc = document.getElementById("account");
+        const inboxMenu = document.getElementById("account-inbox-menu");
+        acc?.classList.remove("is-inbox-open");
+        if (inboxMenu) inboxMenu.hidden = true;
+        inboxBtn.setAttribute("aria-expanded", "false");
+      }
+    }
+    list.replaceChildren();
+    if (empty) empty.hidden = waiting.length > 0;
+    for (const item of waiting.slice(0, 12)) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "account-inbox-item";
+      btn.setAttribute("role", "menuitem");
+      const title = document.createElement("span");
+      title.className = "account-inbox-item-title";
+      title.textContent = item.title || item.key || item.reference || "Change";
+      const meta = document.createElement("span");
+      meta.className = "account-inbox-item-meta";
+      meta.textContent =
+        item.waitingTodo || item.nextStep || item.statusSummary || item.key || "";
+      btn.append(title);
+      if (meta.textContent) btn.append(meta);
+      btn.addEventListener("click", () => {
+        const acc = document.getElementById("account");
+        acc?.classList.remove("is-inbox-open");
+        const menu = document.getElementById("account-inbox-menu");
+        if (menu) menu.hidden = true;
+        inboxBtn?.setAttribute("aria-expanded", "false");
+        void openHubItem(item);
+      });
+      list.appendChild(btn);
+    }
+  }
+
+  function openAccountInbox() {
+    paintAccountInbox();
+    const acc = document.getElementById("account");
+    const menu = document.getElementById("account-menu");
+    const inboxMenu = document.getElementById("account-inbox-menu");
+    const nameBtn = acc?.querySelector(".account-name");
+    const inboxBtn = document.getElementById("account-inbox");
+    if (!acc || !inboxMenu) return;
+    acc.classList.remove("is-open");
+    if (menu) menu.hidden = true;
+    nameBtn?.setAttribute("aria-expanded", "false");
+    acc.classList.add("is-inbox-open");
+    inboxMenu.hidden = false;
+    inboxBtn?.setAttribute("aria-expanded", "true");
+  }
+
+  window.refreshAccountInbox = paintAccountInbox;
+  window.openAccountInbox = openAccountInbox;
+
   function applyHubView(view, { persist = true } = {}) {
     const hub = document.getElementById("hub");
     const board = document.getElementById("hub-board");
+    const chat = document.getElementById("hub-chat");
     const listBtn = document.getElementById("hub-view-list");
     const boardBtn = document.getElementById("hub-view-board");
-    hubView = view === "board" ? "board" : "list";
+    const chatBtn = document.getElementById("hub-view-chat");
+    const reportBtn = document.getElementById("hub-view-report");
+    const report = document.getElementById("hub-report");
+    const allowed = view === "board" || view === "chat" || view === "report";
+    hubView = allowed ? view : "list";
     if (hub) hub.dataset.view = hubView;
-    document.body.classList.remove("hub-chat-view");
+    document.body.classList.toggle("hub-chat-view", hubView === "chat");
     if (startChangeBtn && !document.body.classList.contains("ticket-active")) {
       startChangeBtn.hidden = false;
     }
     if (board) board.hidden = hubView !== "board";
+    if (chat) chat.hidden = hubView !== "chat";
+    if (report) report.hidden = hubView !== "report";
     listBtn?.classList.toggle("is-active", hubView === "list");
     boardBtn?.classList.toggle("is-active", hubView === "board");
+    chatBtn?.classList.toggle("is-active", hubView === "chat");
+    reportBtn?.classList.toggle("is-active", hubView === "report");
     if (persist) {
       try {
         localStorage.setItem(HUB_VIEW_KEY, hubView);
@@ -4413,8 +5914,317 @@
         /* ignore */
       }
     }
-    paintHubItems(hubItems, { keepFocus: true });
-    window.requestAnimationFrame(updateHubBoardScrollHint);
+    if (hubView === "chat") {
+      ensureHubChatWelcome();
+      window.requestAnimationFrame(() => document.getElementById("hub-chat-input")?.focus());
+    } else if (hubView === "report") {
+      void loadEffortReport();
+    } else {
+      paintHubItems(hubItems, { keepFocus: true });
+      window.requestAnimationFrame(updateHubBoardScrollHint);
+    }
+    watchEffortReport();
+  }
+
+  let effortReport = null;
+  let effortReportTimer = 0;
+  let reportOwner = "";
+  const reportSort = {
+    owners: { key: "totalPt", dir: "desc" },
+    changes: { key: "totalPt", dir: "desc" },
+  };
+
+  function formatPt(value, blankZero) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return blankZero ? "—" : "0,0";
+    if (blankZero && Math.abs(n) < 0.05) return "—";
+    const sign = n < 0 ? "-" : "";
+    const abs = Math.abs(n);
+    const [whole, frac] = abs.toFixed(1).split(".");
+    const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    return `${sign}${grouped},${frac}`;
+  }
+
+  function toggleReportSort(which, key) {
+    const sort = reportSort[which];
+    if (!sort || !key) return;
+    if (sort.key === key) sort.dir = sort.dir === "desc" ? "asc" : "desc";
+    else {
+      sort.key = key;
+      sort.dir = key === "name" || key === "title" || key === "owner" || key === "statusLabel" ? "asc" : "desc";
+    }
+    paintEffortReport();
+  }
+
+  function sortReportRows(rows, key, dir) {
+    const sign = dir === "asc" ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      const av = a[key];
+      const bv = b[key];
+      const an = Number(av);
+      const bn = Number(bv);
+      const aNum = av !== "" && Number.isFinite(an);
+      const bNum = bv !== "" && Number.isFinite(bn);
+      if (aNum && bNum) return (an - bn) * sign;
+      return String(av || "").localeCompare(String(bv || ""), "de") * sign;
+    });
+  }
+
+  function markReportSort(tableId, sort) {
+    document.querySelectorAll(`#${tableId} th[data-sort]`).forEach((th) => {
+      const on = th.dataset.sort === sort.key;
+      th.dataset.active = on ? sort.dir : "";
+      th.setAttribute("aria-sort", on ? (sort.dir === "asc" ? "ascending" : "descending") : "none");
+    });
+  }
+
+  function reportQuery() {
+    return String(document.getElementById("hub-search")?.value || "")
+      .trim()
+      .toLowerCase();
+  }
+
+  function watchEffortReport() {
+    window.clearInterval(effortReportTimer);
+    if (hubView !== "report") return;
+    effortReportTimer = window.setInterval(() => {
+      if (document.hidden || hubView !== "report") return;
+      void loadEffortReport({ silent: true });
+    }, 20000);
+  }
+
+  async function loadEffortReport({ silent = false } = {}) {
+    const state = document.getElementById("hub-report-state");
+    if (!silent && state) {
+      state.hidden = false;
+      state.textContent = "Lade Auswertung…";
+    }
+    try {
+      const response = await fetch("/api/requests/evaluation");
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof body.detail === "string" ? body.detail : "Auswertung nicht geladen");
+      }
+      effortReport = body;
+      paintEffortReport();
+      if (state) state.hidden = true;
+    } catch (err) {
+      if (state) {
+        state.hidden = false;
+        state.textContent = err?.message || "Auswertung nicht geladen";
+      }
+    }
+  }
+
+  function paintEffortReport() {
+    const data = effortReport || { totals: {}, owners: [], changes: [] };
+    const q = reportQuery();
+    const allChanges = data.changes || [];
+    const changes = q
+      ? allChanges.filter((row) =>
+          [row.title, row.owner, row.statusLabel].join(" ").toLowerCase().includes(q)
+        )
+      : allChanges;
+    const matchedOwners = new Set(changes.map((row) => row.owner));
+    const owners = sortReportRows(
+      q
+        ? (data.owners || []).filter(
+            (row) => matchedOwners.has(row.name) || String(row.name || "").toLowerCase().includes(q)
+          )
+        : data.owners || [],
+      reportSort.owners.key,
+      reportSort.owners.dir
+    );
+    let visibleChanges = changes;
+    if (reportOwner) {
+      visibleChanges = visibleChanges.filter((row) => row.owner === reportOwner);
+    }
+    visibleChanges = sortReportRows(
+      visibleChanges,
+      reportSort.changes.key,
+      reportSort.changes.dir
+    );
+    const totals = q ? totalsFromOwners(owners) : data.totals || {};
+    const kpis = document.getElementById("hub-report-kpis");
+    if (kpis) {
+      const cards = [
+        ["Gesamt-PT IT", formatPt(totals.itPt)],
+        ["Betreute Projekte mit IT-PT", String(totals.projects || 0)],
+        ["Ø PT pro Verantwortlichem", formatPt(totals.avgPerOwner)],
+      ];
+      kpis.replaceChildren();
+      for (const [label, value] of cards) {
+        const card = document.createElement("div");
+        card.className = "hub-report-kpi";
+        const name = document.createElement("span");
+        name.textContent = label;
+        const strong = document.createElement("strong");
+        strong.textContent = value;
+        card.append(name, strong);
+        kpis.appendChild(card);
+      }
+    }
+    const ownerBody = document.querySelector("#hub-report-owners tbody");
+    markReportSort("hub-report-owners", reportSort.owners);
+    if (ownerBody) {
+      ownerBody.replaceChildren();
+      const sum = {
+        projects: 0,
+        conceptPt: 0,
+        totalPt: 0,
+        approvedPt: 0,
+        openPt: 0,
+        holdPt: 0,
+        donePt: 0,
+        rejectedPt: 0,
+      };
+      for (const row of owners) {
+        sum.projects += Number(row.projects) || 0;
+        for (const key of Object.keys(sum)) {
+          if (key === "projects") continue;
+          sum[key] += Number(row[key]) || 0;
+        }
+        ownerBody.appendChild(reportOwnerRow(row));
+      }
+      const total = document.createElement("tr");
+      total.className = "is-sum";
+      total.append(
+        reportCell("Gesamt"),
+        reportCell(String(sum.projects)),
+        reportCell(formatPt(sum.conceptPt, true)),
+        reportTotalCell(sum.totalPt),
+        reportCell(formatPt(sum.approvedPt, true)),
+        reportCell(formatPt(sum.openPt, true)),
+        reportCell(formatPt(sum.holdPt, true)),
+        reportCell(formatPt(sum.donePt, true)),
+        reportCell(formatPt(sum.rejectedPt, true))
+      );
+      ownerBody.appendChild(total);
+    }
+    const title = document.getElementById("hub-report-changes-title");
+    const clear = document.getElementById("hub-report-clear");
+    if (title) title.textContent = reportOwner ? reportOwner : "Changes";
+    if (clear) clear.hidden = !reportOwner;
+    const changeBody = document.querySelector("#hub-report-changes tbody");
+    markReportSort("hub-report-changes", reportSort.changes);
+    if (changeBody) {
+      changeBody.replaceChildren();
+      for (const row of visibleChanges) {
+        const tr = document.createElement("tr");
+        if (row.id) tr.dataset.id = row.id;
+        tr.append(
+          reportCell(row.title || "Change"),
+          reportCell(row.statusLabel || ""),
+          reportCell(row.owner || ""),
+          reportCell(formatPt(row.conceptPt, true)),
+          reportCell(formatPt(row.operatePt, true)),
+          reportCell(formatPt(row.totalPt), "is-total")
+        );
+        if (row.id) {
+          tr.addEventListener("click", () => {
+            void openHubItem({ requestId: row.id });
+          });
+        }
+        changeBody.appendChild(tr);
+      }
+    }
+  }
+
+  function reportCell(text, className) {
+    const td = document.createElement("td");
+    const quiet = text === "—";
+    td.className = [className, quiet ? "is-quiet" : ""].filter(Boolean).join(" ");
+    td.textContent = text;
+    return td;
+  }
+
+  function reportTotalCell(value) {
+    const td = document.createElement("td");
+    td.className = "is-total";
+    td.textContent = formatPt(value);
+    return td;
+  }
+
+  function totalsFromOwners(owners) {
+    const itPt = owners.reduce((sum, row) => sum + (Number(row.totalPt) || 0), 0);
+    const projects = owners.reduce((sum, row) => sum + (Number(row.projects) || 0), 0);
+    const named = owners.filter((row) => row.name && row.name !== "Ohne Zuordnung");
+    const divisor = named.length || owners.length;
+    return {
+      itPt,
+      projects,
+      avgPerOwner: divisor ? itPt / divisor : 0,
+    };
+  }
+
+  function reportOwnerRow(row) {
+    const tr = document.createElement("tr");
+    tr.dataset.owner = row.name || "";
+    if (reportOwner && reportOwner === row.name) tr.classList.add("is-picked");
+    const name = document.createElement("td");
+    name.className = "is-name";
+    name.textContent = row.name || "";
+    tr.append(
+      name,
+      reportCell(String(row.projects || 0)),
+      reportCell(formatPt(row.conceptPt, true)),
+      reportTotalCell(row.totalPt),
+      reportCell(formatPt(row.approvedPt, true)),
+      reportCell(formatPt(row.openPt, true)),
+      reportCell(formatPt(row.holdPt, true)),
+      reportCell(formatPt(row.donePt, true)),
+      reportCell(formatPt(row.rejectedPt, true))
+    );
+    return tr;
+  }
+
+  function paintHubChange(item, { meta } = {}) {
+    const wrap = document.createElement("div");
+    wrap.className = "row-change";
+    const dot = document.createElement("span");
+    dot.className = "row-dot";
+    const healthKey = String(item?.standHealth?.key || "").toLowerCase();
+    if (
+      healthKey === "green" ||
+      healthKey === "blue" ||
+      healthKey === "yellow" ||
+      healthKey === "red" ||
+      healthKey === "white" ||
+      healthKey === "done"
+    ) {
+      dot.dataset.health = healthKey;
+    } else if (item.completed || item.localStatus === "abgeschlossen") {
+      dot.dataset.health = "done";
+    } else {
+      dot.dataset.health = "green";
+    }
+    dot.setAttribute("aria-hidden", "true");
+    if (item.standHealth?.label) dot.title = item.standHealth.label;
+
+    const stack = document.createElement("div");
+    stack.className = "row-stack";
+    const metaBits = meta === "key" ? [] : [item.status].filter(Boolean);
+    if (metaBits.length) {
+      const meta = document.createElement("span");
+      meta.className = "row-meta";
+      meta.textContent = metaBits.join(" · ");
+      stack.appendChild(meta);
+    }
+    const name = document.createElement("span");
+    name.className = "row-title";
+    name.textContent = item.title || item.key || "Change";
+    stack.appendChild(name);
+    const cueText = hubCueText(item) || item.statusSummary || "";
+    if (cueText) {
+      const cue = document.createElement("span");
+      cue.className = `row-cue${hubCueIsAction(item) ? " is-next" : ""}`;
+      cue.textContent = cueText;
+      const tip = standTooltip(item);
+      if (tip) cue.title = tip;
+      stack.appendChild(cue);
+    }
+    wrap.append(dot, stack);
+    return wrap;
   }
 
   function paintHubBoard(visible) {
@@ -4425,7 +6235,10 @@
     if (!cols.length) {
       const empty = document.createElement("p");
       empty.className = "hub-col-empty";
-      empty.textContent = hubItems.length ? "Keine Treffer." : "Keine Tickets in Jira.";
+      empty.textContent =
+            hubItems.length
+              ? "Keine Treffer."
+              : "Keine Tickets in Jira.";
       board.appendChild(empty);
       return;
     }
@@ -4471,55 +6284,7 @@
         if (item.waitingOnMe) card.classList.add("is-waiting");
         if (flatIndex === hubFocusIndex) card.classList.add("is-hub-focus");
 
-        const wrap = document.createElement("div");
-        wrap.className = "row-change";
-        const dot = document.createElement("span");
-        dot.className = "row-dot";
-        const healthKey = String(item?.standHealth?.key || "").toLowerCase();
-        if (
-          healthKey === "green" ||
-          healthKey === "blue" ||
-          healthKey === "yellow" ||
-          healthKey === "red" ||
-          healthKey === "white" ||
-          healthKey === "done"
-        ) {
-          dot.dataset.health = healthKey;
-        } else if (item.completed || item.localStatus === "abgeschlossen") {
-          dot.dataset.health = "done";
-        } else {
-          dot.dataset.health = "green";
-        }
-        dot.setAttribute("aria-hidden", "true");
-        if (item.standHealth?.label) dot.title = item.standHealth.label;
-
-        const stack = document.createElement("div");
-        stack.className = "row-stack";
-        const head = document.createElement("div");
-        head.className = "row-head";
-        const name = document.createElement("span");
-        name.className = "row-title";
-        name.textContent = item.title || item.key || "Change";
-        head.appendChild(name);
-        const cueText = hubCueText(item) || item.statusSummary || "";
-        if (cueText) {
-          const cue = document.createElement("span");
-          cue.className = `row-cue${hubCueIsAction(item) ? " is-next" : ""}`;
-          cue.textContent = cueText;
-          const tip = standTooltip(item);
-          if (tip) cue.title = tip;
-          head.appendChild(cue);
-        }
-        stack.appendChild(head);
-        const metaBits = [item.key, item.status].filter(Boolean);
-        if (metaBits.length) {
-          const metaLine = document.createElement("span");
-          metaLine.className = "row-meta";
-          metaLine.textContent = metaBits.join(" · ");
-          stack.appendChild(metaLine);
-        }
-        wrap.append(dot, stack);
-        card.appendChild(wrap);
+        card.appendChild(paintHubChange(item, { meta: "key" }));
 
         card.addEventListener("click", (event) => openHubItem(item, event.currentTarget));
         card.addEventListener("keydown", (e) => {
@@ -4544,6 +6309,7 @@
     const hub = document.getElementById("hub");
     if (!rows) return;
     if (Array.isArray(items)) hubItems = items;
+    paintAccountInbox();
     const visible = filteredHubItems();
     const prevKey =
       keepFocus && hubFocusIndex >= 0
@@ -4560,55 +6326,8 @@
       tr.dataset.key = item.key || "";
       tr.dataset.index = String(index);
       if (item.waitingOnMe) tr.classList.add("is-waiting");
-      const healthKey = String(item?.standHealth?.key || "").toLowerCase();
       const title = document.createElement("td");
-      const wrap = document.createElement("div");
-      wrap.className = "row-change";
-      const dot = document.createElement("span");
-      dot.className = "row-dot";
-      if (
-        healthKey === "green" ||
-        healthKey === "blue" ||
-        healthKey === "yellow" ||
-        healthKey === "red" ||
-        healthKey === "white" ||
-        healthKey === "done"
-      ) {
-        dot.dataset.health = healthKey;
-      } else if (item.completed || item.localStatus === "abgeschlossen") {
-        dot.dataset.health = "done";
-      } else {
-        dot.dataset.health = "green";
-      }
-      dot.setAttribute("aria-hidden", "true");
-      if (item.standHealth?.label) dot.title = item.standHealth.label;
-      const stack = document.createElement("div");
-      stack.className = "row-stack";
-      const head = document.createElement("div");
-      head.className = "row-head";
-      const name = document.createElement("span");
-      name.className = "row-title";
-      name.textContent = item.title || item.key || "Change";
-      head.appendChild(name);
-      const cueText = hubCueText(item) || item.statusSummary || "";
-      if (cueText) {
-        const cue = document.createElement("span");
-        cue.className = `row-cue${hubCueIsAction(item) ? " is-next" : ""}`;
-        cue.textContent = cueText;
-        const tip = standTooltip(item);
-        if (tip) cue.title = tip;
-        head.appendChild(cue);
-      }
-      stack.appendChild(head);
-      const metaBits = [item.key, item.status].filter(Boolean);
-      if (metaBits.length) {
-        const meta = document.createElement("span");
-        meta.className = "row-meta";
-        meta.textContent = metaBits.join(" · ");
-        stack.appendChild(meta);
-      }
-      wrap.append(dot, stack);
-      title.appendChild(wrap);
+      title.appendChild(paintHubChange(item));
       tr.append(title);
       tr.addEventListener("click", (event) => {
         openHubItem(item, event.currentTarget);
@@ -4647,9 +6366,22 @@
   }
 
   async function openHubItem(item) {
+    if (isCreatingChange()) {
+      const ok = window.confirm(
+        "Du legst gerade einen neuen Change an. Entwurf verwerfen und dieses Ticket öffnen?"
+      );
+      if (!ok) return;
+      intakeStarted = false;
+      publishing = false;
+      autoFillBusy = false;
+      aiReviewPending = false;
+      resetTicketState();
+      document.body.classList.remove("ticket-creating", "field-flow");
+    }
     if (!item || openHubItem._busy) return;
     openHubItem._busy = true;
     try {
+      rememberTicketFrom("");
       if (syncedRequestId) markCommentVisit(syncedRequestId);
       saveScrollMemory();
       const hub = document.getElementById("hub");
@@ -4685,6 +6417,7 @@
   }
 
   function openTicketSibling(delta) {
+    if (isCreatingChange()) return;
     const list = filteredHubItems();
     if (!list.length) return;
     let idx = currentHubTicketIndex();
@@ -4732,6 +6465,50 @@
     }
   }
 
+  function softRefreshOpenTicket(requestId, delays = [1200, 3500, 8000]) {
+    if (!requestId) return;
+    for (const ms of delays) {
+      window.setTimeout(() => {
+        if (syncedRequestId !== requestId) return;
+        // Während Inline-Edit nicht neu laden — sonst geht die Eingabe verloren.
+        if (editingKey) return;
+        void fetch(`/api/requests/${encodeURIComponent(requestId)}`)
+          .then(async (r) => {
+            if (!r.ok || syncedRequestId !== requestId || editingKey) return;
+            // Kein erneutes Sync-Polling — sonst starten mehrere Follows parallel.
+            applyRequest(await r.json(), { animate: false, skipSyncFollow: true });
+          })
+          .catch(() => {
+            /* lokaler Stand bleibt */
+          });
+      }, ms);
+    }
+  }
+
+  async function fetchHubIssues(retries = 2) {
+    let lastErr;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const r = await fetch("/api/jira/issues?limit=50");
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          throw new Error(
+            typeof body.detail === "string" ? body.detail : "Jira nicht erreichbar"
+          );
+        }
+        return body;
+      } catch (err) {
+        lastErr = err;
+        if (attempt < retries) {
+          await new Promise((resolve) =>
+            window.setTimeout(resolve, 500 * (attempt + 1))
+          );
+        }
+      }
+    }
+    throw lastErr || new Error("Jira nicht erreichbar");
+  }
+
   async function loadHub() {
     const hub = document.getElementById("hub");
     const rows = document.getElementById("rows");
@@ -4769,13 +6546,7 @@
     }
 
     try {
-      const r = await fetch("/api/jira/issues?limit=50");
-      const body = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        throw new Error(
-          typeof body.detail === "string" ? body.detail : "Jira nicht erreichbar"
-        );
-      }
+      const body = await fetchHubIssues(2);
       const items = body.items || [];
       paintHubItems(items);
       restoreHubScroll();
@@ -4787,18 +6558,23 @@
       } catch (_) {
         /* ignore */
       }
-      setHubSync("gerade aktualisiert…", "busy");
+      setHubSync("gerade aktualisiert", "ok");
       if (intakeStarted || document.body.classList.contains("ticket-active")) {
         hub.hidden = true;
         return;
       }
-      void fetch("/api/jira/issues?limit=50&sync=1")
-        .then(async (res) => {
-          const syncBody = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error("sync");
-          const next = syncBody.items || items;
-          if (!(intakeStarted || document.body.classList.contains("ticket-active"))) {
-            paintHubItems(next, { keepFocus: true });
+      // Abgleich nur anstoßen — Antwort nicht abwarten (blockiert sonst Ticket-Öffnen).
+      void fetch("/api/jira/issues?limit=50&sync=1").catch(() => {});
+      // Nach Hintergrund-Sync Hub einmal nachziehen, damit Kommentare/Stand stimmen.
+      window.setTimeout(() => {
+        if (intakeStarted || document.body.classList.contains("ticket-active")) return;
+        void fetchHubIssues(1)
+          .then((fresh) => {
+            if (intakeStarted || document.body.classList.contains("ticket-active")) {
+              return;
+            }
+            const next = fresh.items || [];
+            paintHubItems(next);
             try {
               sessionStorage.setItem(
                 HUB_CACHE_KEY,
@@ -4807,14 +6583,10 @@
             } catch (_) {
               /* ignore */
             }
-          }
-          const syncInfo = syncBody.sync || {};
-          if (syncInfo.failed) setHubSync("Abgleich teilweise fehlgeschlagen", "err");
-          else if (syncInfo.updated) {
-            setHubSync(`gerade aktualisiert · ${syncInfo.updated}`, "ok");
-          } else setHubSync("gerade aktualisiert", "ok");
-        })
-        .catch(() => setHubSync("Hintergrund-Abgleich fehlgeschlagen", "err"));
+            setHubSync("gerade aktualisiert", "ok");
+          })
+          .catch(() => {});
+      }, 6500);
     } catch (err) {
       if (!painted && state) {
         state.hidden = false;
@@ -4825,6 +6597,7 @@
   }
 
   async function openJiraTicket(key, { skipHubExit = false, deferHideHub = false, animate = true } = {}) {
+    if (isCreatingChange()) return;
     if (!deferHideHub) {
       const hub = document.getElementById("hub");
       if (hub) hub.hidden = true;
@@ -4842,9 +6615,50 @@
     }
     history.replaceState({}, "", `/workspace/${body.id}`);
     applyRequest(body, { animate });
+    if (body.enrichPending && body.id) softRefreshOpenTicket(body.id);
   }
 
-  async function openExisting(slug, { skipHubExit = false, deferHideHub = false, animate = true } = {}) {
+  function paintTicketNav() {
+    const ctx = document.getElementById("ticket-nav-context");
+    if (!ctx) return;
+    if (ticketOpenedFrom === "chat") {
+      ctx.hidden = false;
+      ctx.textContent = "Aus dem Chat";
+    } else {
+      ctx.hidden = true;
+      ctx.textContent = "";
+    }
+  }
+
+  function rememberTicketFrom(from) {
+    ticketOpenedFrom = from === "chat" ? "chat" : "";
+    try {
+      if (ticketOpenedFrom) sessionStorage.setItem(TICKET_FROM_KEY, ticketOpenedFrom);
+      else sessionStorage.removeItem(TICKET_FROM_KEY);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  function openTicketFromChat(id) {
+    if (!id) return;
+    rememberTicketFrom("chat");
+    void openExisting(id, { animate: true, from: "chat" });
+  }
+
+  async function openExisting(
+    slug,
+    { skipHubExit = false, deferHideHub = false, animate = true, from = "" } = {}
+  ) {
+    if (isCreatingChange()) return;
+    if (from === "chat") rememberTicketFrom("chat");
+    else if (!ticketOpenedFrom) {
+      try {
+        ticketOpenedFrom = sessionStorage.getItem(TICKET_FROM_KEY) || "";
+      } catch (_) {
+        ticketOpenedFrom = "";
+      }
+    }
     if (!deferHideHub) {
       const hub = document.getElementById("hub");
       if (hub) hub.hidden = true;
@@ -4853,16 +6667,28 @@
     if (local.ok) {
       const detail = await local.json();
       applyRequest(detail, { animate });
-      const jiraKey = detail.externalKey;
+      const sync = detail.sync || {};
+      const ref = String(detail.reference || "").trim();
+      const jiraKey =
+        sync.externalKey ||
+        detail.externalKey ||
+        (/^[A-Z][A-Z0-9]+-\d+$/i.test(ref) ? ref : "");
+      const requestId = detail.id || slug;
+      // Jira-Nachzug im Hintergrund — Ticket sofort zeigen, nicht auf Import warten.
       if (jiraKey) {
-        try {
-          const r = await fetch(`/api/jira/issues/${encodeURIComponent(jiraKey)}/import`, {
-            method: "POST",
+        void fetch(`/api/jira/issues/${encodeURIComponent(jiraKey)}/import`, {
+          method: "POST",
+        })
+          .then(async (r) => {
+            if (!r.ok || syncedRequestId !== requestId) return;
+            const body = await r.json();
+            if (!editingKey) applyRequest(body, { animate: false });
+            // Enrich (Kommentare/Anhänge) kommt verzögert — mehrfach nachladen.
+            softRefreshOpenTicket(requestId);
+          })
+          .catch(() => {
+            softRefreshOpenTicket(requestId, [2500, 7000]);
           });
-          if (r.ok) applyRequest(await r.json(), { animate: false });
-        } catch (_) {
-          /* lokaler Stand bleibt */
-        }
       }
       return;
     }
@@ -4873,6 +6699,11 @@
     const parts = location.pathname.split("/").filter(Boolean);
     const slug = parts[0] === "workspace" ? parts[1] : null;
     if (slug) {
+      try {
+        ticketOpenedFrom = sessionStorage.getItem(TICKET_FROM_KEY) || "";
+      } catch (_) {
+        ticketOpenedFrom = "";
+      }
       void openExisting(slug);
       return;
     }
@@ -4883,6 +6714,15 @@
     if (syncedRequestId) markCommentVisit(syncedRequestId);
     saveScrollMemory();
     saveDraft(syncedRequestId, commentInput?.value || "");
+    const fromChat = ticketOpenedFrom === "chat";
+    rememberTicketFrom("");
+    if (fromChat) {
+      try {
+        localStorage.setItem(HUB_VIEW_KEY, "chat");
+      } catch (_) {
+        /* ignore */
+      }
+    }
     history.replaceState({}, "", "/workspace");
     location.assign("/workspace");
   }
@@ -4937,7 +6777,11 @@
       return;
     }
 
-    if (event.key === "c" && document.body.classList.contains("ticket-active")) {
+    if (
+      event.key === "c" &&
+      document.body.classList.contains("ticket-active") &&
+      commentsAllowed()
+    ) {
       event.preventDefault();
       commentInput?.focus();
       return;
@@ -4945,6 +6789,7 @@
 
     if (
       document.body.classList.contains("ticket-active") &&
+      !isCreatingChange() &&
       (event.key === "j" || event.key === "k")
     ) {
       event.preventDefault();
@@ -4973,12 +6818,103 @@
     }
   });
 
+  document.getElementById("ticket-back")?.addEventListener("click", () => {
+    backToHub();
+  });
   document.getElementById("hub-view-list")?.addEventListener("click", () => {
     applyHubView("list");
   });
   document.getElementById("hub-view-board")?.addEventListener("click", () => {
     applyHubView("board");
   });
+  document.getElementById("hub-view-chat")?.addEventListener("click", () => {
+    applyHubView("chat");
+  });
+  document.getElementById("hub-view-report")?.addEventListener("click", () => {
+    applyHubView("report");
+  });
+  document.getElementById("hub-report-owners")?.addEventListener("click", (event) => {
+    const th = event.target.closest("th[data-sort]");
+    if (th) {
+      toggleReportSort("owners", th.dataset.sort);
+      return;
+    }
+    const tr = event.target.closest("tbody tr[data-owner]");
+    if (!tr) return;
+    reportOwner = reportOwner === tr.dataset.owner ? "" : tr.dataset.owner;
+    paintEffortReport();
+  });
+  document.getElementById("hub-report-changes")?.addEventListener("click", (event) => {
+    const th = event.target.closest("th[data-sort]");
+    if (!th) return;
+    toggleReportSort("changes", th.dataset.sort);
+  });
+  document.getElementById("hub-report-clear")?.addEventListener("click", () => {
+    reportOwner = "";
+    paintEffortReport();
+  });
+  document.getElementById("hub-chat-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (hubChatBusy) {
+      hubChatAbort?.abort();
+      return;
+    }
+    const input = document.getElementById("hub-chat-input");
+    void sendHubChat(input?.value || "");
+  });
+  document.getElementById("hub-chat-input")?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      document.getElementById("hub-chat-form")?.requestSubmit();
+    }
+  });
+  document.getElementById("hub-chat-input")?.addEventListener("input", () => {
+    resizeHubChatInput();
+    syncHubChatSend();
+  });
+  document.getElementById("hub-chat-thread")?.addEventListener("scroll", () => {
+    const thread = hubChatThread();
+    hubChatStick = hubChatNearBottom(thread);
+    const jump = document.getElementById("hub-chat-jump");
+    if (jump) {
+      jump.hidden = hubChatStick || !thread?.querySelector(".hub-chat-bubble.is-user, .hub-chat-bubble.is-assistant");
+    }
+  });
+  document.getElementById("hub-chat-jump")?.addEventListener("click", () => {
+    hubChatStick = true;
+    stickHubChat(hubChatThread());
+  });
+  document.getElementById("hub-chat-draft-create")?.addEventListener("click", () => {
+    void sendHubChat("Change anlegen");
+  });
+  document.getElementById("hub-chat-suggest")?.addEventListener("click", (event) => {
+    const chip = event.target?.closest?.(".hub-chat-chip");
+    if (!chip) return;
+    const prompt = String(chip.getAttribute("data-prompt") || chip.textContent || "").trim();
+    if (prompt) void sendHubChat(prompt);
+  });
+  document.getElementById("hub-chat-reset")?.addEventListener("click", () => {
+    resetHubChat();
+  });
+  document.getElementById("hub-chat-history")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const menu = document.getElementById("hub-chat-history-menu");
+    const btn = document.getElementById("hub-chat-history");
+    if (!menu) return;
+    const open = menu.hidden;
+    closeHubChatHistoryMenu();
+    if (open) {
+      menu.hidden = false;
+      btn?.setAttribute("aria-expanded", "true");
+      void paintHubChatHistoryMenu();
+    }
+  });
+  document.addEventListener("click", () => closeHubChatHistoryMenu());
+  document.getElementById("hub-chat-history-menu")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
+  resizeHubChatInput();
+
   document.getElementById("hub-board")?.addEventListener(
     "scroll",
     () => updateHubBoardScrollHint(),
@@ -4987,13 +6923,18 @@
   window.addEventListener("resize", () => updateHubBoardScrollHint());
   try {
     const saved = localStorage.getItem(HUB_VIEW_KEY);
-    if (saved === "board" || saved === "list") applyHubView(saved, { persist: false });
-    else applyHubView("list", { persist: false });
+    if (saved === "board" || saved === "list" || saved === "chat" || saved === "report")
+      applyHubView(saved, { persist: false });
+    else applyHubView("chat", { persist: false });
   } catch (_) {
-    applyHubView("list", { persist: false });
+    applyHubView("chat", { persist: false });
   }
 
   document.getElementById("hub-search")?.addEventListener("input", () => {
+    if (hubView === "report") {
+      paintEffortReport();
+      return;
+    }
     paintHubItems(hubItems);
     window.clearTimeout(filteredHubItems.searchTid);
     filteredHubItems.searchTid = window.setTimeout(() => {
@@ -5047,25 +6988,6 @@
     flash(`${stamped.length} Screenshot${stamped.length === 1 ? "" : "s"} angehängt`);
   });
 
-  commentStandHealth?.addEventListener("change", () => {
-    const requestId = syncedRequestId;
-    const key = String(commentStandHealth.value || "green");
-    if (!requestId) return;
-    if (commentStand) commentStand.dataset.health = key;
-    void fetch(`/api/requests/${requestId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fields: { stand_health: key } }),
-    }).then(async (r) => {
-      if (r.ok) return;
-      const body = await r.json().catch(() => ({}));
-      flash(
-        typeof body.detail === "string" ? body.detail : "Ampel nicht gespeichert",
-        true
-      );
-    });
-  });
-
   bootWorkspace();
   commentForm?.addEventListener("submit", (event) => {
     void submitComment(event);
@@ -5081,6 +7003,11 @@
     event.preventDefault();
     event.stopPropagation();
     openEffortTemplate();
+  });
+  statusUpdateOpen?.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (!syncedRequestId) return;
+    location.assign(`/status-update/${encodeURIComponent(syncedRequestId)}`);
   });
   void loadEffortSheetSettings();
 })();

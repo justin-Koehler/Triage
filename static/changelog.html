@@ -1,0 +1,2470 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Was neu ist — CRITR</title>
+    <link rel="stylesheet" href="/styles.css?v=v0-3-52" />
+  </head>
+  <body class="gated">
+    <header class="chrome">
+      <div class="top">
+        <div class="brand-row">
+          <a class="brand" href="/">CRITR</a>
+          <div class="app-version" id="app-version">
+            <a class="app-version-label" id="app-version-info" href="/was-neu" aria-current="page" title="Was neu ist">
+              v0.3.52
+            </a>
+          </div>
+        </div>
+        <div class="account" id="account" hidden></div>
+      </div>
+    </header>
+
+    <div class="shell shell-wide">
+      <article class="changelog">
+        <p class="hub-kicker">Versionen</p>
+        <h1 class="empty-title">Was neu ist</h1>
+        <p class="empty-sub">
+          Funktionsupdates und Qualitätsupdates getrennt. Oben die Übersicht, darunter der Inhalt jeder Version.
+        </p>
+
+        <div class="log-split">
+          <nav class="log-index" aria-label="Funktionsupdates">
+            <p class="log-index-kicker">Funktionsupdates</p>
+            <ol>
+              <li><a href="#v0-3-52">v0.3.52 <span>Chat fragt nach</span></a></li>
+              <li><a href="#v0-3-50">v0.3.50 <span>Chat wie ein Gespräch</span></a></li>
+              <li><a href="#v0-3-49">v0.3.49 <span>Einfacher Chat</span></a></li>
+              <li><a href="#v0-3-43">v0.3.43 <span>Auswertung aus Jira</span></a></li>
+              <li><a href="#v0-3-42">v0.3.42 <span>Auswertung</span></a></li>
+              <li><a href="#v0-3-20">v0.3.20 <span>Sync aus Jira/Aufwand</span></a></li>
+              <li><a href="#v0-3-18">v0.3.18 <span>Chat geht auf Antworten ein</span></a></li>
+              <li><a href="#v0-3-14">v0.3.14 <span>Steckbrief im Chat</span></a></li>
+              <li><a href="#v0-3-11">v0.3.11 <span>Change im Chat</span></a></li>
+              <li><a href="#v0-3-3">v0.3.3 <span>Hub-Leiste</span></a></li>
+              <li><a href="#v0-3-2">v0.3.2 <span>Status-Tabellen</span></a></li>
+              <li><a href="#v0-3-1">v0.3.1 <span>Plan/Ist Tabelle</span></a></li>
+              <li><a href="#v0-3-0">v0.3.0 <span>Stand im Ticket</span></a></li>
+              <li><a href="#v0-2-96">v0.2.96 <span>Status-Freitext</span></a></li>
+              <li><a href="#v0-2-95">v0.2.95 <span>Fragen bündeln</span></a></li>
+              <li><a href="#v0-2-94">v0.2.94 <span>Ruhiger Chat</span></a></li>
+              <li><a href="#v0-2-93">v0.2.93 <span>KI-Hinweis</span></a></li>
+              <li><a href="#v0-2-92">v0.2.92 <span>Change in sechs Fragen</span></a></li>
+              <li><a href="#v0-2-91">v0.2.91 <span>Hilfe ohne Chips</span></a></li>
+              <li><a href="#v0-2-90">v0.2.90 <span>Chat zuerst</span></a></li>
+              <li><a href="#v0-2-89">v0.2.89 <span>Inbox neben dem Namen</span></a></li>
+              <li><a href="#v0-2-88">v0.2.88 <span>Name öffnet Inbox</span></a></li>
+              <li><a href="#v0-2-87">v0.2.87 <span>Inbox und Sparring</span></a></li>
+              <li><a href="#v0-2-83">v0.2.83 <span>Chat klarer</span></a></li>
+              
+              <li><a href="#v0-2-82">v0.2.82 <span>Change im Chat</span></a></li>
+              <li><a href="#v0-2-81">v0.2.81 <span>Chat ruhiger</span></a></li>
+              <li><a href="#v0-2-80">v0.2.80 <span>Chat mit Qwen</span></a></li>
+              <li><a href="#v0-2-79">v0.2.79 <span>KI-Chat mit Qwen</span></a></li>
+              <li><a href="#v0-2-78">v0.2.78 <span>Workspace-Chat</span></a></li>
+              <li><a href="#v0-2-64">v0.2.64 <span>Was sich geändert hat</span></a></li>
+              <li><a href="#v0-2-57">v0.2.57 <span>Status-Seite</span></a></li>
+              <li><a href="#v0-2-55">v0.2.55 <span>Statusfarbe</span></a></li>
+              <li><a href="#v0-2-53">v0.2.53 <span>Snapshots</span></a></li>
+              <li><a href="#v0-2-52">v0.2.52 <span>Unterstützung</span></a></li>
+              <li><a href="#v0-2-51">v0.2.51 <span>Links in Jira</span></a></li>
+              <li><a href="#v0-2-35">v0.2.35 <span>Schritte</span></a></li>
+              <li><a href="#v0-2-32">v0.2.32 <span>Stand</span></a></li>
+              <li><a href="#v0-2-30">v0.2.30 <span>Hilfe und Bezug</span></a></li>
+              <li><a href="#v0-2-28">v0.2.28 <span>In Jira öffnen</span></a></li>
+              <li><a href="#v0-2-24">v0.2.24 <span>Anhang</span></a></li>
+              <li><a href="#v0-2-23">v0.2.23 <span>Solution</span></a></li>
+              <li><a href="#v0-2-21">v0.2.21 <span>Ohne Kommentar</span></a></li>
+              <li><a href="#v0-2-19">v0.2.19 <span>Nummer nur im Ticket</span></a></li>
+              <li><a href="#v0-2-17">v0.2.17 <span>Jira-Abschluss</span></a></li>
+              <li><a href="#v0-2-12">v0.2.12 <span>Versionsseite</span></a></li>
+              <li><a href="#v0-2-8">v0.2.8 <span>Versionslink</span></a></li>
+              <li><a href="#v0-2-5">v0.2.5 <span>Change anlegen</span></a></li>
+              <li><a href="#v0-2-4">v0.2.4 <span>Stand</span></a></li>
+              <li><a href="#v0-2-3">v0.2.3 <span>Letzte Kommentare</span></a></li>
+              <li><a href="#v0-2-2">v0.2.2 <span>Kalkulation</span></a></li>
+              <li><a href="#v0-2-1">v0.2.1 <span>Hilfe und Kosten</span></a></li>
+            </ol>
+          </nav>
+          <nav class="log-index" aria-label="Qualitätsupdates">
+            <p class="log-index-kicker">Qualitätsupdates</p>
+            <ol>
+              <li><a href="#v0-3-51">v0.3.51 <span>Jira öffnen</span></a></li>
+              <li><a href="#v0-3-48">v0.3.48 <span>Mehr Luft in der Tabelle</span></a></li>
+              <li><a href="#v0-3-41">v0.3.41 <span>Aufwand-Sync abgesichert</span></a></li>
+              <li><a href="#v0-3-40">v0.3.40 <span>Leere Aufwand-Felder</span></a></li>
+              <li><a href="#v0-3-39">v0.3.39 <span>Chat mit Qwen</span></a></li>
+              <li><a href="#v0-3-37">v0.3.37 <span>Kein Massen-Update</span></a></li>
+              <li><a href="#v0-3-36">v0.3.36 <span>Keine Mail ohne Änderung</span></a></li>
+              <li><a href="#v0-3-35">v0.3.35 <span>Stand Liste = Ticket</span></a></li>
+              <li><a href="#v0-3-34">v0.3.34 <span>Stand folgt Jira-Status</span></a></li>
+              <li><a href="#v0-3-33">v0.3.33 <span>Chat ohne Anlegen</span></a></li>
+              <li><a href="#v0-3-32">v0.3.32 <span>Drei CRITR-Links</span></a></li>
+              <li><a href="#v0-3-31">v0.3.31 <span>Schlanke Jira-Beschreibung</span></a></li>
+              <li><a href="#v0-3-30">v0.3.30 <span>Links in Jira</span></a></li>
+              <li><a href="#v0-3-29">v0.3.29 <span>Aufwand-Link in Jira</span></a></li>
+              <li><a href="#v0-3-28">v0.3.28 <span>Sync-Bugs behoben</span></a></li>
+              <li><a href="#v0-3-27">v0.3.27 <span>Schlankere Beschreibung</span></a></li>
+              <li><a href="#v0-3-26">v0.3.26 <span>Gesamtsumme nach Jira</span></a></li>
+              <li><a href="#v0-3-25">v0.3.25 <span>Ohne Solution-Felder</span></a></li>
+              <li><a href="#v0-3-24">v0.3.24 <span>Personen finden</span></a></li>
+              <li><a href="#v0-3-23">v0.3.23 <span>Unterstützung-Frage</span></a></li>
+              <li><a href="#v0-3-22">v0.3.22 <span>Change anlegen im Chat</span></a></li>
+              <li><a href="#v0-3-21">v0.3.21 <span>Übersicht synct</span></a></li>
+              <li><a href="#v0-3-19">v0.3.19 <span>Öffentliche CRITR-Links</span></a></li>
+              <li><a href="#v0-3-17">v0.3.17 <span>Liste nach Erstellt</span></a></li>
+              <li><a href="#v0-3-16">v0.3.16 <span>Status-update-Link</span></a></li>
+              <li><a href="#v0-3-15">v0.3.15 <span>Jira Create</span></a></li>
+              <li><a href="#v0-3-13">v0.3.13 <span>Chat-Session</span></a></li>
+              <li><a href="#v0-3-12">v0.3.12 <span>Sync/Chat sauberer</span></a></li>
+              <li><a href="#v0-3-10">v0.3.10 <span>Jira-Sync sichtbar</span></a></li>
+              <li><a href="#v0-3-9">v0.3.9 <span>Stand nur Status update</span></a></li>
+              <li><a href="#v0-3-8">v0.3.8 <span>Sync zuverlässig</span></a></li>
+              <li><a href="#v0-3-7">v0.3.7 <span>Seite erreichbar</span></a></li>
+              <li><a href="#v0-3-4">v0.3.4 <span>Jira-Sync</span></a></li>
+
+<li><a href="#v0-2-100">v0.2.100 <span>Plan/Ist sichtbar</span></a></li>
+              <li><a href="#v0-2-99">v0.2.99 <span>Plan/Ist Lesbarkeit</span></a></li>
+              <li><a href="#v0-2-98">v0.2.98 <span>Plan und Ist</span></a></li>
+              <li><a href="#v0-2-97">v0.2.97 <span>KI-Hinweis</span></a></li>
+              <li><a href="#v0-2-86">v0.2.86 <span>Chat wie Hub</span></a></li>
+              <li><a href="#v0-2-85">v0.2.85 <span>Titel und Start</span></a></li>
+              <li><a href="#v0-2-84">v0.2.84 <span>Change-Sparring</span></a></li>
+              <li><a href="#v0-2-77">v0.2.77 <span>Intake ohne Sackgasse</span></a></li>
+              <li><a href="#v0-2-76">v0.2.76 <span>Ohne Hinweis</span></a></li>
+              <li><a href="#v0-2-75">v0.2.75 <span>Kalkulation</span></a></li>
+              <li><a href="#v0-2-74">v0.2.74 <span>Ohne Ampel oben</span></a></li>
+              <li><a href="#v0-2-73">v0.2.73 <span>Speichern oben</span></a></li>
+              <li><a href="#v0-2-72">v0.2.72 <span>Zurück</span></a></li>
+              <li><a href="#v0-2-71">v0.2.71 <span>Speichern unten</span></a></li>
+              <li><a href="#v0-2-70">v0.2.70 <span>Überschrift</span></a></li>
+              <li><a href="#v0-2-69">v0.2.69 <span>Wie das Ticket</span></a></li>
+              <li><a href="#v0-2-68">v0.2.68 <span>Ruhiger Kopf</span></a></li>
+              <li><a href="#v0-2-67">v0.2.67 <span>Änderung am Snapshot</span></a></li>
+              <li><a href="#v0-2-66">v0.2.66 <span>Entscheidungen</span></a></li>
+              <li><a href="#v0-2-65">v0.2.65 <span>Änderung beim Stand</span></a></li>
+              <li><a href="#v0-2-63">v0.2.63 <span>Effort-Hinweis</span></a></li>
+              <li><a href="#v0-2-62">v0.2.62 <span>Wie das Ticket</span></a></li>
+              <li><a href="#v0-2-61">v0.2.61 <span>Eine Tabelle</span></a></li>
+              <li><a href="#v0-2-60">v0.2.60 <span>Ruhigere Seite</span></a></li>
+              <li><a href="#v0-2-59">v0.2.59 <span>Status aus den Zahlen</span></a></li>
+              <li><a href="#v0-2-58">v0.2.58 <span>Snapshot beim Speichern</span></a></li>
+              <li><a href="#v0-2-56">v0.2.56 <span>Status-Button</span></a></li>
+              <li><a href="#v0-2-54">v0.2.54 <span>Art ohne Stift</span></a></li>
+              <li><a href="#v0-2-50">v0.2.50 <span>Gar keiner</span></a></li>
+              <li><a href="#v0-2-49">v0.2.49 <span>Status update</span></a></li>
+              <li><a href="#v0-2-48">v0.2.48 <span>Tabelle bündig</span></a></li>
+              <li><a href="#v0-2-47">v0.2.47 <span>Termine</span></a></li>
+              <li><a href="#v0-2-46">v0.2.46 <span>Risiken zum Stand</span></a></li>
+              <li><a href="#v0-2-45">v0.2.45 <span>Terminzeile</span></a></li>
+              <li><a href="#v0-2-44">v0.2.44 <span>Statustext</span></a></li>
+              <li><a href="#v0-2-43">v0.2.43 <span>Plan und Ist</span></a></li>
+              <li><a href="#v0-2-42">v0.2.42 <span>Nächste Schritte</span></a></li>
+              <li><a href="#v0-2-41">v0.2.41 <span>Nächste Schritte</span></a></li>
+              <li><a href="#v0-2-40">v0.2.40 <span>Kommentar setzt den Stand</span></a></li>
+              <li><a href="#v0-2-39">v0.2.39 <span>Aktueller Stand</span></a></li>
+              <li><a href="#v0-2-38">v0.2.38 <span>Plan und Ist</span></a></li>
+              <li><a href="#v0-2-37">v0.2.37 <span>Statusbalken</span></a></li>
+              <li><a href="#v0-2-36">v0.2.36 <span>Stand ändern</span></a></li>
+              <li><a href="#v0-2-34">v0.2.34 <span>Statustext</span></a></li>
+              <li><a href="#v0-2-33">v0.2.33 <span>Stand unter Status</span></a></li>
+              <li><a href="#v0-2-31">v0.2.31 <span>Beschreibung</span></a></li>
+              <li><a href="#v0-2-29">v0.2.29 <span>Ablauf</span></a></li>
+              <li><a href="#v0-2-27">v0.2.27 <span>In Jira Anlegen</span></a></li>
+              <li><a href="#v0-2-26">v0.2.26 <span>Spalten</span></a></li>
+              <li><a href="#v0-2-25">v0.2.25 <span>Aufteilung</span></a></li>
+              <li><a href="#v0-2-22">v0.2.22 <span>Jira-Knopf</span></a></li>
+              <li><a href="#v0-2-20">v0.2.20 <span>Leiste im Ticket</span></a></li>
+              <li><a href="#v0-2-18">v0.2.18 <span>Ohne Nummer</span></a></li>
+              <li><a href="#v0-2-16">v0.2.16 <span>Anlegen bleibt</span></a></li>
+              <li><a href="#v0-2-15">v0.2.15 <span>Board</span></a></li>
+              <li><a href="#v0-2-14">v0.2.14 <span>Anlegen-Bereich</span></a></li>
+              <li><a href="#v0-2-13">v0.2.13 <span>Board-Wechsel</span></a></li>
+              <li><a href="#v0-2-11">v0.2.11 <span>Board-Breite</span></a></li>
+              <li><a href="#v0-2-10">v0.2.10 <span>Anlegen-Button</span></a></li>
+              <li><a href="#v0-2-7">v0.2.7 <span>Board und Wechsel</span></a></li>
+              <li><a href="#v0-2-6">v0.2.6 <span>Liste</span></a></li>
+            </ol>
+          </nav>
+        </div>
+
+        <div class="log-lane">
+          <h2 class="log-lane-title">Funktionsupdates</h2>
+          <p class="log-lane-lead">Was neu dazugekommen ist.</p>
+
+          <section class="log-release is-current" id="v0-3-52">
+            <p class="log-meta">v0.3.52 · Aktuell</p>
+            <h2 class="log-title">Der Chat fragt nach, bis der Change trägt</h2>
+            <p class="log-lead">
+              Beim Anlegen hakt der Chat nach: für wen das Problem gilt, was sich ändert, welcher Nutzen entsteht, wann es startet und bis wann es fertig ist.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Rückfragen</h3>
+                <p>Eine dünne Antwort bleibt im Entwurf. Die nächste Frage holt das fehlende Detail, ohne das Thema zu wechseln.</p>
+              </div>
+              <div>
+                <h3>Entwurf</h3>
+                <p>Problem, Lösung und Nutzen werden in den Steckbrief-Ton gebracht. Auf der Karte stehen außerdem Start und Ende.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-50">
+            <p class="log-meta">v0.3.50</p>
+            <h2 class="log-title">Der Chat schreibt wie ein Gespräch</h2>
+            <p class="log-lead">
+              Die Antwort erscheint Wort für Wort. Du kannst stoppen, kopieren, neu erzeugen oder die letzte Nachricht ändern.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Schreiben</h3>
+                <p>Solange der Chat leer ist, sitzt das Feld in der Mitte. Danach bleibt es unten. Senden wird zu Stoppen, solange die Antwort läuft. Bist du nach oben gescrollt, holt „Nach unten“ dich zurück.</p>
+              </div>
+              <div>
+                <h3>Nachricht</h3>
+                <p>Deine Sätze stehen rechts, die Antwort links im Fließtext. Unter der letzten Antwort: Kopieren und Neu erzeugen. Die letzte eigene Nachricht lässt sich ändern.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-49">
+            <p class="log-meta">v0.3.49</p>
+            <h2 class="log-title">Der Chat fragt oder legt an</h2>
+            <p class="log-lead">
+              Ein Feld, eine Antwort, höchstens eine Frage. Das System entscheidet, ob du etwas zum Workspace wissen willst oder einen Change anlegst.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Start</h3>
+                <p>Leer siehst du zwei Vorschläge: Change anlegen und Was wartet auf mich? Neu leert den Strang. Der Verlauf bleibt im Menü.</p>
+              </div>
+              <div>
+                <h3>Entwurf</h3>
+                <p>Beim Anlegen erscheint eine Karte mit dem, was schon klar ist, und genau einer Lücke. Change anlegen sitzt auf der Karte, sobald sie trägt.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-43">
+            <p class="log-meta">v0.3.43</p>
+            <h2 class="log-title">Auswertung liest auch Jira</h2>
+            <p class="log-lead">
+              Die Personentage kommen aus dem Aufwand-Sheet und, wo das Sheet leer ist, aus dem Jira-Ticket. Status und Verantwortliche folgen dem Ticket.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Quellen</h3>
+                <p>Ein Change ohne Sheet erscheint, sobald Jira IT-Personentage hat. Betrieb bleibt aus dem Sheet.</p>
+              </div>
+              <div>
+                <h3>Ansicht</h3>
+                <p>Die Tabelle ist schlichter: keine Kästen, keine farbigen Spalten.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-42">
+            <p class="log-meta">v0.3.42</p>
+            <h2 class="log-title">Auswertung der IT-Personentage</h2>
+            <p class="log-lead">
+              Im Workspace zeigt Auswertung die IT-Personentage je Verantwortlichem und je Change. Die Zahlen kommen aus den Aufwand-Sheets und aktualisieren sich beim Öffnen.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ansicht</h3>
+                <p>Neben Chat, Liste und Board gibt es Auswertung mit Summe, Projekten und Schnitt je Verantwortlichem.</p>
+              </div>
+              <div>
+                <h3>Tabellen</h3>
+                <p>Oben die Verantwortlichen mit Status-Aufteilung, darunter jeder Change mit Konzeption, Betrieb und Gesamt.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-18">
+            <p class="log-meta">v0.3.18</p>
+            <h2 class="log-title">Chat geht auf Antworten ein</h2>
+            <p class="log-lead">
+              Der Chat spiegelt deine Angaben, fragt gezielt nach und sagt klar, wenn noch zu wenig Information da ist.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Steckbrief</h3>
+                <p>Zu dünne Antworten bleiben am gleichen Punkt — mit Nachfrage statt „Passt“ und nächster Frage.</p>
+              </div>
+              <div>
+                <h3>Freier Chat</h3>
+                <p>Antworten greifen deine Aussage auf und benennen fehlende Infos statt zu raten.</p>
+              </div>
+            </div>
+          </section>
+
+
+          <section class="log-release" id="v0-3-14">
+            <p class="log-meta">v0.3.14</p>
+            <h2 class="log-title">Steckbrief im Chat per Slot-Filling</h2>
+            <p class="log-lead">
+              Der Chat fragt die wichtigsten Steckbrief-Felder gezielt ab, übernimmt mehrere Angaben aus einer Antwort und legt erst nach einer klaren Zusammenfassung an.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Felder</h3>
+                <p>Problem, Lösung, Nutzen, Risiken, Personen, Zeitraum, Tags, Stand und Unterstützung landen im Ticket.</p>
+              </div>
+              <div>
+                <h3>Antworten</h3>
+                <p>Wo sinnvoll, gibt es Kurzantworten zum Tippen — der Rest bleibt Freitext.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-11">
+            <p class="log-meta">v0.3.11</p>
+            <h2 class="log-title">Change im Chat in wenigen einfachen Fragen</h2>
+            <p class="log-lead">
+              Du legst einen Change mit 2–3 kurzen, gezielten Fragen an. Der Chat fragt nur, was noch fehlt, und bietet passende Kurzantworten an.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Fragen</h3>
+                <p>Was soll sich ändern, wann ist es erfolgreich, wann starten — dann Zusammenfassung und Anlegen.</p>
+              </div>
+              <div>
+                <h3>Chips</h3>
+                <p>Bei optionalen Punkten kannst du z. B. „Bald“ oder „Weiß ich noch nicht“ tippen.</p>
+              </div>
+            </div>
+          </section>
+
+                                                  <section class="log-release" id="v0-3-0">
+            <p class="log-meta">v0.3.0</p>
+            <h2 class="log-title">Stand mit Plan und Ist</h2>
+            <p class="log-lead">
+              Im Ticket siehst du Plan und Ist als eigenen Block — mit Freitext zu Changebeschreibung, Entscheidungen, Risiken und nächsten Schritten. Status update öffnet die große Ansicht mit Verlauf.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Im Ticket</h3>
+                <p>Tabelle und Freitext direkt unter dem Status.</p>
+              </div>
+              <div>
+                <h3>Status update</h3>
+                <p>Volle Seite mit Snapshots rechts.</p>
+              </div>
+              <div>
+                <h3>KI-Hinweis</h3>
+                <p>In der Beschreibung steht, wenn der Change mit KI aufgewertet wurde.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-96">
+            <p class="log-meta">v0.2.96</p>
+            <h2 class="log-title">Status-Freitext wie im Sheet</h2>
+            <p class="log-lead">
+              Im Status update stehen Changebeschreibung, Entscheidungen, Risiken und Nächste Schritte als Freitext — Plan und Ist sind größer lesbar.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Freitext zum Stand</h3>
+                <p>Vier Felder unter der Plan/Ist-Tabelle; der unklare Titel „Was jetzt gilt“ ist weg.</p>
+              </div>
+              <div>
+                <h3>Plan und Ist</h3>
+                <p>Die Spaltenüberschriften sind größer und deutlicher.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-95">
+            <p class="log-meta">v0.2.95</p>
+            <h2 class="log-title">Change-Fragen bündeln</h2>
+            <p class="log-lead">
+              Die Hilfe fragt nicht Feld für Feld, sondern holt in einer natürlichen Frage mehrere Punkte auf einmal — und schreibt sie in den Entwurf.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Erarbeiten</h3>
+                <p>Zum Beispiel Auslöser und Betroffene zusammen, Ziel und Auftrag zusammen.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-94">
+            <p class="log-meta">v0.2.94</p>
+            <h2 class="log-title">Ruhiger Chat, klarer Rückweg</h2>
+            <p class="log-lead">
+              Der Chat füllt den Raum mit fester Eingabe unten. Im Ticket führt „← Changes“ zurück — aus dem Chat mit Kontextzeile. Wartende Changes sind ruhig markiert, die Suche sitzt neben der Ansicht.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Chat</h3>
+                <p>Dezente Werkzeuge, höherer Thread, Composer unten.</p>
+              </div>
+              <div>
+                <h3>Ticket</h3>
+                <p>Zurück zu Changes; aus dem Chat mit Hinweiszeile.</p>
+              </div>
+              <div>
+                <h3>Liste & Board</h3>
+                <p>Wartende mit ruhigem Streifen; Suche rechts neben Chat/Liste/Board.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-93">
+            <p class="log-meta">v0.2.93</p>
+            <h2 class="log-title">KI-Hinweis in der Beschreibung</h2>
+            <p class="log-lead">
+              Changes aus der Chat-Hilfe tragen in der Beschreibung den Satz, dass sie mithilfe von KI aufbereitet wurden.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Beschreibung</h3>
+                <p>Der Hinweis steht am Ende des Steckbrief-Texts.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-92">
+            <p class="log-meta">v0.2.92</p>
+            <h2 class="log-title">Change in sechs Fragen</h2>
+            <p class="log-lead">
+              Die Hilfe holt Auslöser, Ziel, Auftrag, Start und Risiken in höchstens sechs Fragen — danach legt „Change anlegen“ den Steckbrief in Jira an.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Kurz</h3>
+                <p>Maximal sechs gezielte Fragen, dann der Button unten.</p>
+              </div>
+              <div>
+                <h3>Anlegen</h3>
+                <p>CRITR füllt die wichtigen Felder und öffnet den neuen Change.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-91">
+            <p class="log-meta">v0.2.91</p>
+            <h2 class="log-title">Hilfe ohne Chips</h2>
+            <p class="log-lead">
+              Sobald du um Hilfe beim Change bittest, verschwinden die Vorschläge unten — der Dialog läuft freier.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Sparring</h3>
+                <p>Keine Inbox-/Optionen-Chips während der Unterstützung.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-90">
+            <p class="log-meta">v0.2.90</p>
+            <h2 class="log-title">Chat zuerst</h2>
+            <p class="log-lead">
+              In der Ansichts-Leiste steht Chat ganz links — und ist der Start, wenn noch nichts gewählt war.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Reihenfolge</h3>
+                <p>Chat, Liste, Board.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-89">
+            <p class="log-meta">v0.2.89</p>
+            <h2 class="log-title">Inbox neben dem Namen</h2>
+            <p class="log-lead">
+              Der Inbox-Reiter ist weg. Wenn etwas auf dich wartet, erscheint neben deinem Namen ein roter Punkt und „Inbox“ — ein Klick öffnet die Nachrichten.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Hinweis</h3>
+                <p>Roter Kreis und Inbox nur, wenn Updates warten.</p>
+              </div>
+              <div>
+                <h3>Menü</h3>
+                <p>Inbox zeigt die wartenden Changes; dein Name öffnet weiter Abmelden.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-88">
+            <p class="log-meta">v0.2.88</p>
+            <h2 class="log-title">Dein Name öffnet die Inbox</h2>
+            <p class="log-lead">
+              Oben rechts auf deinen Namen tippen — CRITR zeigt, was auf dich wartet. Abmelden liegt hinter dem kleinen Pfeil daneben.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Name</h3>
+                <p>Ein Klick wechselt in die Inbox; aus einem Ticket kommst du damit zurück in den Hub.</p>
+              </div>
+              <div>
+                <h3>Konto</h3>
+                <p>Abmelden bleibt über ▾ erreichbar.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-87">
+            <p class="log-meta">v0.2.87</p>
+            <h2 class="log-title">Inbox, Sparring bis Steckbrief, Stand mit Bestätigung</h2>
+            <p class="log-lead">
+              Was auf dich wartet hat eine eigene Ansicht. Beim Anlegen siehst du Lücken und Ähnliche — Stand setzt du im Chat erst nach Ja.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Inbox</h3>
+                <p>Nur Changes, die auf dich warten — auch über den Chat erreichbar.</p>
+              </div>
+              <div>
+                <h3>Nach dem Anlegen</h3>
+                <p>Der Steckbrief öffnet sich mit den noch offenen Punkten markiert.</p>
+              </div>
+              <div>
+                <h3>Ähnliche Changes</h3>
+                <p>Während du erarbeitest, zeigt CRITR Treffer zum Öffnen statt Doppelarbeit.</p>
+              </div>
+              <div>
+                <h3>Stand & Risiko</h3>
+                <p>Im Chat speichert CRITR Stand erst, wenn du mit ja bestätigst.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-86">
+            <p class="log-meta">v0.2.86</p>
+            <h2 class="log-title">Chat sieht aus wie der restliche Hub</h2>
+            <p class="log-lead">
+              Dieselbe Breite, Typo und Eingabezeile wie Liste, Board und Intake — kein eigener Look mehr.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Einheitlich</h3>
+                <p>Antworten und Eingabe nutzen die bekannten CRITR-Muster.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-85">
+            <p class="log-meta">v0.2.85</p>
+            <h2 class="log-title">Titel-Frage und Startdatum greifen wieder</h2>
+            <p class="log-lead">
+              Die erste Frage beim Anlegen ist wieder sichtbar, und ein Datum im Kalender lässt sich übernehmen.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Fragetext</h3>
+                <p>„Wie lautet der Titel des Changes?“ erscheint wieder über dem Feld.</p>
+              </div>
+              <div>
+                <h3>Start / Ende</h3>
+                <p>Kalenderwahl zählt wieder — nicht nur „Weiß ich noch nicht“.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-84">
+            <p class="log-meta">v0.2.84</p>
+            <h2 class="log-title">Change-Hilfe denkt mit statt abzufragen</h2>
+            <p class="log-lead">
+              Beim Erstellen stellt die KI gezielte Fragen zum Thema — kein stumpfes Feld für Feld.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Sparring</h3>
+                <p>Sie greift Unklares auf, schlägt Formulierungen vor und fragt nur, was als Nächstes hilft.</p>
+              </div>
+              <div>
+                <h3>Kein Formularparcours</h3>
+                <p>Titel und Auftraggeber entstehen aus dem Gespräch, nicht als Checkliste.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-83">
+            <p class="log-meta">v0.2.83</p>
+            <h2 class="log-title">Chat zeigt Fortschritt und fragt vor dem Anlegen</h2>
+            <p class="log-lead">
+              Beim Erstellen siehst du, was schon steht — und legst erst an, wenn du bestätigst.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Fortschritt</h3>
+                <p>Oben stehen Titel, Inhalt, Auftraggeber und Start als kurze Statuszeile.</p>
+              </div>
+              <div>
+                <h3>Bestätigen</h3>
+                <p>Wenn genug da ist: Anlegen, Noch anpassen oder Abbrechen.</p>
+              </div>
+              <div>
+                <h3>Neuer Chat</h3>
+                <p>Oben rechts startest du eine frische Unterhaltung.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-82">
+            <p class="log-meta">v0.2.82</p>
+            <h2 class="log-title">Change gemeinsam im Chat anlegen</h2>
+            <p class="log-lead">
+              Unter Chat wählst du Unterstützung beim Erstellen — dann erarbeitet ihr die Punkte in natürlicher Sprache, und daraus wird ein Ticket.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Auswahl</h3>
+                <p>Der Vorschlag „Unterstützung beim Erstellen eines Changes“ startet den Dialog.</p>
+              </div>
+              <div>
+                <h3>Natürliche Sprache</h3>
+                <p>Qwen fragt nach Titel, Inhalt und Auftraggeber — ohne Formularparcours.</p>
+              </div>
+              <div>
+                <h3>Ticket</h3>
+                <p>Nach deiner Bestätigung legt CRITR den Change an und öffnet den Steckbrief.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-81">
+            <p class="log-meta">v0.2.81</p>
+            <h2 class="log-title">Chat ist ruhiger</h2>
+            <p class="log-lead">
+              Weniger Zierde, mehr Fokus — und unten kein Anlegen-Button mehr.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Schlichter</h3>
+                <p>Ohne große Überschrift und Badge; nur Thread, Vorschläge und Eingabe.</p>
+              </div>
+              <div>
+                <h3>Unten frei</h3>
+                <p>„Neuen Change anlegen“ ist in der Chat-Ansicht ausgeblendet.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-80">
+            <p class="log-meta">v0.2.80</p>
+            <h2 class="log-title">Workspace-Chat mit Qwen, klarer gestaltet</h2>
+            <p class="log-lead">
+              Der Chat im Hub wirkt wie ein eigener Raum — und spricht weiter mit Qwen über deine Changes.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Neue Oberfläche</h3>
+                <p>Überschrift, Modell-Hinweis und Vorschläge führen dich schneller in den Dialog.</p>
+              </div>
+              <div>
+                <h3>Schreiben mit Qwen</h3>
+                <p>Freie Nachrichten gehen an die Workspace-KI; während der Antwort siehst du „Qwen schreibt…“.</p>
+              </div>
+              <div>
+                <h3>Anlegen getrennt</h3>
+                <p>Neue Changes bleiben bei „Neuen Change anlegen“.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-79">
+            <p class="log-meta">v0.2.79</p>
+            <h2 class="log-title">Im Chat schreibst du mit Qwen</h2>
+            <p class="log-lead">
+              Freie Fragen im Workspace-Chat beantwortet die konfigurierte KI — mit Überblick über deine Changes.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Freier Dialog</h3>
+                <p>Unter Chat kannst du normal schreiben; die KI antwortet auf Deutsch zum Workspace.</p>
+              </div>
+              <div>
+                <h3>Mit Kontext</h3>
+                <p>Statuszahlen und aktuelle Changes fließen in die Antwort ein — ohne erfundene Nummern.</p>
+              </div>
+              <div>
+                <h3>Anlegen bleibt getrennt</h3>
+                <p>Neue Changes legst du weiter über „Neuen Change anlegen“ an.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-64">
+            <p class="log-meta">v0.2.64</p>
+            <h2 class="log-title">Der Verlauf sagt, was sich geändert hat</h2>
+            <p class="log-lead">
+              Unter den Daten steht, was seit dem letzten Snapshot anders ist. Der Statustext wird mitgespeichert.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Ein älterer Snapshot zeigt den Statustext von diesem Tag.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-57">
+            <p class="log-meta">v0.2.57</p>
+            <h2 class="log-title">Das Status update ist übersichtlicher</h2>
+            <p class="log-lead">
+              Oben stehen Zustand und Speichern. Darunter Plan und Ist nebeneinander, dann was jetzt gilt. Der Verlauf sitzt rechts.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Termine und Kosten vergleichen Plan mit Ist. Entscheidungen, Risiken und nächste Schritte folgen darunter.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-55">
+            <p class="log-meta">v0.2.55</p>
+            <h2 class="log-title">Die Statusfarbe kommt vom Status update</h2>
+            <p class="log-lead">
+              Im Status update stehen dieselben Zustände wie am Ticket. Die Farbe am Ticket folgt dieser Auswahl.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Im Plan, Im Blick behalten, Kritisch, Überzogen, On hold und Done.</p>
+              </div>
+              <div>
+                <h3>Ticket</h3>
+                <p>Die Ampel übernimmt den Zustand, sobald du ihn im Status update setzt.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-53">
+            <p class="log-meta">v0.2.53</p>
+            <h2 class="log-title">Status update merkt sich jeden Stand</h2>
+            <p class="log-lead">
+              Speichern legt einen Snapshot an. Rechts steht das Datum, ein Klick zeigt den Stand von diesem Tag.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Der aktuelle Stand bleibt bearbeitbar. Ältere Snapshots öffnest du nur zum Ansehen.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-52">
+            <p class="log-meta">v0.2.52</p>
+            <h2 class="log-title">Die Frage heißt Unterstützung</h2>
+            <p class="log-lead">
+              Beim Erstellen steht Unterstützung. Dahinter kannst du Projektmanagement oder Werkzeugkasten wählen.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Erstellen</h3>
+                <p>Die Beispiele sitzen direkt an der Frage. Du kannst auch selbst etwas anderes schreiben oder Keine wählen.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-51">
+            <p class="log-meta">v0.2.51</p>
+            <h2 class="log-title">Die Jira-Beschreibung verlinkt Ticket und Status</h2>
+            <p class="log-lead">
+              Unten in der Jira-Beschreibung stehen zwei Links: zum Ticket und zum Status update.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Jira</h3>
+                <p>Die Links kommen beim Anlegen und beim nächsten Abgleich in die Beschreibung.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-35">
+            <p class="log-meta">v0.2.35</p>
+            <h2 class="log-title">Entscheidungen, Risiken und nächste Schritte am Ticket</h2>
+            <p class="log-lead">
+              Unter der Tabelle stehen drei Felder. Nächste Schritte kommen aus dem Ticket. Du kannst alle drei ändern.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Die Felder gibt es erst, wenn der Change angelegt ist. Beim Anlegen fehlen sie.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-32">
+            <p class="log-meta">v0.2.32</p>
+            <h2 class="log-title">Auf dem offenen Ticket liegt der Stand</h2>
+            <p class="log-lead">
+              Plan und Ist für Termine, Personentage und Kosten stehen direkt unter Status. Die Ampel vergleicht beides. Begründung und nächste Schritte kommen aus den Berichten.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Der Block erscheint erst, wenn der Change angelegt ist. Stand nachtragen hängt einen neuen Bericht an, der Plan bleibt aus Zeitraum, Vorlage und Kosten.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-30">
+            <p class="log-meta">v0.2.30</p>
+            <h2 class="log-title">Hilfe und Bezug werden wieder gefragt</h2>
+            <p class="log-lead">
+              Nach der Übersicht kommen Bezug und ob du Hilfe brauchst. Die Antworten stehen in einem eigenen Block, nicht mehr in der Übersicht.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Anlegen</h3>
+                <p>Zuerst Bezug, dann Hilfe. Sagst du Ja, kommt die Frage, wobei genau.</p>
+              </div>
+              <div>
+                <h3>Ticket</h3>
+                <p>Der Block Hilfe und Bezug sitzt unter der Übersicht.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-28">
+            <p class="log-meta">v0.2.28</p>
+            <h2 class="log-title">Bestehende Tickets haben unten In Jira öffnen</h2>
+            <p class="log-lead">
+              Öffnest du einen Change, sitzt In Jira öffnen ganz unten unter den Kommentaren.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Der Knopf öffnet den Change in Jira. Weiteren Change anlegen bleibt nur nach dem Anlegen.</p>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div class="log-lane">
+          <h2 class="log-lane-title">Qualitätsupdates</h2>
+          <p class="log-lane-lead">Was ruhiger, klarer oder zuverlässiger geworden ist.</p>
+
+          <section class="log-release" id="v0-3-51">
+            <p class="log-meta">v0.3.51</p>
+            <h2 class="log-title">In Jira öffnen führt zur Ticketseite</h2>
+            <p class="log-lead">
+              Der Knopf und die SCSCM-Nummer öffnen das Ticket in Jira. Vorher landeten sie auf der Schnittstelle.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>In Jira öffnen und die Nummer oben gehen zu jira.schwarz.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-48">
+            <p class="log-meta">v0.3.48</p>
+            <h2 class="log-title">Die Auswertungstabelle hat mehr Luft</h2>
+            <p class="log-lead">
+              Namen und Zahlen sitzen nicht mehr am Rand der weißen Fläche. Zeilen und Spaltenköpfe haben gleichmäßigen Abstand.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Tabelle</h3>
+                <p>Links und rechts bleibt Platz, die Zeilen sind etwas höher.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-47">
+            <p class="log-meta">v0.3.47</p>
+            <h2 class="log-title">Unter dem Namen steht nichts mehr</h2>
+            <p class="log-lead">
+              In der Auswertung steht bei jeder Person nur noch der Name. Der Zusatz wie offen oder freigegeben ist weg.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Tabelle</h3>
+                <p>Die Status-Zahlen bleiben in den Spalten daneben.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-46">
+            <p class="log-meta">v0.3.46</p>
+            <h2 class="log-title">Auswertung ohne Kästen</h2>
+            <p class="log-lead">
+              Oben stehen nur noch die drei Zahlen, ohne Karten. Unter den Summen gibt es keine Balken mehr.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Kennzahlen</h3>
+                <p>Gesamt, Projekte und Schnitt stehen frei nebeneinander.</p>
+              </div>
+              <div>
+                <h3>Tabelle</h3>
+                <p>Die Gesamt-Spalte zeigt nur die Zahl.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-45">
+            <p class="log-meta">v0.3.45</p>
+            <h2 class="log-title">Auswertung mit mehr Ruhe</h2>
+            <p class="log-lead">
+              Die Kennzahlen sitzen in hellen Karten, die Tabelle hat mehr Luft, und der Gesamt-Wert ist in Blau mit einem kurzen Balken für den Anteil.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Kennzahlen</h3>
+                <p>Gesamt-PT steht auf einem leichten Blau, die beiden anderen Zahlen daneben auf Weiß.</p>
+              </div>
+              <div>
+                <h3>Tabelle</h3>
+                <p>Zeilen haben mehr Abstand. Eine gewählte Person bleibt hellblau markiert.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-44">
+            <p class="log-meta">v0.3.44</p>
+            <h2 class="log-title">Auswertung lässt sich lesen</h2>
+            <p class="log-lead">
+              Die Tabelle sortiert nach Größe, blendet Nullen aus und zeigt am Gesamt-Wert, wer den größten Anteil hat. Ein Klick auf eine Person filtert die Changes darunter.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Sortieren</h3>
+                <p>Spaltenköpfe wechseln die Reihenfolge. Standard ist der größte Aufwand oben.</p>
+              </div>
+              <div>
+                <h3>Person</h3>
+                <p>Ein Klick auf den Namen zeigt nur deren Changes. Alle hebt die Auswahl auf.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-41">
+            <p class="log-meta">v0.3.41</p>
+            <h2 class="log-title">Kein Jira-Update ohne echte Änderung</h2>
+            <p class="log-lead">
+              Speichern im Steckbrief oder Aufwand-Sheet schreibt nur noch nach Jira, wenn sich Werte wirklich geändert haben — und eine Pause oder zu viele Updates hintereinander stoppen alle Feld-Updates.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Speichern</h3>
+                <p>Unveränderte Felder erzeugen keine Benachrichtigungsmail mehr.</p>
+              </div>
+              <div>
+                <h3>Schutz</h3>
+                <p>Die Notbremse und das Update-Limit gelten für jedes Feld-Update nach Jira, nicht nur für die Beschreibung beim Sync.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-37">
+            <p class="log-meta">v0.3.37</p>
+            <h2 class="log-title">Kein Massen-Schreiben nach Jira</h2>
+            <p class="log-lead">
+              Beim Sync schreibt CRITR die Beschreibung nicht mehr bei jedem Ticket nach Jira — nur bei Neuanlage oder fehlenden Links, und höchstens wenige Male in kurzer Zeit.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Sync</h3>
+                <p>Bestehende Tickets mit vollständigen CRITR-Links bleiben unangetastet; Kommentar-Sync erzeugt keine Beschreibungs-Mails.</p>
+              </div>
+              <div>
+                <h3>Schutz</h3>
+                <p>Stehen zu viele Beschreibungs-Updates kurz hintereinander an, stoppt CRITR weitere — damit keine Mail-Flut entsteht.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-36">
+            <p class="log-meta">v0.3.36</p>
+            <h2 class="log-title">Jira nur bei echter Änderung</h2>
+            <p class="log-lead">
+              CRITR schreibt die Ticket-Beschreibung nicht mehr bei jedem Sync nach Jira — nur wenn sich Text oder Links wirklich geändert haben.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Sync</h3>
+                <p>Unveränderte Beschreibungen erzeugen kein Jira-Update und damit keine Benachrichtigungsmails.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-35">
+            <p class="log-meta">v0.3.35</p>
+            <h2 class="log-title">Stand in der Liste und im Ticket sind gleich</h2>
+            <p class="log-lead">
+              Was du in der Übersicht als Stand siehst, ist derselbe Text wie im Ticket unter Status — nicht mehr zwei abweichende Kurzfassungen.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Übersicht</h3>
+                <p>Die Stand-Zeile kommt aus dem Status-Text im Ticket (erster Satz).</p>
+              </div>
+              <div>
+                <h3>Ticket</h3>
+                <p>Unter Status steht der volle Ablauf; Liste und Ticket passen zusammen.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-34">
+            <p class="log-meta">v0.3.34</p>
+            <h2 class="log-title">Stand folgt dem Jira-Status</h2>
+            <p class="log-lead">
+              Quality Gate, Freigabe und Umsetzung aus Jira landen nicht mehr fälschlich als „Steckbrief / keine Rückmeldung“.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status</h3>
+                <p>Jira-Status wie Quality Gate, Approval Required und In Progress werden auf den passenden CRITR-Stand gemappt.</p>
+              </div>
+              <div>
+                <h3>Stand-Text</h3>
+                <p>Ohne Kommentare beschreibt der Text den Workflow oder den Steckbrief — nicht mehr „Steht auf Steckbrief, noch keine Rückmeldung“, wenn schon ein anderer Status gilt.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-33">
+            <p class="log-meta">v0.3.33</p>
+            <h2 class="log-title">Chat ohne „Neuen Change anlegen“</h2>
+            <p class="log-lead">
+              Im Chat-Reiter ist der Knopf „Neuen Change anlegen“ unten nicht mehr zu sehen.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Chat</h3>
+                <p>Unten bleibt der Bereich leer — Anlegen geht weiter über die anderen Ansichten.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-32">
+            <p class="log-meta">v0.3.32</p>
+            <h2 class="log-title">Drei funktionierende CRITR-Links in jedem Ticket</h2>
+            <p class="log-lead">
+              In der Jira-Beschreibung stehen immer Ticket-, Status-update- und Aufwand-Sheet-Link — mit der richtigen Adresse.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Beschreibung</h3>
+                <p>Fehlende Aufwand-Sheets werden angelegt. Alte oder kaputte Links werden ersetzt.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-31">
+            <p class="log-meta">v0.3.31</p>
+            <h2 class="log-title">Jira-Beschreibung nur Text und Links</h2>
+            <p class="log-lead">
+              In der Jira-Beschreibung stehen nur noch die eigentliche Beschreibung und die CRITR-Links — keine zusätzlichen Feldzeilen.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Beschreibung</h3>
+                <p>Freitext plus Ticket-, Status-update- und Aufwand-Sheet-Link.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-30">
+            <p class="log-meta">v0.3.30</p>
+            <h2 class="log-title">CRITR-Links in Jira funktionieren wieder</h2>
+            <p class="log-lead">
+              Status-update-Links in der Jira-Beschreibung brechen nicht mehr ab — Ticket und Status update öffnen sich korrekt.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Beschreibung</h3>
+                <p>Die Links sind klickbar und führen ohne abgeschnittene Adresse nach CRITR.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-29">
+            <p class="log-meta">v0.3.29</p>
+            <h2 class="log-title">Aufwand-Sheet-Link in jeder Jira-Beschreibung</h2>
+            <p class="log-lead">
+              Sobald ein Aufwand-Sheet hinterlegt ist, steht der Link fest in der Jira-Beschreibung — zusammen mit Ticket- und Status-update-Link.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Beschreibung</h3>
+                <p>Beim Anlegen und Speichern wird der Aufwand-Sheet-Link mitgeschrieben und nicht mehr weggelassen.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-28">
+            <p class="log-meta">v0.3.28</p>
+            <h2 class="log-title">Sync und Beschreibung zuverlässiger</h2>
+            <p class="log-lead">
+              Alte Meta-Zeilen verschwinden beim nächsten Speichern wirklich, Beschreibungs-Zeilen verdoppeln sich nicht mehr, und ein laufendes Bearbeiten wird nicht mehr durch Nachladen überschrieben.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Beschreibung</h3>
+                <p>Beim Speichern wird die Jira-Beschreibung sauber neu aufgebaut — ohne doppelte Einträge.</p>
+              </div>
+              <div>
+                <h3>Ticket</h3>
+                <p>Während du ein Feld tippst, bleibt der Text erhalten.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-27">
+            <p class="log-meta">v0.3.27</p>
+            <h2 class="log-title">Beschreibung ohne Steckbrief-Meta</h2>
+            <p class="log-lead">
+              In der Jira-Beschreibung stehen Steckbrief-Name, interne Referenz und Betrieb-PT-Plan nicht mehr.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Beschreibung</h3>
+                <p>Nur noch der eigentliche Text — ohne diese Zusatzzeilen.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-26">
+            <p class="log-meta">v0.3.26</p>
+            <h2 class="log-title">Gesamtsumme landet in Jira Kosten</h2>
+            <p class="log-lead">
+              Die Gesamtsumme aus der Kalkulation wird ins Jira-Feld Costs/Kosten geschrieben — nicht mehr in die Beschreibung.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Kosten</h3>
+                <p>Nach dem Ausfüllen der Aufwandstabelle steht die Summe im Feld Kosten in Jira.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-25">
+            <p class="log-meta">v0.3.25</p>
+            <h2 class="log-title">Solution Category und Solution entfallen</h2>
+            <p class="log-lead">
+              Beim Anlegen und im Ticket werden Solution Category und Solution nicht mehr gefragt oder angezeigt.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Steckbrief</h3>
+                <p>Die beiden Felder und der Solution-Block sind entfernt.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-24">
+            <p class="log-meta">v0.3.24</p>
+            <h2 class="log-title">Personen per Namen finden</h2>
+            <p class="log-lead">
+              Die Personensuche findet Leute über den Anzeigenamen — auch wenn sie nicht als Bearbeiter im Projekt stehen, zum Beispiel Daniel Rein.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Suche</h3>
+                <p>Vor- und Nachname reichen; Treffer erscheinen in der Auswahlliste.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-23">
+            <p class="log-meta">v0.3.23</p>
+            <h2 class="log-title">Unterstützung klarer gefragt</h2>
+            <p class="log-lead">
+              Die Frage lautet jetzt: Benötigst du Unterstützung bei dem Projekt? Wenn ja welche? Als Auswahl stehen Projektmanagement, Methodisch und Personell.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Anlegen</h3>
+                <p>Im Steckbrief und im Chat gelten dieselbe Frage und dieselben drei Optionen.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-22">
+            <p class="log-meta">v0.3.22</p>
+            <h2 class="log-title">Change anlegen auch im Chat</h2>
+            <p class="log-lead">
+              In der Chat-Ansicht bleibt „Neuen Change anlegen“ sichtbar — du musst nicht erst zur Liste wechseln.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Chat</h3>
+                <p>Der Button sitzt unten wie in Liste und Board.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-21">
+            <p class="log-meta">v0.3.21</p>
+            <h2 class="log-title">Übersicht holt Jira-Felder wieder nach</h2>
+            <p class="log-lead">
+              Beim Öffnen eines Tickets lädt CRITR Begründung, Nutzen, Lösung und Risiken wieder aus Jira nach. Änderungen in der Übersicht gehen sofort nach Jira.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Öffnen</h3>
+                <p>Der Jira-Abgleich startet zuverlässig — auch wenn das Ticket schon lokal gespeichert ist.</p>
+              </div>
+              <div>
+                <h3>Bearbeiten</h3>
+                <p>Edits in der Übersicht werden sofort synchronisiert; ungültige Zusatzfelder blockieren den Rest nicht mehr.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-20">
+            <p class="log-meta">v0.3.20</p>
+            <h2 class="log-title">Öffentliche CRITR-Links in Jira</h2>
+            <p class="log-lead">
+              In Jira-Beschreibungen stehen jetzt die echten CRITR-Links statt localhost. Bestehende Tickets wurden korrigiert.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Beschreibung</h3>
+                <p>Ticket- und Status-update-Links führen auf https://scscm.stackit.gg.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-17">
+            <p class="log-meta">v0.3.17</p>
+            <h2 class="log-title">Liste nach Erstellungsdatum</h2>
+            <p class="log-lead">
+              Die Ticketliste und das Board sortieren nach dem Erstellungsdatum — neueste Changes zuerst.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Hub</h3>
+                <p>Die Reihenfolge folgt dem Anlagedatum statt der letzten Änderung.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-16">
+            <p class="log-meta">v0.3.16</p>
+            <h2 class="log-title">Status update in der Jira-Beschreibung</h2>
+            <p class="log-lead">
+              Neue Changes bekommen in der Jira-Beschreibung den Link zum CRITR-Ticket und zur Status-update-Seite — mit der öffentlichen Adresse.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Beschreibung</h3>
+                <p>Unten stehen „CRITR Ticket“ und „CRITR Status update“ als klickbare Links.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-15">
+            <p class="log-meta">v0.3.15</p>
+            <h2 class="log-title">Jira-Anlage mit Pflichtfeldern</h2>
+            <p class="log-lead">
+              Neue Changes setzen den Gesamtprojektleiter zuverlässig und schicken keine ungültigen Daten mehr. Schlägt Jira fehl, siehst du den Grund statt „Sync dauert zu lange“.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Sync</h3>
+                <p>Fehlt die Change-Leitung, übernimmt der Autor. Ungültige Datumsangaben werden weggelassen.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-13">
+            <p class="log-meta">v0.3.13</p>
+            <h2 class="log-title">Chat startet nach Session-Verlust neu</h2>
+            <p class="log-lead">
+              Wenn die gespeicherte Chat-Session nicht mehr existiert, legt CRITR still eine neue an — statt „Session unbekannt“ zu zeigen.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Chat</h3>
+                <p>Deine Nachricht wird mit der neuen Session erneut gesendet.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-12">
+            <p class="log-meta">v0.3.12</p>
+            <h2 class="log-title">Sync-Nachzug und Chat-Anlage ohne Doppelarbeit</h2>
+            <p class="log-lead">
+              Beim Ticket-Öffnen starten nicht mehr mehrere Jira-Nachzüge parallel. Der Create-Chat legt erst an, wenn die Fragen durch sind.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Kommentare werden nachgezogen, ohne den Sync-Hinweis mehrfach auszulösen.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-3-10">
+            <p class="log-meta">v0.3.10</p>
+            <h2 class="log-title">Jira-Sync nach dem Anlegen sichtbar</h2>
+            <p class="log-lead">
+              Nach dem Erstellen siehst du die Jira-Nummer, sobald der Sync durch ist — nicht mehr nur die lokale Nummer ohne Hinweis.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Anlegen</h3>
+                <p>Chat und Ticket zeigen den Sync-Stand. Die Nummer erscheint, wenn Jira geantwortet hat.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-3-9">
+            <p class="log-meta">v0.3.9</p>
+            <h2 class="log-title">Freitext nur noch im Status update</h2>
+            <p class="log-lead">
+              Changebeschreibung, Entscheidungen, Risiken und Nächste Schritte stehen nicht mehr oben in der Ticket-Übersicht.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Übersicht</h3>
+                <p>Dort bleiben Status-Freitext und die übrigen Ticketblöcke. Den Stand-Freitext bearbeitest du über Status update.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-3-8">
+            <p class="log-meta">v0.3.8</p>
+            <h2 class="log-title">Sync bleibt durchgängig konsistent</h2>
+            <p class="log-lead">
+              Jira-Abgleich, Outbox und Ticket-Nachzug laufen mit Retries und Wiederaufnahme. Was lokal und in Jira steht, zieht zuverlässig nach.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Hintergrund</h3>
+                <p>Fehlgeschlagene Jobs werden erneut versucht. Kurzlebige Claims und Nachladen im Ticket halten den Stand aktuell.</p>
+              </div>
+              <div>
+                <h3>Öffnen</h3>
+                <p>Nach dem Öffnen erscheinen Kommentare und Anhänge nach dem Abgleich von selbst.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-3-7">
+            <p class="log-meta">v0.3.7</p>
+            <h2 class="log-title">Plan und Ist nur noch im Status update</h2>
+            <p class="log-lead">
+              In der Ticket-Übersicht stehen Termine und Kosten als Plan/Ist-Tabelle nicht mehr. Der Freitext zum Stand bleibt.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Übersicht</h3>
+                <p>Plan und Ist bearbeitest du weiter über Status update.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-3-6">
+            <p class="log-meta">v0.3.6</p>
+            <h2 class="log-title">Tickets öffnen ohne Warten</h2>
+            <p class="log-lead">
+              Ein Ticket erscheint sofort mit dem lokalen Stand. Der Jira-Abgleich läuft danach im Hintergrund.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Öffnen</h3>
+                <p>Hub und Ticket bleiben bedienbar, auch wenn Jira gerade nachzieht.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-3-5">
+            <p class="log-meta">v0.3.5</p>
+            <h2 class="log-title">Seite bleibt erreichbar</h2>
+            <p class="log-lead">
+              Hintergrund-Sync mit Jira blockiert die Oberfläche nicht mehr. Die Seite bleibt währenddessen bedienbar.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Hintergrund</h3>
+                <p>Kommentar- und Outbox-Sync laufen neben der Anfrage, nicht davor.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-3-4">
+            <p class="log-meta">v0.3.4</p>
+            <h2 class="log-title">Jira-Sync läuft wieder durch</h2>
+            <p class="log-lead">
+              Neue Changes und Feldänderungen gehen wieder zuverlässig nach Jira. Die Warteschlange bleibt nicht mehr an der Zeitangabe hängen.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Sync</h3>
+                <p>Anlegen und Aktualisieren werden wieder abgearbeitet, ohne die Seite zu blockieren.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-3-3">
+            <p class="log-meta">v0.3.3</p>
+            <h2 class="log-title">Changes als Label</h2>
+            <p class="log-lead">
+              In der Hub-Leiste sitzen Changes, Chat, Liste und Board auf einer Höhe. Changes ist nur noch ein ruhiges Label — nicht anklickbar.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Leiste</h3>
+                <p>Chat, Liste und Board bleiben die Umschalter.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-3-2">
+            <p class="log-meta">v0.3.2</p>
+            <h2 class="log-title">Termine und Kosten immer sichtbar</h2>
+            <p class="log-lead">
+              Auf der Status-update-Seite stehen Termine und Kosten sofort als Tabelle da — auch wenn der Browser älter ist. Status update öffnet in derselben Seite.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Tabelle</h3>
+                <p>Plan und Ist für Termine und Kosten sind fest im Blatt, nicht nur per Skript.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-3-1">
+            <p class="log-meta">v0.3.1</p>
+            <h2 class="log-title">Termine und Kosten wieder als Tabelle</h2>
+            <p class="log-lead">
+              Plan und Ist für Termine und Kosten erscheinen wieder lesbar — ohne kaputtes Raster-Layout.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Im Ticket und Status update</h3>
+                <p>Zwei klare Blöcke mit Spalten Plan und Ist.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-100">
+            <p class="log-meta">v0.2.100</p>
+            <h2 class="log-title">Plan und Ist wieder sichtbar</h2>
+            <p class="log-lead">
+              Die Plan/Ist-Tabelle sitzt als eigener Block unter dem Ticketkopf — nicht mehr versteckt im Status-Kasten.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Im Ticket</h3>
+                <p>Direkt unter Status: Tabelle plus Freitextfelder.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-99">
+            <p class="log-meta">v0.2.99</p>
+            <h2 class="log-title">Plan und Ist besser lesbar</h2>
+            <p class="log-lead">
+              Die Spalten Plan und Ist im Ticket sind größer. Speichern der Status-Felder ist robuster abgesichert.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Tabelle</h3>
+                <p>Überschriften Plan und Ist fallen im Ticket stärker auf.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-98">
+            <p class="log-meta">v0.2.98</p>
+            <h2 class="log-title">Plan und Ist wieder im Ticket</h2>
+            <p class="log-lead">
+              Unter Status siehst du wieder die Plan/Ist-Tabelle und die Freitextfelder. Über „Status update“ öffnest du Verlauf und die große Ansicht.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Im Ticket</h3>
+                <p>Plan und Ist, Changebeschreibung, Entscheidungen, Risiken, Nächste Schritte.</p>
+              </div>
+              <div>
+                <h3>Status update</h3>
+                <p>Volle Seite mit Snapshot-Verlauf rechts.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-97">
+            <p class="log-meta">v0.2.97</p>
+            <h2 class="log-title">Hinweis „mit KI aufgewertet“</h2>
+            <p class="log-lead">
+              In der Beschreibung steht am Ende der kurze Satz, dass der Change mit KI aufgewertet wurde — nach Chat-Anlage und nach „mit KI aufwerten“.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Beschreibung</h3>
+                <p>Der Hinweis wird nur einmal angehängt und nicht verdoppelt.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-78">
+            <p class="log-meta">v0.2.78</p>
+            <h2 class="log-title">Workspace-Chat wie Liste und Board</h2>
+            <p class="log-lead">
+              Neben Liste und Board gibt es Chat — Fragen zu Changes, ohne einen neuen anzulegen.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Chat-Ansicht</h3>
+                <p>Im Hub unter Chat fragst du nach Status, offenen Tickets oder einer Referenz.</p>
+              </div>
+              <div>
+                <h3>Links öffnen</h3>
+                <p>Treffer öffnen das Ticket direkt im Workspace.</p>
+              </div>
+              <div>
+                <h3>Kein Anlegen hier</h3>
+                <p>Neue Changes bleiben bei „Neuen Change anlegen“.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-77">
+            <p class="log-meta">v0.2.77</p>
+            <h2 class="log-title">Intake kommt nicht mehr ins Stocken</h2>
+            <p class="log-lead">
+              Tags, Termine und Ticket-Wechsel lassen dich weiter — auch wenn Jira oder Popups streiken.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Stichwörter</h3>
+                <p>Ohne Treffer oder ohne Auswahl geht es mit „Ohne Tags weiter“ weiter.</p>
+              </div>
+              <div>
+                <h3>Termine</h3>
+                <p>Start und Ende kannst du mit „Weiß ich noch nicht“ überspringen.</p>
+              </div>
+              <div>
+                <h3>Ticket öffnen</h3>
+                <p>Während eines neuen Changes fragt CRITR, ob der Entwurf verworfen werden soll.</p>
+              </div>
+              <div>
+                <h3>Kalkulation</h3>
+                <p>Ist das Popup blockiert, öffnest du die Vorlage per Klick im neuen Tab.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-76">
+            <p class="log-meta">v0.2.76</p>
+            <h2 class="log-title">Die Kalkulation hat keinen Hinweis mehr</h2>
+            <p class="log-lead">
+              Unter dem Namen steht direkt die Tabelle.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Kostenkalkulation</h3>
+                <p>Speichern übernimmt die Summen weiterhin ins Ticket.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-75">
+            <p class="log-meta">v0.2.75</p>
+            <h2 class="log-title">Die Kalkulation sieht aus wie das Status update</h2>
+            <p class="log-lead">
+              Weiße Seite, der Name groß in der Mitte, Speichern und Zurück oben rechts.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Kostenkalkulation</h3>
+                <p>Darunter der kurze Satz, dann die Tabelle.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-74">
+            <p class="log-meta">v0.2.74</p>
+            <h2 class="log-title">Oben steht keine Ampel mehr</h2>
+            <p class="log-lead">
+              Überzogen, Im Plan und die anderen Zustände stehen nur noch bei Termine und Kosten.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Unter der Überschrift bleibt der Satz zum Stand.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-73">
+            <p class="log-meta">v0.2.73</p>
+            <h2 class="log-title">Speichern sitzt oben</h2>
+            <p class="log-lead">
+              Der Knopf ist oben rechts, neben Zurück, und hebt sich ab.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Zurück bleibt der leise Text daneben.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-72">
+            <p class="log-meta">v0.2.72</p>
+            <h2 class="log-title">Zurück führt zum Ticket</h2>
+            <p class="log-lead">
+              Oben rechts steht Zurück. Es schließt das Fenster und du bist wieder beim Change.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Ohne Fenster öffnet Zurück das Ticket direkt.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-71">
+            <p class="log-meta">v0.2.71</p>
+            <h2 class="log-title">Zustand beim Text, Speichern am Ende</h2>
+            <p class="log-lead">
+              Die Ampel sitzt über dem Satz zum Stand. Speichern steht unter den letzten Feldern.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Die Überschrift bleibt nur der Name des Changes.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-70">
+            <p class="log-meta">v0.2.70</p>
+            <h2 class="log-title">Die Überschrift ist wie im Ticket</h2>
+            <p class="log-lead">
+              Oben steht leise Status update, darunter der Name des Changes groß und mittig.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Darunter sitzen Zustand und Speichern, dann der Satz zum Stand.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-69">
+            <p class="log-meta">v0.2.69</p>
+            <h2 class="log-title">Der Kopf ist wie im Ticket</h2>
+            <p class="log-lead">
+              Der Name ist leise, Speichern ist ein Text, der Satz zum Stand hat dieselbe Schrift wie im Ticket.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Der Zustand bleibt die farbige Ampel.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-68">
+            <p class="log-meta">v0.2.68</p>
+            <h2 class="log-title">Oben bleibt nur der Name</h2>
+            <p class="log-lead">
+              Die große Überschrift ist weg. Daneben stehen Zustand und Speichern, darunter der Satz zum Stand.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Danach kommen direkt Termine und Kosten.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-67">
+            <p class="log-meta">v0.2.67</p>
+            <h2 class="log-title">Die Änderung steht am Snapshot</h2>
+            <p class="log-lead">
+              Unter jedem Datum im Verlauf steht, was sich gegenüber dem vorherigen Stand geändert hat.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Aktueller Stand zeigt den Unterschied zum letzten Snapshot. Ohne Änderung bleibt die Zeile leer.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-66">
+            <p class="log-meta">v0.2.66</p>
+            <h2 class="log-title">Entscheidungen lassen sich ändern</h2>
+            <p class="log-lead">
+              Das Feld Entscheidungen bleibt beschreibbar. Der Text bleibt stehen, bis du speicherst.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Speichern nimmt den Text in den neuen Snapshot auf.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-65">
+            <p class="log-meta">v0.2.65</p>
+            <h2 class="log-title">Die Änderung steht unter dem Statustext</h2>
+            <p class="log-lead">
+              Was sich seit dem letzten Snapshot geändert hat, steht direkt unter dem Satz zum Stand.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Der Verlauf rechts bleibt die Liste der Tage.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-63">
+            <p class="log-meta">v0.2.63</p>
+            <h2 class="log-title">Unten steht, dass das Effort Sheet offen ist</h2>
+            <p class="log-lead">
+              Solange das Fenster offen ist, steht unten: Bitte das Effort Sheet ausfüllen.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Anlegen</h3>
+                <p>Der Hinweis verschwindet, sobald du das Fenster schließt.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-62">
+            <p class="log-meta">v0.2.62</p>
+            <h2 class="log-title">Das Status update sieht aus wie das Ticket</h2>
+            <p class="log-lead">
+              Weiße Fläche, dieselbe Breite und dieselben Überschriften wie im Ticket.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Kein extra Kasten. Termine, Kosten und der Text stehen direkt auf der Seite, der Verlauf rechts.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-61">
+            <p class="log-meta">v0.2.61</p>
+            <h2 class="log-title">Plan und Ist stehen in einer Tabelle</h2>
+            <p class="log-lead">
+              Termine und Kosten liegen untereinander. Jede Zeile zeigt den Namen, den Plan und das Ist.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Darunter folgen Entscheidungen, Risiken und nächste Schritte. Der Verlauf bleibt rechts.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-60">
+            <p class="log-meta">v0.2.60</p>
+            <h2 class="log-title">Das Status update ist ein ruhiges Blatt</h2>
+            <p class="log-lead">
+              Termine, Kosten und was jetzt gilt liegen auf einer Fläche. Der Verlauf steht daneben, ohne Kasten.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Oben Zustand und Speichern, darunter der Satz zum Stand, dann Plan gegen Ist.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-59">
+            <p class="log-meta">v0.2.59</p>
+            <h2 class="log-title">Der Status folgt den Zahlen</h2>
+            <p class="log-lead">
+              Änderst du Plan oder Ist, springt der Zustand auf Im Plan, Im Blick behalten oder Überzogen.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Liegt das Ist über dem Plan, wird es Überzogen. Ohne Ist bleibt es Im Blick behalten. Die Farbe am Ticket zieht mit.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-58">
+            <p class="log-meta">v0.2.58</p>
+            <h2 class="log-title">Jedes Speichern legt einen Snapshot an</h2>
+            <p class="log-lead">
+              Speichern im Status update erzeugt jedes Mal einen neuen Eintrag im Verlauf.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Der Stand wird festgehalten, auch wenn sich seit dem letzten Mal nichts geändert hat.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-56">
+            <p class="log-meta">v0.2.56</p>
+            <h2 class="log-title">Status update sitzt an der Stelle der Ampel</h2>
+            <p class="log-lead">
+              Der Knopf Status update ersetzt Im Plan und übernimmt Form und Farbe des aktuellen Stands.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Die Farbe wechselt mit dem Status. Ein Klick öffnet das Status update.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-54">
+            <p class="log-meta">v0.2.54</p>
+            <h2 class="log-title">Neben der Art steht kein Stift mehr</h2>
+            <p class="log-lead">
+              IT Request und Change Request stehen ohne das kleine Stift-Symbol daneben.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Die Art lässt sich weiter anklicken und wechseln.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-50">
+            <p class="log-meta">v0.2.50</p>
+            <h2 class="log-title">Gar keiner im Change-Team</h2>
+            <p class="log-lead">
+              Bei den Personen, die dich unterstützen, gibt es die Auswahl Gar keiner.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Gar keiner lässt das Team leer. Es wird niemand erfunden und nichts nach Jira geschrieben.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-49">
+            <p class="log-meta">v0.2.49</p>
+            <h2 class="log-title">Status update ist eine eigene Seite</h2>
+            <p class="log-lead">
+              Plan, Ist, Entscheidungen, Risiken und nächste Schritte liegen nicht mehr im Ticket, sondern auf einer eigenen Seite.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Unter dem Statustext öffnet Status update ein Fenster, ähnlich der Kostenkalkulation.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-48">
+            <p class="log-meta">v0.2.48</p>
+            <h2 class="log-title">Plan und Ist liegt auf einer Linie</h2>
+            <p class="log-lead">
+              Termine, Kosten, Plan und Ist stehen zeilenweise nebeneinander. Die Werte rechts schließen bündig ab.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Start liegt auf einer Höhe mit Termine, die Ist-Felder mit dem Plan daneben.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-47">
+            <p class="log-meta">v0.2.47</p>
+            <h2 class="log-title">Termine ohne extra Zeile</h2>
+            <p class="log-lead">
+              Bei Termine stehen wieder nur Start, Ende und die geplanten Aufwände. Der Knopf Zeile ist weg.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Plan und Ist zeigt die Termine wie zuvor, ohne weitere Zeile zum Anlegen.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-46">
+            <p class="log-meta">v0.2.46</p>
+            <h2 class="log-title">Risiken gehören zum aktuellen Stand</h2>
+            <p class="log-lead">
+              Das Feld schätzt, was am jetzigen Stand schiefgehen kann. Die bekannten Risiken im Ticket bleiben davon getrennt.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Gibt es zum Stand kein Risiko, steht dort: Keine aktuellen Risiken.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-45">
+            <p class="log-meta">v0.2.45</p>
+            <h2 class="log-title">Bei Termine eine Zeile mehr</h2>
+            <p class="log-lead">
+              Unter Termine hängt eine Zeile. Damit kommt ein weiterer Termin mit Plan und Ist dazu.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Plan und Ist aufklappen, bei Termine auf Zeile. Name, Plan und Ist tippen, dann ist die Zeile gespeichert.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-44">
+            <p class="log-meta">v0.2.44</p>
+            <h2 class="log-title">Der Status sagt, wo es steht</h2>
+            <p class="log-lead">
+              Der Satz fasst die letzten Kommentare zusammen und nennt den aktuellen Stand in eigenen Worten.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Ein zurückgenommener Abbruch bleibt nicht als Abbruch stehen. Was noch offen ist, steht im selben Satz.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-43">
+            <p class="log-meta">v0.2.43</p>
+            <h2 class="log-title">Alles liegt in Plan und Ist</h2>
+            <p class="log-lead">
+              Entscheidungen, Risiken und nächste Schritte klappen mit der Tabelle auf. Zugeklappt bleibt nur die Zeile.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Unter Status siehst du Plan und Ist. Die drei Felder kommen erst beim Aufklappen.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-42">
+            <p class="log-meta">v0.2.42</p>
+            <h2 class="log-title">Nächste Schritte nennen den offenen Punkt</h2>
+            <p class="log-lead">
+              Im Feld steht, was als Nächstes zu tun ist. Der Hinweistext ist weg.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Steht im letzten Kommentar, dass noch ein Teammitglied fehlt, steht das auch bei den nächsten Schritten.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-41">
+            <p class="log-meta">v0.2.41</p>
+            <h2 class="log-title">Nächste Schritte stehen im Feld</h2>
+            <p class="log-lead">
+              Das Feld nennt den offenen Punkt aus dem Ticket. Die drei Texte wachsen mit dem Inhalt.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Entscheidungen, Risiken und nächste Schritte haben keinen Ziehpunkt mehr. Die Höhe folgt dem Text.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-40">
+            <p class="log-meta">v0.2.40</p>
+            <h2 class="log-title">Ein neuer Kommentar setzt den Stand</h2>
+            <p class="log-lead">
+              Der Satz oben folgt dem Kommentar, den du gerade geschrieben hast. Nimmt er einen Abbruch zurück, gilt das.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Steht im letzten Kommentar, dass es weitergeht und noch jemand fehlt, sagt der Status das.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-39">
+            <p class="log-meta">v0.2.39</p>
+            <h2 class="log-title">Der Statustext folgt dem letzten Stand</h2>
+            <p class="log-lead">
+              Der Satz nennt, was jetzt gilt. Ein älterer Plan, den ein neuer Kommentar aufhebt, fällt weg. Nichts steht doppelt.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Ist der letzte Stand ein Abbruch, sagt der Text das. Ein früherer Start bleibt draußen.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-38">
+            <p class="log-meta">v0.2.38</p>
+            <h2 class="log-title">Plan und Ist bleibt zugeklappt</h2>
+            <p class="log-lead">
+              Die Tabelle ist eine Zeile unter dem Statustext. Aufklappen zeigt Plan und Ist, leiser gesetzt.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Entscheidungen, Risiken und nächste Schritte bleiben sichtbar. Die Zahlen kommen erst auf Klick.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-37">
+            <p class="log-meta">v0.2.37</p>
+            <h2 class="log-title">Der farbige Strich bleibt am Statustext</h2>
+            <p class="log-lead">
+              Der Balken sitzt nur neben Status und dem Satz darunter. Tabelle, Entscheidungen und Risiken laufen ohne Strich.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Die Farbe folgt weiter dem Status, hört aber über der Tabelle auf.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-36">
+            <p class="log-meta">v0.2.36</p>
+            <h2 class="log-title">Den Stand änderst du in der Tabelle</h2>
+            <p class="log-lead">
+              Ist-Werte tippst du direkt in die Spalte. Eine Begründung schreibst du daneben. Sobald du das Feld verlässt, ist der Stand gespeichert.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Kein extra Formular mehr. Die Ampel folgt den Zahlen.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-34">
+            <p class="log-meta">v0.2.34</p>
+            <h2 class="log-title">Der Statustext steht über der Tabelle</h2>
+            <p class="log-lead">
+              Zuerst der Statustext, dann etwas Luft, dann Plan und Ist. Die Tabelle ist ruhiger gesetzt, die Werte etwas kräftiger.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Der Satz zum Status bleibt oben. Termine und Kosten folgen darunter.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-33">
+            <p class="log-meta">v0.2.33</p>
+            <h2 class="log-title">Die Stand-Tabelle sitzt unter Status</h2>
+            <p class="log-lead">
+              Plan, Ist und Begründung liegen direkt unter dem Status, in derselben Schrift und mit denselben Ampel-Farben.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Keine eigene Karte mehr unter der Übersicht. Termine und Kosten stehen in der Status-Fläche.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-31">
+            <p class="log-meta">v0.2.31</p>
+            <h2 class="log-title">Status und Ablauf bleiben aus der Jira-Beschreibung</h2>
+            <p class="log-lead">
+              Beim Anlegen in Jira hängt der Stand nicht mehr unter der Beschreibung. Status, Ablauf und die Kurzfassung bleiben im Ticket.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Jira</h3>
+                <p>Die Beschreibung behält den Text und die Felder ohne eigenes Jira-Feld. Status und Ablauf fehlen dort.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-29">
+            <p class="log-meta">v0.2.29</p>
+            <h2 class="log-title">Anhang, Jira-Knopf und offenes Ticket stimmen wieder</h2>
+            <p class="log-lead">
+              Am Ende kommt zuerst die Frage zum Anhang. In Jira Anlegen erst, wenn alle Angaben da sind. Bei einem bestehenden Change sitzt In Jira öffnen nur unten im Ticket, und nur wenn eine Jira-Adresse da ist.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Anlegen</h3>
+                <p>Ja oder Nein zum Anhang, danach der Knopf. Leere Pflichtfelder halten ihn zurück.</p>
+              </div>
+              <div>
+                <h3>Ticket</h3>
+                <p>Ein Knopf ganz unten. Die Leiste liegt nicht mehr darüber.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-27">
+            <p class="log-meta">v0.2.27</p>
+            <h2 class="log-title">Nach der letzten Angabe kommt wieder In Jira Anlegen</h2>
+            <p class="log-lead">
+              Wenn alles ausgefüllt ist, erscheint In Jira Anlegen unten im Ticket — wie früher. Die Frage zum Anhang hält den Knopf nicht mehr fest.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Anlegen</h3>
+                <p>Der Knopf sitzt wieder am Ende des Tickets. Anhang kannst du vorher noch hinzufügen, musst aber nicht.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-26">
+            <p class="log-meta">v0.2.26</p>
+            <h2 class="log-title">Kosten, Team und Solution stehen untereinander</h2>
+            <p class="log-lead">
+              Die drei Blöcke liegen wieder untereinander, nicht nebeneinander. Das Ticket bleibt in einer Spalte und zieht sich nicht mehr auseinander.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Ticket</h3>
+                <p>Zuerst Kosten, dann Team und Beteiligte, dann Solution — volle Breite, untereinander.</p>
+              </div>
+            </div>
+          </section>
+          <section class="log-release" id="v0-2-25">
+            <p class="log-meta">v0.2.25</p>
+            <h2 class="log-title">Funktions- und Qualitätsupdates stehen getrennt</h2>
+            <p class="log-lead">
+              Oben zwei Spalten: links Funktionsupdates, rechts Qualitätsupdates. Darunter jede Version von der aktuellen rückwärts.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Funktionsupdates</h3>
+                <p>Neue Abläufe und Flächen: Anlegen, Jira, Anhang, Solution, Stand, Kalkulation.</p>
+              </div>
+              <div>
+                <h3>Qualitätsupdates</h3>
+                <p>Korrekturen und Lesbarkeit: Leiste, Typografie, Breite, dass ein Entwurf nicht abbricht.</p>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <section class="log-release" id="v0-2-24">
+          <p class="log-meta">v0.2.24</p>
+          <h2 class="log-title">Ja beim Anhang öffnet sofort die Dateiauswahl</h2>
+          <p class="log-lead">
+            Wenn du beim Anlegen Ja zu einem Anhang sagst, geht direkt das Fenster zum Hochladen auf.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Anlegen</h3>
+              <p>Ja: Datei wählen. Nein: weiter ohne Datei, In Jira Anlegen bleibt.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-23">
+          <p class="log-meta">v0.2.23</p>
+          <h2 class="log-title">Solution steht in einer eigenen Spalte</h2>
+          <p class="log-lead">
+            Solution Category und Solution sitzen nicht mehr bei Team und Beteiligte. Sie haben einen eigenen Block darunter.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Ticket</h3>
+              <p>Kosten, Team, Solution — drei Blöcke. Team bleibt bei den Personen.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-22">
+          <p class="log-meta">v0.2.22</p>
+          <h2 class="log-title">Nach der letzten Angabe kommt wieder In Jira Anlegen</h2>
+          <p class="log-lead">
+            Wenn alle Felder ausgefüllt sind, sitzt In Jira Anlegen unten in der Leiste — wie früher. Die Frage zum Anhang blockiert den Knopf nicht mehr.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Abschluss</h3>
+              <p>Der Knopf erscheint, sobald die Angaben fertig sind. Anhang bleibt optional.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-21">
+          <p class="log-meta">v0.2.21</p>
+          <h2 class="log-title">Beim Anlegen gibt es kein Kommentarfeld</h2>
+          <p class="log-lead">
+            Solange du einen neuen Change ausfüllst, siehst du weder Kommentare noch das Feld zum Schreiben. Beides kommt erst, wenn du einen bestehenden Change öffnest.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Anlegen</h3>
+              <p>Kein Stand, keine Liste, kein Senden.</p>
+            </div>
+            <div>
+              <h3>Ticket</h3>
+              <p>Kommentare wie gewohnt, sobald der Change schon existiert.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-20">
+          <p class="log-meta">v0.2.20</p>
+          <h2 class="log-title">Im Ticket bleibt nur In Jira öffnen unten fest</h2>
+          <p class="log-lead">
+            Öffnest du einen bestehenden Change, sitzt In Jira öffnen unten fest. Weiteren Change anlegen erscheint nur, nachdem du gerade einen Change erstellt hast.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Ticket</h3>
+              <p>Die Leiste bleibt am unteren Rand. Kein zweiter Anlegen-Knopf.</p>
+            </div>
+            <div>
+              <h3>Anlegen</h3>
+              <p>Nach In Jira Anlegen kannst du einen weiteren Change starten.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-19">
+          <p class="log-meta">v0.2.19</p>
+          <h2 class="log-title">Die SCSCM-Nummer steht nur noch im Ticket</h2>
+          <p class="log-lead">
+            Öffnest du einen Change, siehst du die Nummer oben neben dem Typ. In Liste und Board im Workspace fehlt sie — dort bleiben Titel und Stand.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Ticket</h3>
+              <p>Oben die Jira-Nummer, klickbar wenn der Link da ist, daneben der Typ.</p>
+            </div>
+            <div>
+              <h3>Workspace</h3>
+              <p>Liste und Board zeigen keinen Schlüssel mehr.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-18">
+          <p class="log-meta">v0.2.18</p>
+          <h2 class="log-title">Die Nummer war kurz aus dem Ticket-Kopf</h2>
+          <p class="log-lead">
+            Die Jira-Nummer fehlte oben im Ticket. Das gilt nicht mehr — ab v0.2.19 steht sie wieder im Ticket und nicht in der Liste.
+          </p>
+        </section>
+
+        <section class="log-release" id="v0-2-17">
+          <p class="log-meta">v0.2.17</p>
+          <h2 class="log-title">Am Ende wieder in Jira anlegen — ohne Kommentare, mit Anhang-Frage</h2>
+          <p class="log-lead">
+            Wenn alle Fragen durch sind, liegt „In Jira Anlegen“ wieder unten in der Leiste. Der Change geht wie bisher nach Jira. Kommentare kommen erst nach der Anlage. Vorher fragt die Oberfläche noch nach einem Anhang — Nein reicht.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Abschluss</h3>
+              <p>Letzte Frage: Anhang hochladen? Ja öffnet die Dateien, Nein überspringt das. Danach der Jira-Button, dann der Abgleich.</p>
+            </div>
+            <div>
+              <h3>Kommentare</h3>
+              <p>Während du anlegst, gibt es weder Stand noch Kommentarfeld. Beides erscheint erst bei einem bestehenden Change.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-16">
+          <p class="log-meta">v0.2.16</p>
+          <h2 class="log-title">Anlegen bricht nicht mehr zu einem anderen Change ab</h2>
+          <p class="log-lead">
+            Solange du einen neuen Change ausfüllst, bleibt genau dieser Entwurf offen. Ein anderes Ticket kann ihn nicht mehr überschreiben.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Tastatur</h3>
+              <p>j und k wechseln erst wieder Tickets, wenn du einen bestehenden Change geöffnet hast — nicht mitten in der Anlage.</p>
+            </div>
+            <div>
+              <h3>Wechsel</h3>
+              <p>Liste, Board und hintere Aufrufe öffnen keinen anderen Change, bis du die Anlage verlässt.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-15">
+          <p class="log-meta">v0.2.15</p>
+          <h2 class="log-title">Das Board liest sich wie die Liste</h2>
+          <p class="log-lead">
+            Die Spalten haben mehr Luft. Auf der Karte steht nur noch der Schlüssel — der Status steht schon in der Spaltenüberschrift. Titel und Stand haben dieselbe Größe wie in der Liste.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Spalte</h3>
+              <p>Status oben, Anzahl daneben. Darunter die Changes mit mehr Abstand, ohne den Status ein zweites Mal.</p>
+            </div>
+            <div>
+              <h3>Change</h3>
+              <p>Schlüssel, Titel, Stand — wie in der Liste. Die Ampel sitzt am Titel.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-14">
+          <p class="log-meta">v0.2.14</p>
+          <h2 class="log-title">Kein Kasten mehr um den Anlegen-Button</h2>
+          <p class="log-lead">
+            Unter der Liste sitzt nur noch der Button. Der helle, halb durchsichtige Streifen dahinter ist weg.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Unten</h3>
+              <p>„Neuen Change anlegen“ steht frei auf dem Hintergrund, ohne weißen Verlauf um sich.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-13">
+          <p class="log-meta">v0.2.13</p>
+          <h2 class="log-title">Nur das Board wechselt die Breite</h2>
+          <p class="log-lead">
+            Liste und Board tauschen nur die Fläche in der Mitte. Kopf, Suche, der Wechsel und der Anlegen-Button bleiben an derselben Stelle.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Board</h3>
+              <p>Die Spalten gehen weiter über den Bildschirm. Alles drumherum bleibt im gewohnten Raster.</p>
+            </div>
+            <div>
+              <h3>Wechsel</h3>
+              <p>CRITR, Versionszahl, „Changes“, Suche, Liste/Board und der Button unten springen nicht mehr, wenn du die Ansicht wechselst.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-12">
+          <p class="log-meta">v0.2.12</p>
+          <h2 class="log-title">Die Versionsseite ist eine Übersicht</h2>
+          <p class="log-lead">
+            Oben stehen alle Releases als Sprungmarken. Jede Version hat denselben Aufbau: Nummer, Titel, Leittext, dann die einzelnen Punkte.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Übersicht</h3>
+              <p>Die Liste oben springt zur Version. Daneben steht in einem Wort, worum es ging.</p>
+            </div>
+            <div>
+              <h3>Eintrag</h3>
+              <p>Leittext zuerst, darunter kurze Blöcke — nicht mehr nur ein Satz pro Release.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-11">
+          <p class="log-meta">v0.2.11</p>
+          <h2 class="log-title">Board über die ganze Breite</h2>
+          <p class="log-lead">
+            Im Board nutzen die Spalten den ganzen Bildschirm. Die Changes haben mehr Luft, Status-Spalten stehen nebeneinander statt in einer schmalen Mitte.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Board</h3>
+              <p>Kopf, Spalten und der Anlegen-Button gehen mit. Viele Status-Spalten bleiben sichtbar, ohne ins 1080-Pixel-Raster zu quetschen.</p>
+            </div>
+            <div>
+              <h3>Liste und Ticket</h3>
+              <p>Die Liste und ein geöffneter Change bleiben in der gewohnten Breite. Nur die Board-Ansicht wird vollflächig.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-10">
+          <p class="log-meta">v0.2.10</p>
+          <h2 class="log-title">Anlegen-Button wie zuvor</h2>
+          <p class="log-lead">
+            „Neuen Change anlegen“ ist wieder der volle dunkle Button über die Breite — kein Unterstrich und kein schmaler Mittel-Button.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Button</h3>
+              <p>Volle Breite, dunkle Fläche, runde Ecken. Hover wird blau. In v0.2.9 war er kurz zentriert und kleiner; das ist zurückgenommen.</p>
+            </div>
+            <div>
+              <h3>Danach</h3>
+              <p>Ein Klick startet den Change. Die erste Frage steht als Überschrift in der Mitte.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-8">
+          <p class="log-meta">v0.2.8</p>
+          <h2 class="log-title">Versionsnummer öffnet diese Seite</h2>
+          <p class="log-lead">
+            Ein Klick auf die Versionszahl neben CRITR führt hierher — nicht mehr in ein kleines Overlay nur mit dem letzten Release.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Wo</h3>
+              <p>Der Link sitzt in der Kopfzeile auf Workspace, Einstellungen und hier. Die aktuelle Zahl ist immer die, die du siehst.</p>
+            </div>
+            <div>
+              <h3>Inhalt</h3>
+              <p>Alle sichtbaren Releases stehen untereinander, von neu nach alt.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-7">
+          <p class="log-meta">v0.2.7</p>
+          <h2 class="log-title">Board, Wechsel und Anlegen in einer Sprache</h2>
+          <p class="log-lead">
+            Board und der Wechsel Liste/Board folgen derselben Typografie wie die Liste: offene Spalten, Text-Reiter, keine Karten und keine Pillen.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Board</h3>
+              <p>Spalten ohne graue Kästen. Jeder Change darin wie in der Liste: Schlüssel und Status oben, Titel, Stand darunter.</p>
+            </div>
+            <div>
+              <h3>Liste / Board</h3>
+              <p>Zwei Wörter oben rechts, die aktive Ansicht mit Unterstrich. Kein Schalter in einer Kapsel.</p>
+            </div>
+            <div>
+              <h3>Anlegen</h3>
+              <p>Der Button blieb der Einstieg. Die erste Frage im Change ist die Überschrift, nicht eine Chat-Blase.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-6">
+          <p class="log-meta">v0.2.6</p>
+          <h2 class="log-title">Die Liste liest sich wie das Ticket</h2>
+          <p class="log-lead">
+            Jeder Change ist ein ruhiger Eintrag mit Luft — nicht mehr Titel und Stand in einer abgeschnittenen Zeile.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Aufbau</h3>
+              <p>Oben Schlüssel und Status in Kapitälchen. Darunter der Titel als Überschrift. Darunter der Stand, höchstens zwei Zeilen.</p>
+            </div>
+            <div>
+              <h3>Ampel</h3>
+              <p>Der Punkt sitzt am Titel: grün, blau, gelb, rot, weiß oder erledigt.</p>
+            </div>
+            <div>
+              <h3>Auswahl</h3>
+              <p>Die aktive Zeile hat einen feinen Strich links, kein blaues Feld.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-5">
+          <p class="log-meta">v0.2.5</p>
+          <h2 class="log-title">Einen Change anlegen ohne Chat</h2>
+          <p class="log-lead">
+            Die erste Frage steht als Überschrift in der Mitte. Das Feld darunter ist eine Linie wie der Titel im Ticket — keine schwebende Blase in der leeren Fläche.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Erste Frage</h3>
+              <p>„Neuer Change“ und der Schritt, etwa „1 · Titel“, stehen über der Frage. Darunter das Feld, rechts der Pfeil.</p>
+            </div>
+            <div>
+              <h3>Weitere Fragen</h3>
+              <p>Sobald der Titel steht, wächst das Ticket. Die nächsten Fragen bleiben unten: kleiner Kicker, klare Frage, ruhiges Feld oder Kalender.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-4">
+          <p class="log-meta">v0.2.4</p>
+          <h2 class="log-title">Der Stand steht in jedem Ticket</h2>
+          <p class="log-lead">
+            Jeder Change hat einen aktuellen Stand — auch ohne Kommentar, bei Tickets aus Jira und bei älteren Changes, in denen noch Fragen offen sind.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Wann er kommt</h3>
+              <p>Beim Öffnen, beim Import aus Jira und beim Abgleich. Fehlt er, wird er nachgebaut. Ältere Changes zieht der Hintergrund nach.</p>
+            </div>
+            <div>
+              <h3>Woraus</h3>
+              <p>Kommentare und Status-Einträge, sonst Titel, Beschreibung, Workflow und Daten. Fehlt jede Rückmeldung, sagt der Text das offen. Im Hinweis steht die Quelle.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-3">
+          <p class="log-meta">v0.2.3</p>
+          <h2 class="log-title">Nur die letzten Stimmen im Stand</h2>
+          <p class="log-lead">
+            Der Stand nimmt die letzten fünf Kommentare plus die Status-Einträge. Ältere Diskussionen verdünnen ihn nicht mehr.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Quelle</h3>
+              <p>Neueste fünf Kommentare zuerst. Status-Wechsel zählen mit. Gibt es beides nicht, bleibt der Fallback auf die Ticketdaten aus v0.2.4.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-2">
+          <p class="log-meta">v0.2.2</p>
+          <h2 class="log-title">Die Kalkulation bleibt am Change</h2>
+          <p class="log-lead">
+            Im Kopf der Kalkulation steht der Change, zu dem sie gehört. Beim Schließen gehen die Summen immer an genau diesen Change.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Zugehörigkeit</h3>
+              <p>Oben in der Tabelle steht der Change-Titel. Ein zweites offenes Ticket überschreibt die Summen nicht.</p>
+            </div>
+            <div>
+              <h3>Wechsel</h3>
+              <p>Beim Wechsel zwischen Tickets bleiben keine Werte des vorherigen Changes stehen.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="log-release" id="v0-2-1">
+          <p class="log-meta">v0.2.1</p>
+          <h2 class="log-title">Hilfe, Kosten und die erste Semantik</h2>
+          <p class="log-lead">
+            Pflichtfrage zur Hilfe, Sachkosten und Gesamtsumme im Ticket, klarere Kalkulation — und die Zählung nach x.x.x.
+          </p>
+          <div class="log-blocks">
+            <div>
+              <h3>Hilfe</h3>
+              <p>„Benötigst du Hilfe?“ Bei „Ja“ folgt, bei was genau. Die Antwort landet unten in der Beschreibung und geht mit nach Jira.</p>
+            </div>
+            <div>
+              <h3>Kosten im Ticket</h3>
+              <p>Aufwand, Kosten, IT-Kosten, Sachkosten und Gesamtsumme stehen nebeneinander und brechen auf schmalen Fenstern um. Keine Karten um die Felder.</p>
+            </div>
+            <div>
+              <h3>Kosten Kalkulation</h3>
+              <p>„Konzeption &amp; Einführung“ und „Betrieb“ stehen als Überschrift über dem Block. Der SCS-Block heißt „Kalkulation SCS inklusive weiterer Schwarzfirmen“. Die Gesamtsumme tritt hervor.</p>
+            </div>
+            <div>
+              <h3>Version</h3>
+              <p>Die Zählung läuft nach x.x.x. Bis zur allgemeinen Freigabe bleibt CRITR unter 1.0.0.</p>
+            </div>
+          </div>
+        </section>
+      </article>
+    </div>
+    <script src="/auth.js?v=v0-3-33"></script>
+  </body>
+</html>
