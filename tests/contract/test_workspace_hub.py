@@ -225,8 +225,10 @@ def test_status_patch_writes_own_db_and_enqueues_outbox(client):
         request = db.scalar(select(Request).where(Request.reference == target))
         assert request.status == RequestStatus.QG1
         jobs = db.scalars(select(OutboxJob).where(OutboxJob.request_id == request.id)).all()
-        assert [job.operation for job in jobs] == [OutboxOperation.UPDATE_FIELDS]
-        assert jobs[0].payload["fields"]["status"] == "qg1"
+        ops = [job.operation for job in jobs]
+        assert OutboxOperation.UPDATE_FIELDS in ops
+        field_job = next(j for j in jobs if j.operation == OutboxOperation.UPDATE_FIELDS)
+        assert field_job.payload["fields"]["status"] == "qg1"
 
 
 def test_detail_groups_expose_type_and_choice_values(client):

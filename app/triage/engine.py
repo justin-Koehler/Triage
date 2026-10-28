@@ -278,6 +278,8 @@ _LABEL_PREFIX = re.compile(
 # "Keine Ahnung" ist keine Angabe. Der Wortlaut darf nicht als Wert im
 # Steckbrief landen, und die Frage darf nicht nochmal kommen.
 UNKNOWN_ANSWERS = (
+    "gar keiner",
+    "gar keine",
     "keine ahnung",
     "keine idee",
     "kein plan",

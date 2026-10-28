@@ -37,8 +37,6 @@ services:
     depends_on:
       app:
         condition: service_healthy
-      ki-buddy:
-        condition: service_started
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -48,33 +46,6 @@ services:
     read_only: true
     tmpfs:
       - /tmp
-
-  ki-buddy:
-    build:
-      context: ./ki-buddy
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    env_file:
-      - deploy/compose.env
-    # Qwen-Secrets nur aus env_file — ${QWEN_API_KEY:-} würde leere Host-Env den Key überschreiben.
-    networks:
-      - proxy_network
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://127.0.0.1:3000/ki-buddy').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
-        ]
-      interval: 20s
-      timeout: 5s
-      retries: 5
-      start_period: 40s
 
   app:
     image: critr:${IMAGE_TAG:-local}
@@ -95,6 +66,8 @@ services:
       PRIORITY_KEYWORDS_PATH: /app/config/priority_keywords.md
       TOPICS_DIR: /app/config/topics
       RISKS_DIR: /app/config/risks
+      # 1 = keine Jira-Feld-Updates / kein Sync-Pull (Notfall-Pause wegen Mail-Flut)
+      CRITR_PAUSE_JIRA_PUSH: ${CRITR_PAUSE_JIRA_PUSH:-0}
     networks:
       - proxy_network
       - backend_network

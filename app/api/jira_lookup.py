@@ -6,10 +6,11 @@ from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Qu
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.db import SessionLocal, get_db
+from app import db as dbmod
+from app.db import get_db
 from app.models import AppSetting, User
 from app.ports.fake import FakeTicketSystem
-from app.ports.jira_v3 import JiraRestV3
+from app.ports.jira_v3 import JiraRestV3, user_picker_label
 from app.ports.ticket_port import TicketPort, TicketPortError
 from app.security import current_actor
 from app.services.settings_service import decrypt_secret, get_runtime_config
@@ -36,7 +37,7 @@ def _inbox_port(db: Session) -> TicketPort:
     runtime = get_runtime_config(db)
     if runtime.ticket_port == "jira":
         return JiraRestV3(runtime=runtime)
-    return FakeTicketSystem(SessionLocal, project=runtime.jira_project_key or "TRI")
+    return FakeTicketSystem(dbmod.SessionLocal, project=runtime.jira_project_key or "TRI")
 
 
 @router.get("/users")
@@ -58,7 +59,8 @@ def search_users(
             {
                 "name": row["name"],
                 "displayName": row.get("displayName") or row["name"],
-                "label": f'{row.get("displayName") or row["name"]} ({row["name"]})',
+                "emailAddress": row.get("emailAddress") or "",
+                "label": user_picker_label(row),
                 "avatarUrl": row.get("avatarUrl") or "",
             }
             for row in items
@@ -140,13 +142,21 @@ def resolve_value(
             hit = port.resolve_user(payload.value, user_token=token, user_email=email)
             if not hit:
                 return {"resolved": None, "label": None, "value": payload.value}
+            # Display über Picker/Suche (nicht nur Assignable — z. B. Daniel Rein).
             rows = port.search_assignable_users(
-                hit["name"], limit=1, user_token=token, user_email=email
+                hit["name"], limit=8, user_token=token, user_email=email
             )
-            display = rows[0]["displayName"] if rows else hit["name"]
+            chosen = hit
+            for row in rows:
+                if row.get("name") == hit["name"]:
+                    chosen = row
+                    break
+            else:
+                if rows:
+                    chosen = rows[0]
             return {
                 "resolved": hit["name"],
-                "label": f"{display} ({hit['name']})",
+                "label": user_picker_label(chosen),
                 "value": hit["name"],
             }
         if payload.kind == "option":
@@ -177,15 +187,55 @@ def resolve_value(
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(err)) from err
 
 
+def _hub_sync_later(
+    keys: list[str],
+    *,
+    user_token: str | None,
+    user_email: str | None,
+    limit: int,
+) -> None:
+    """Kommentar-Abgleich nach Hub-Laden — nie im HTTP-Thread, mit Retry."""
+    import logging
+    import time
+
+    from app.services.jira_inbox import sync_comments_batch
+
+    log = logging.getLogger("triage.sync")
+    if not keys:
+        return
+    last_err: Exception | None = None
+    for attempt in range(4):
+        with dbmod.SessionLocal() as session:
+            try:
+                stats = sync_comments_batch(
+                    session,
+                    _inbox_port(session),
+                    keys=keys,
+                    limit=limit,
+                    user_token=user_token,
+                    user_email=user_email,
+                )
+                session.commit()
+                if stats.get("updated") or stats.get("failed"):
+                    log.info("hub-sync %s", stats)
+                return
+            except Exception as err:
+                session.rollback()
+                last_err = err
+                time.sleep(0.4 * (2**attempt))
+    log.error("hub-sync fehlgeschlagen nach Retries: %s", last_err, exc_info=last_err)
+
+
 @router.get("/issues")
 def list_issues(
+    background_tasks: BackgroundTasks,
     q: str = Query(default="", max_length=80),
     limit: int = Query(default=50, ge=1, le=100),
     sync: bool = Query(default=False),
     db: Session = Depends(get_db),
     user: User = Depends(current_actor),
 ) -> dict:
-    from app.services.jira_inbox import list_inbox, sync_comments_batch
+    from app.services.jira_inbox import list_inbox
 
     token, email = _user_jira_credentials(db, user)
     try:
@@ -199,38 +249,57 @@ def list_issues(
             user_email=email,
             actor=user,
         )
-        sync_info = {"synced": 0, "updated": 0, "failed": 0}
+        sync_info = {"synced": 0, "updated": 0, "failed": 0, "queued": False}
         if sync:
-            keys = [str(item.get("key") or "") for item in (body.get("items") or [])]
-            sync_info = sync_comments_batch(
-                db, port, keys=keys, limit=limit, user_token=token, user_email=email
-            )
-            # Stand-Zeilen nach Sync neu lesen
-            body = list_inbox(
-                db,
-                port,
-                query=q,
-                limit=limit,
+            keys = [str(item.get("key") or "") for item in (body.get("items") or []) if item.get("key")]
+            background_tasks.add_task(
+                _hub_sync_later,
+                keys,
                 user_token=token,
                 user_email=email,
-                actor=user,
+                limit=min(limit, 20),
             )
+            sync_info = {"synced": 0, "updated": 0, "failed": 0, "queued": True}
         body["sync"] = sync_info
         return body
     except TicketPortError as err:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(err)) from err
 
 
+def _webhook_sync_later(issue_key: str) -> None:
+    import logging
+    import time
+
+    from app.services.jira_inbox import mirror_jira_issue
+
+    log = logging.getLogger("triage.sync")
+    for attempt in range(4):
+        with dbmod.SessionLocal() as session:
+            try:
+                stats = mirror_jira_issue(
+                    session,
+                    _inbox_port(session),
+                    issue_key,
+                    summarize=True,
+                )
+                session.commit()
+                log.info("webhook-sync %s %s", issue_key, stats)
+                return
+            except Exception:
+                session.rollback()
+                time.sleep(0.4 * (2**attempt))
+    log.error("webhook-sync fehlgeschlagen %s", issue_key)
+
+
 @router.post("/hooks/sync")
-def webhook_sync_comments(
+def webhook_sync_issue(
+    background_tasks: BackgroundTasks,
     payload: dict = Body(default_factory=dict),
     key: str = Query(default="", max_length=64),
     secret: str = Query(default="", max_length=200),
-    db: Session = Depends(get_db),
 ) -> dict:
-    """Jira-Webhook oder manueller Trigger: Kommentare eines Tickets nachziehen."""
+    """Jira-Webhook: Ticket nach CRITR spiegeln (Create/Update inkl. Kommentare)."""
     from app.config import get_settings
-    from app.services.jira_inbox import sync_comments_batch
 
     settings = get_settings()
     expected = (settings.jira_webhook_secret or "").strip()
@@ -240,12 +309,63 @@ def webhook_sync_comments(
     if not issue_key and isinstance(payload, dict):
         issue = payload.get("issue") if isinstance(payload.get("issue"), dict) else {}
         issue_key = str(issue.get("key") or payload.get("key") or "").strip()
+        # Jira Cloud/Server webhook payload variants
+        if not issue_key and isinstance(payload.get("issueEvent"), dict):
+            issue = payload["issueEvent"].get("issue") or {}
+            issue_key = str(issue.get("key") or "").strip()
     if not issue_key:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Issue-Key fehlt")
-    stats = sync_comments_batch(
-        db, _inbox_port(db), keys=[issue_key], limit=1, summarize=True
+    background_tasks.add_task(_webhook_sync_later, issue_key)
+    return {"ok": True, "key": issue_key, "queued": True}
+
+
+def _import_enrich_later(
+    request_id: str,
+    jira_key: str,
+    *,
+    user_token: str | None,
+    user_email: str | None,
+) -> None:
+    """Kommentare/Anhänge nach schnellem Import nachziehen — mit Retry."""
+    import logging
+    import time
+
+    from app.services.jira_inbox import (
+        refresh_stand_after_sync,
+        sync_attachments_from_jira,
+        sync_comments_from_jira,
     )
-    return {"ok": True, "key": issue_key, **stats}
+    from app.services.requests_service import get_request
+
+    log = logging.getLogger("triage.sync")
+    last_err: Exception | None = None
+    for attempt in range(5):
+        with dbmod.SessionLocal() as session:
+            try:
+                request = get_request(session, request_id)
+                if not request:
+                    return
+                port = _inbox_port(session)
+                sync_comments_from_jira(
+                    session, port, request, user_token=user_token, user_email=user_email
+                )
+                sync_attachments_from_jira(
+                    session, port, request, user_token=user_token, user_email=user_email
+                )
+                refresh_stand_after_sync(session, request, changed=True, llm=False)
+                session.commit()
+                return
+            except Exception as err:
+                session.rollback()
+                last_err = err
+                time.sleep(0.5 * (2**attempt))
+    log.error(
+        "import-enrich fehlgeschlagen %s %s: %s",
+        jira_key,
+        request_id[:8],
+        last_err,
+        exc_info=last_err,
+    )
 
 
 @router.post("/issues/{key}/import")
@@ -267,12 +387,24 @@ def import_issue(
             user=user,
             user_token=token,
             user_email=email,
+            defer_enrich=True,
         )
     except LookupError as err:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(err)) from err
     except TicketPortError as err:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(err)) from err
     rid = str(body.get("id") or "").strip()
-    if rid:
+    jira_key = str(body.get("externalKey") or key or "").strip()
+    body["enrichPending"] = bool(rid and jira_key)
+    if rid and jira_key:
+        background_tasks.add_task(
+            _import_enrich_later,
+            rid,
+            jira_key,
+            user_token=token,
+            user_email=email,
+        )
+        background_tasks.add_task(_stand_later, rid)
+    elif rid:
         background_tasks.add_task(_stand_later, rid)
     return body

@@ -4,27 +4,29 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Kostenkalkulation — CRITR</title>
-    <link rel="stylesheet" href="/styles.css?v=v0-2-4" />
+    <link rel="stylesheet" href="/styles.css?v=v0-4-10" />
   </head>
-  <body class="effort-sheet-page">
-    <header class="effort-sheet-chrome">
+  <body class="effort-sheet-page status-update-page">
+    <header class="status-update-chrome">
       <a class="brand" href="/workspace">CRITR</a>
-      <p class="effort-sheet-chrome-meta">Kostenkalkulation</p>
-    </header>
-    <main class="effort-sheet-main">
-      <header class="effort-sheet-head">
-        <p class="effort-sheet-kicker" id="kalk-for">Change</p>
-        <h1>Kosten Kalkulation</h1>
-        <p class="effort-sheet-note">Personentage und Sach-/Lizenzkosten je Phase eintragen.</p>
-        <p class="effort-sheet-note">
-          Speichern übernimmt Kosten, Sachkosten und Gesamtsumme ins Ticket.
-        </p>
-      </header>
-      <div id="kalk" class="kalk"></div>
-      <div class="kalk-bar">
-        <button type="button" class="btn btn-primary" id="kalk-save">Speichern und schließen</button>
+      <div class="status-update-chrome-actions">
+        <button type="button" class="btn btn-primary" id="kalk-save">Speichern</button>
+        <button type="button" class="status-update-save" id="kalk-back">Zurück</button>
       </div>
+    </header>
+    <main class="status-update-main">
+      <div class="ticket-hero">
+        <p class="ticket-eyebrow">
+          <span class="ticket-jira" id="kalk-key" hidden>
+            <a class="ticket-jira-key" id="kalk-key-link" target="_blank" rel="noopener"></a>
+          </span>
+          <span class="ticket-eyebrow-sep" id="kalk-key-sep" hidden aria-hidden="true">—</span>
+          <span>Kostenkalkulation</span>
+        </p>
+        <h1 class="ticket-headline" id="kalk-for">Change</h1>
+      </div>
+      <div id="kalk" class="kalk"></div>
     </main>
-    <script src="/effort-sheet.js?v=v0-2-4"></script>
+    <script src="/effort-sheet.js?v=v0-4-10"></script>
   </body>
 </html>

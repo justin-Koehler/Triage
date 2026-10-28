@@ -506,6 +506,14 @@ def fetch_effort_sheet(url: str, *, timeout: int = 15) -> dict[str, str]:
     return parsed
 
 
+# Diese Jira-Felder gehören dem Sheet. Ein anderer Wert in Jira wird zurückgeschrieben.
+JIRA_SHEET_KEYS = (
+    "concept_scs_pt",
+    "concept_cit_pt",
+    "it_costs",
+    "total_costs",
+)
+
 EFFORT_SYNC_KEYS = (
     "effort_sheet_url",
     "costs",
@@ -529,6 +537,30 @@ EFFORT_SYNC_KEYS = (
 
 def effort_sync_fields(parsed: dict[str, str]) -> dict[str, str]:
     return {key: str(parsed.get(key) or "").strip() for key in EFFORT_SYNC_KEYS}
+
+
+def amounts_match(left: object, right: object) -> bool:
+    """12 und 12,0 sind derselbe Aufwand. Leer zählt wie 0."""
+    a = str(left or "").strip()
+    b = str(right or "").strip()
+    if a == b:
+        return True
+    return abs(parse_number(a) - parse_number(b)) < 1e-6
+
+
+def sheet_drift(jira_values: dict | None, sheet_fields: dict) -> dict[str, str]:
+    """Sheet-Werte, die von Jira abweichen und zurückgeschrieben werden müssen."""
+    if not jira_values:
+        return {}
+    drift: dict[str, str] = {}
+    for key in JIRA_SHEET_KEYS:
+        if key not in jira_values:
+            continue
+        sheet_val = str(sheet_fields.get(key) or "").strip()
+        if amounts_match(jira_values.get(key), sheet_val):
+            continue
+        drift[key] = sheet_val
+    return drift
 
 
 def commit_effort_csv(
@@ -561,6 +593,40 @@ def load_share_csv(db: Session, share_id: str) -> str | None:
         return None
     row = db.get(AppSetting, f"{_SHARE_PREFIX}{share_id}")
     return row.value if row and row.value else None
+
+
+def empty_kalkulation_csv() -> str:
+    """Minimales Sheet, das die Aufwand-UI öffnen kann."""
+    # Gleiches Spalten-Schema wie die Editor-Export-CSV (fromCsv versteht Kalkulation-Blöcke).
+    lines = [
+        "Kalkulation SCS;inklusive weiterer Schwarzfirmen;;",
+        "Personentage;Aufschlüsselung / Beschreibung;;",
+        ";;;",
+        "Sach-/Lizenzkosten;Aufschlüsselung / Beschreibung;;",
+        ";;;",
+        "Kosten-Kalkulation;Sätze;Teilsummen;Berechnungen",
+        "Tarifsatz (SCS);750,00;;0,00 €",
+        ";;;",
+        "Kalkulation IT;;;",
+        "Personentage;Aufschlüsselung / Beschreibung;;",
+        ";;;",
+        "Sach-/Lizenzkosten;Aufschlüsselung / Beschreibung;;",
+        ";;;",
+    ]
+    # Semikolon → Editor nutzt ; in toCsv? check effort-sheet.js
+    return "\ufeff" + "\r\n".join(lines)
+
+
+def ensure_effort_share(db: Session, share_id: str, *, public_base: str = "") -> str:
+    """Share anlegen, falls der Jira-/CRITR-Link noch keine Tabelle hat."""
+    existing = load_share_csv(db, share_id)
+    if existing and len(existing.strip()) >= 8:
+        return existing
+    base = (public_base or "").rstrip("/") or "https://scscm.stackit.gg"
+    csv_text = empty_kalkulation_csv()
+    parsed = commit_effort_csv(db, csv_text, base, share_id=share_id)
+    return csv_text
+
 
 
 def kalkulation_xlsx(csv_text: str) -> bytes:

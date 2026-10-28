@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ROOT / ".env", extra="ignore")
 
     app_env: str = "dev"
+    public_base_url: str = "http://127.0.0.1:8787"
     database_url: str = f"sqlite:///{ROOT / 'data' / 'triage.db'}"
 
     llm_provider: str = "ollama"
@@ -23,6 +24,11 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4o-mini"
+    # STACKIT-Qwen (OpenAI-kompatibel). Wenn gesetzt, hat Vorrang vor lokalem Ollama.
+    qwen_base_url: str = ""
+    qwen_api_key: str = ""
+    qwen_model: str = ""
+    qwen_timeout_ms: int = 180000
 
     ticket_port: str = "fake"
     jira_base_url: str = ""
@@ -71,9 +77,12 @@ class Settings(BaseSettings):
     default_actor_name: str = "Dev"
     settings_encryption_key: str = ""
 
-    outbox_max_attempts: int = 6
+    outbox_max_attempts: int = 8
     outbox_poll_seconds: int = 3
-    comment_sync_seconds: int = 300
+    outbox_claim_seconds: int = 90
+    outbox_dead_revive_minutes: int = 15
+    # Jira→CRITR: neue Tickets pullen + bestehende spiegeln (Webhook ist schneller).
+    comment_sync_seconds: int = 120
     jira_webhook_secret: str = ""
 
     anthropic_api_key: str = ""
@@ -110,6 +119,16 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     settings = Settings()
+    # Qwen (STACKIT) → OpenAI-Provider, damit Chat/Steckbrief nicht auf totes Ollama fallen.
+    if (settings.qwen_api_key or "").strip() and (settings.qwen_base_url or "").strip():
+        if settings.llm_provider in {"", "ollama"} or not (settings.openai_api_key or "").strip():
+            settings.llm_provider = "openai"
+            settings.openai_base_url = settings.qwen_base_url.strip()
+            settings.openai_api_key = settings.qwen_api_key.strip()
+            if (settings.qwen_model or "").strip():
+                settings.openai_model = settings.qwen_model.strip()
+            if settings.qwen_timeout_ms:
+                settings.llm_timeout = max(30, int(settings.qwen_timeout_ms) // 1000)
     if settings.is_sqlite:
         target = settings.database_url.split("///", 1)[-1]
         Path(target).parent.mkdir(parents=True, exist_ok=True)

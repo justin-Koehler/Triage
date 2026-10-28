@@ -426,6 +426,8 @@ def to_detail(request: Request, actor: User | None = None) -> dict:
         "standHealth": health,
         "nextStep": str(next_info.get("nextStep") or ""),
         "openTodos": todos,
+        "phaseLabel": request.phase_label or "",
+        "phaseLinks": list(request.phase_links or []),
     }
 
 
@@ -618,6 +620,118 @@ def export_rows(db: Session, filters: RequestFilter) -> list[tuple[str, ...]]:
     return out
 
 
+_COPY_SKIP = {
+    "status_digest",
+    "status_summary",
+    "status_ablauf",
+    "current_status",
+    "comment_digest",
+    "comment_ablauf",
+    "comment_summary",
+    "stand_digest",
+    "stand_summary",
+    "stand_health",
+}
+
+
+def _next_reference(db: Session) -> str:
+    highest = 1000
+    for ref in db.scalars(select(Request.reference)):
+        suffix = str(ref or "").removeprefix("AN-")
+        try:
+            highest = max(highest, int(suffix))
+        except ValueError:
+            continue
+    n = highest + 1
+    for _ in range(50):
+        candidate = f"AN-{n}"
+        exists = db.scalar(select(Request.id).where(Request.reference == candidate))
+        if not exists:
+            return candidate
+        n += 1
+    raise RuntimeError("keine freie Referenz gefunden")
+
+
+def duplicate_request(db: Session, source: Request, actor: User | None) -> Request:
+    """Kopie ohne Kommentare, Anhänge und Jira-Verknüpfung."""
+    title = f"Kopie: {source.title}".strip()[:200]
+    copy = Request(
+        reference=_next_reference(db),
+        kind=source.kind,
+        status=RequestStatus.STECKBRIEF,
+        priority=source.priority,
+        title=title,
+        steckbrief_name=title,
+        description=source.description or "",
+        company=source.company,
+        change_lead=source.change_lead,
+        incomplete=source.incomplete,
+        triage_failed=False,
+        confidence=source.confidence,
+        created_by=actor.id if actor else source.created_by,
+        phase_label=source.phase_label,
+        phase_links=[],
+    )
+    db.add(copy)
+    db.flush()
+    for field in sorted(source.fields, key=lambda item: item.position):
+        if field.key in _COPY_SKIP:
+            continue
+        db.add(
+            RequestField(
+                request_id=copy.id,
+                key=field.key,
+                label=field.label,
+                value=field.value,
+                position=field.position,
+            )
+        )
+    db.flush()
+    return copy
+
+
+def set_phase_label(db: Session, request: Request, label: str) -> Request:
+    text = (label or "").strip()[:40]
+    request.phase_label = text or None
+    db.flush()
+    return request
+
+
+def link_requests(db: Session, left: Request, right: Request, phase: str) -> Request:
+    if left.id == right.id:
+        raise ValueError("Ein Change kann nicht mit sich selbst verknüpft werden")
+    label = (phase or "").strip()[:40] or (right.phase_label or "Verknüpft")
+    _remember_link(left, right, label)
+    back = (left.phase_label or "").strip() or label
+    _remember_link(right, left, back)
+    db.flush()
+    return left
+
+
+def unlink_requests(db: Session, left: Request, other_id: str) -> Request:
+    left.phase_links = [row for row in list(left.phase_links or []) if row.get("id") != other_id]
+    other = db.get(Request, other_id)
+    if other is not None:
+        other.phase_links = [
+            row for row in list(other.phase_links or []) if row.get("id") != left.id
+        ]
+    db.flush()
+    return left
+
+
+def _remember_link(request: Request, other: Request, phase: str) -> None:
+    links = [row for row in list(request.phase_links or []) if row.get("id") != other.id]
+    links.append(
+        {
+            "id": other.id,
+            "phase": phase,
+            "title": other.title,
+            "reference": other.reference,
+        }
+    )
+    request.phase_links = links
+
+
 def get_request(db: Session, request_id: str) -> Request | None:
     return db.scalar(_base_query().where(Request.id == request_id))
 
@@ -774,6 +888,31 @@ _FIELD_ALIASES: dict[str, str] = {
 }
 
 
+SELF_AS_LEAD = "Man darf sich nicht selbst auswählen. Bitte nach dem Vier-Augen-Prinzip."
+
+
+def _same_person(left: object, right: object) -> bool:
+    a = str(left or "").strip().casefold()
+    b = str(right or "").strip().casefold()
+    return len(a) >= 2 and a == b
+
+
+def lead_is_creator(lead: object, *identities: object) -> bool:
+    return any(_same_person(lead, item) for item in identities)
+
+
+def creator_identities(request: Request) -> list[str]:
+    author = getattr(request, "author", None)
+    values = request.field_values() if hasattr(request, "field_values") else {}
+    bits = [
+        getattr(author, "display_name", None),
+        getattr(author, "external_subject", None),
+        getattr(author, "email", None),
+        values.get("author"),
+    ]
+    return [str(bit).strip() for bit in bits if str(bit or "").strip()]
+
+
 def update_request(
     db: Session,
     request: Request,
@@ -796,6 +935,8 @@ def update_request(
         alias = _FIELD_ALIASES.get(key)
         if key not in field_labels and alias and alias in field_labels:
             key = alias
+        if key == "change_lead" and lead_is_creator(value, *creator_identities(request)):
+            raise ValueError(SELF_AS_LEAD)
         if key in EDITABLE_SCALARS:
             if key == "status":
                 new_status = RequestStatus(value)

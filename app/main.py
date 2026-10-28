@@ -57,16 +57,49 @@ def _configure_logging() -> None:
 _configure_logging()
 
 
+def _run_outbox_once() -> dict[str, int]:
+    get_ticket_port.cache_clear()
+    port = get_ticket_port()
+    with SessionLocal() as db:
+        return process_pending(db, port)
+
+
+def _run_comment_sync_once() -> None:
+    import os
+
+    # Not-Stop: kein Jira-Pull/Spiegeln, solange Pause aktiv ist.
+    if os.environ.get("CRITR_PAUSE_JIRA_PUSH", "").strip().lower() in {"1", "true", "yes", "on"}:
+        return
+    get_ticket_port.cache_clear()
+    port = get_ticket_port()
+    from app.services.jira_inbox import pull_new_jira_issues, sync_comments_batch
+    from app.services.stand_summary import backfill_missing
+
+    # Zuerst neue Jira-Tickets ohne CRITR-Spiegelung holen.
+    with SessionLocal() as db:
+        pulled = pull_new_jira_issues(db, port, limit=30)
+        db.commit()
+        if pulled.get("created") or pulled.get("failed"):
+            log.info("jira-pull %s", pulled)
+    with SessionLocal() as db:
+        stats = sync_comments_batch(db, port, limit=20, summarize=True)
+        db.commit()
+        if stats.get("updated") or stats.get("failed") or stats.get("created"):
+            log.info("comment-sync %s", stats)
+    with SessionLocal() as db:
+        filled = backfill_missing(db, limit=5, llm=True)
+        db.commit()
+        if filled:
+            log.info("stand-backfill %s", filled)
+
+
 async def _outbox_loop(stop: asyncio.Event) -> None:
     settings = get_settings()
     while not stop.is_set():
         try:
-            get_ticket_port.cache_clear()
-            port = get_ticket_port()
-            with SessionLocal() as db:
-                stats = process_pending(db, port)
-                if any(stats.values()):
-                    log.info("outbox %s", stats)
+            stats = await asyncio.to_thread(_run_outbox_once)
+            if any(stats.values()):
+                log.info("outbox %s", stats)
         except Exception:
             log.exception("outbox poll fehlgeschlagen")
         try:
@@ -85,22 +118,7 @@ async def _comment_sync_loop(stop: asyncio.Event) -> None:
         pass
     while not stop.is_set():
         try:
-            get_ticket_port.cache_clear()
-            port = get_ticket_port()
-            from app.services.jira_inbox import sync_comments_batch
-
-            from app.services.stand_summary import backfill_missing
-
-            with SessionLocal() as db:
-                stats = sync_comments_batch(db, port, limit=20, summarize=True)
-                db.commit()
-                if stats.get("updated") or stats.get("failed"):
-                    log.info("comment-sync %s", stats)
-            with SessionLocal() as db:
-                filled = backfill_missing(db, limit=5, llm=True)
-                db.commit()
-                if filled:
-                    log.info("stand-backfill %s", filled)
+            await asyncio.to_thread(_run_comment_sync_once)
         except Exception:
             log.exception("comment-sync fehlgeschlagen")
         try:
@@ -123,7 +141,12 @@ async def lifespan(app: FastAPI):
     stop = asyncio.Event()
     outbox_task = asyncio.create_task(_outbox_loop(stop))
     comment_task = asyncio.create_task(_comment_sync_loop(stop))
-    log.info("CRITR ready (%s)", settings.llm_label)
+    try:
+        from app.services.settings_service import get_runtime_config
+
+        log.info("CRITR ready (%s)", get_runtime_config().llm_label)
+    except Exception:
+        log.info("CRITR ready (%s)", settings.llm_label)
     try:
         yield
     finally:
@@ -244,6 +267,11 @@ def settings_page() -> FileResponse:
     return _html("settings.html")
 
 
+@app.get("/was-neu")
+def changelog_page() -> FileResponse:
+    return _html("changelog.html")
+
+
 @app.get("/workspace")
 def workspace_page() -> FileResponse:
     return _html("workspace.html")
@@ -258,6 +286,18 @@ def workspace_detail_page(request_id: str) -> FileResponse:
 @app.get("/effort-sheet")
 def effort_sheet_editor() -> FileResponse:
     return _html("effort-sheet.html")
+
+
+@app.get("/status-update")
+@app.get("/status-update.html")
+@app.get("/status-update/{request_id}")
+def status_update_page(request_id: str | None = None) -> FileResponse:
+    return _html("status-update.html")
+
+
+@app.get("/status-update.js")
+def status_update_js() -> FileResponse:
+    return _asset("status-update.js", "application/javascript")
 
 
 @app.get("/effort-sheet.js")

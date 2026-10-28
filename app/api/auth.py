@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import html
+import json
 import secrets
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -166,9 +168,18 @@ def cidaas_start(next: str | None = Query(default=None, alias="next")):
         },
         settings,
     )
-    redirect = RedirectResponse(url=url, status_code=302)
-    redirect.set_cookie(OIDC_COOKIE, blob, **cookie_kwargs(settings, max_age=OIDC_MAX_AGE))
-    return redirect
+    # 200 statt 302: Safari speichert das Cookie nicht, wenn die Antwort sofort
+    # auf eine andere Domain weiterleitet. Danach geht es per Script zu Cidaas.
+    page = (
+        "<!DOCTYPE html><html lang=\"de\"><head><meta charset=\"utf-8\">"
+        f"<meta http-equiv=\"refresh\" content=\"0;url={html.escape(url, quote=True)}\">"
+        "<title>Anmeldung</title></head><body>"
+        f"<script>location.replace({json.dumps(url)})</script>"
+        "</body></html>"
+    )
+    response = HTMLResponse(page, headers={"Cache-Control": "no-store"})
+    response.set_cookie(OIDC_COOKIE, blob, **cookie_kwargs(settings, max_age=OIDC_MAX_AGE))
+    return response
 
 
 @router.get("/cidaas/callback")
@@ -184,15 +195,21 @@ def cidaas_callback(
     if not settings.cidaas_enabled:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Cidaas nicht konfiguriert")
     if error:
-        text = error_description or error
-        return RedirectResponse(url=f"/login?error={text}", status_code=302)
+        return RedirectResponse(
+            url=f"/login?error={quote(error_description or error)}",
+            status_code=302,
+        )
     pending = read_blob(
         request.cookies.get(OIDC_COOKIE) or "",
         max_age=OIDC_MAX_AGE,
         settings=settings,
     )
     if not code or not state or not pending or pending.get("state") != state:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Ungültiger Cidaas-Callback")
+        return RedirectResponse(
+            url="/login?error="
+            + quote("Die Anmeldung ist abgelaufen. Bitte erneut anmelden."),
+            status_code=302,
+        )
     try:
         tokens = exchange_code(code, str(pending["verifier"]), settings)
         info = userinfo(str(tokens["access_token"]), settings)

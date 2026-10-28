@@ -23,6 +23,38 @@ from app.services.settings_service import RuntimeConfig
 
 _OAUTH_CACHE: dict[str, tuple[str, float]] = {}
 _ISSUE_KEY = re.compile(r"[A-Z][A-Z0-9]+-\d+", re.IGNORECASE)
+_STAFF = re.compile(r"\bscs\b|\bcit\b|\(scs\)|\(cit\)", re.IGNORECASE)
+
+
+def user_picker_label(row: dict[str, str]) -> str:
+    """Anzeigename plus E-Mail. Der Jira-Username bleibt unsichtbar."""
+    display = str(row.get("displayName") or row.get("name") or "").strip()
+    email = str(row.get("emailAddress") or "").strip()
+    if display and email:
+        return f"{display} · {email}"
+    return email or display
+
+
+def user_staff_rank(row: dict[str, str]) -> int:
+    blob = " ".join(
+        str(row.get(key) or "")
+        for key in ("displayName", "emailAddress", "name")
+    )
+    if not _STAFF.search(blob):
+        return 2
+    if re.search(r"\bscs\b|\(scs\)", blob, re.IGNORECASE):
+        return 0
+    return 1
+
+
+def user_picker_sort_key(row: dict[str, str], needle: str, match_rank=None) -> tuple:
+    """SCS und CIT zuerst. Bei einer Suche zählt der Treffer vor der Gruppe."""
+    staff = user_staff_rank(row)
+    name = str(row.get("displayName") or row.get("name") or "").casefold()
+    if not (needle or "").strip():
+        return (staff, name)
+    rank = match_rank(row, needle) if match_rank else 50
+    return (rank, staff, name)
 
 
 def public_browse_url(url: str | None, key: str | None = None) -> str:
@@ -626,7 +658,7 @@ class JiraRestV3:
                     continue
                 seen.add(key)
                 out.append(parsed)
-        out.sort(key=lambda row: (self._user_match_rank(row, needle), row["displayName"].casefold()))
+        out.sort(key=lambda row: user_picker_sort_key(row, needle, self._user_match_rank))
         return out[:want]
 
     def _search_users_assignable(
@@ -707,9 +739,11 @@ class JiraRestV3:
         want = max(1, min(int(limit or 10), 5000))
         needle = (query or "").strip()
         if not needle:
-            return self._search_users_assignable(
-                "", limit=want, user_token=user_token, user_email=user_email
+            rows = self._search_users_assignable(
+                "", limit=max(want, 80), user_token=user_token, user_email=user_email
             )
+            rows.sort(key=lambda row: user_picker_sort_key(row, ""))
+            return rows[:want]
         picked = self._search_users_picker(
             needle, limit=want, user_token=user_token, user_email=user_email
         )
@@ -729,9 +763,7 @@ class JiraRestV3:
                 continue
             seen.add(key)
             picked.append(row)
-        picked.sort(
-            key=lambda row: (self._user_match_rank(row, needle), row["displayName"].casefold())
-        )
+        picked.sort(key=lambda row: user_picker_sort_key(row, needle, self._user_match_rank))
         return picked[:want]
 
     def list_component_records(
@@ -1237,28 +1269,31 @@ class JiraRestV3:
                 jira_fields["reporter"] = resolved
                 break
 
-        # Gesamtprojektleiter (change_lead) ist Create-Pflicht — Fallback Autor/Reporter.
+        # Gesamtprojektleiter nur, wenn es nicht die anlegende Person ist.
         lead_meta = meta_for("change_lead")
         lead_id = str(lead_meta.get("jira") or "").strip()
-        if lead_id and lead_id not in jira_fields and field_applies("change_lead"):
-            for candidate in (
-                str(payload.fields.get("change_lead") or "").strip(),
-                str(payload.fields.get("author") or "").strip(),
-                str(payload.fields.get("assignee") or "").strip(),
-                str(payload.reporter_hint or "").strip(),
-                str(payload.created_by or "").strip(),
-            ):
-                if not candidate or len(candidate) < 2:
-                    continue
-                resolved = self.resolve_user(
-                    candidate,
-                    user_token=payload.user_jira_token,
-                    user_email=payload.user_jira_email,
-                )
-                if resolved:
-                    jira_fields[lead_id] = resolved
-                    mapped_keys.add("change_lead")
-                    break
+        lead_raw = str(payload.fields.get("change_lead") or "").strip()
+        creator = {
+            str(payload.fields.get("author") or "").strip().casefold(),
+            str(payload.reporter_hint or "").strip().casefold(),
+            str(payload.created_by or "").strip().casefold(),
+        }
+        creator.discard("")
+        if lead_raw and lead_raw.casefold() in creator:
+            from app.services.requests_service import SELF_AS_LEAD
+
+            if lead_id:
+                jira_fields.pop(lead_id, None)
+            raise TicketPortError(SELF_AS_LEAD)
+        if lead_id and lead_id not in jira_fields and field_applies("change_lead") and lead_raw:
+            resolved = self.resolve_user(
+                lead_raw,
+                user_token=payload.user_jira_token,
+                user_email=payload.user_jira_email,
+            )
+            if resolved:
+                jira_fields[lead_id] = resolved
+                mapped_keys.add("change_lead")
 
         # Jira-Beschreibung = nur Freitext + CRITR-Links (keine Feld-Fallbacks).
         effort_url = str(payload.fields.get("effort_sheet_url") or "").strip()
@@ -1836,12 +1871,21 @@ class JiraRestV3:
         values: dict[str, str] = {}
         values["title"] = self._jira_field_text(fields.get("summary"))
         values["description"] = adf_to_text(fields.get("description"))
+        from app.services.effort_sheet import JIRA_SHEET_KEYS
+
         for domain_key, meta in (self._field_map.get("fields") or {}).items():
             jira_id = str((meta or {}).get("jira") or "").strip()
             if not jira_id:
                 continue
-            text = self._jira_field_text(fields.get(jira_id))
+            present = jira_id in fields
+            text = self._jira_field_text(fields.get(jira_id)) if present else ""
             if not text:
+                # Leeres Aufwand-/Kostenfeld mitgeben, damit das Sheet es wieder füllt.
+                if present and domain_key in JIRA_SHEET_KEYS:
+                    values[domain_key] = ""
+                    alias = aliases.get(domain_key)
+                    if alias:
+                        values[alias] = ""
                 continue
             values[domain_key] = text
             alias = aliases.get(domain_key)

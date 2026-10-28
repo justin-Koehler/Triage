@@ -11,8 +11,33 @@
   // Zeigt, zu welchem Change diese Kalkulation gehört.
   const forEl = document.getElementById("kalk-for");
   const forTitle = String(PARAMS.get("for") || "").trim();
-  if (forEl && forTitle) forEl.textContent = `Change: ${forTitle}`;
+  if (forEl && forTitle) forEl.textContent = forTitle;
 
+  function showIssueKey(key, url) {
+    const box = document.getElementById("kalk-key");
+    const link = document.getElementById("kalk-key-link");
+    const sep = document.getElementById("kalk-key-sep");
+    const issue = String(key || "").trim();
+    if (!box || !link) return;
+    if (!/^[A-Z][A-Z0-9]+-\d+$/i.test(issue)) {
+      box.hidden = true;
+      if (sep) sep.hidden = true;
+      return;
+    }
+    box.hidden = false;
+    if (sep) sep.hidden = false;
+    link.textContent = issue;
+    const raw = String(url || "").trim();
+    link.href = !raw || /live\.api\.schwarz/i.test(raw) ? `https://jira.schwarz/browse/${issue}` : raw;
+    link.title = `In Jira öffnen: ${issue}`;
+  }
+
+  showIssueKey(PARAMS.get("key"), "");
+
+  const HOURS_PER_PT = 8;
+  const MINUTES_PER_PT = HOURS_PER_PT * 60;
+  const USD_PER_EUR_FALLBACK = 1.1234;
+  let usdPerEur = USD_PER_EUR_FALLBACK;
   const SCS_RATE = 750;
   const CIT_RATE = 665;
   const CIT_OH = 0.1544;
@@ -70,6 +95,64 @@
     return match ? Number(match[0]) : 0;
   }
 
+  function formatPt(n) {
+    const rounded = Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+    return rounded
+      .toFixed(2)
+      .replace(".", ",")
+      .replace(/,00$/, "")
+      .replace(/,(\d)0$/, ",$1");
+  }
+
+  function perPt(unit) {
+    if (unit === "min") return MINUTES_PER_PT;
+    if (unit === "h") return HOURS_PER_PT;
+    return 1;
+  }
+
+  function lineMoney(tr) {
+    const n = parseNum(lineValues(tr).menge);
+    return tr.querySelector("[data-ccy]")?.value === "usd" ? n / usdPerEur : n;
+  }
+
+  function linePt(tr) {
+    const n = parseNum(lineValues(tr).menge);
+    const unit = tr.querySelector("[data-unit]")?.value || "pt";
+    return unit === "pt" ? n : n / perPt(unit);
+  }
+
+  function settleUnits(root) {
+    const boxes =
+      root?.classList?.contains("kalk-qty")
+        ? [root]
+        : [...(root || host).querySelectorAll(".kalk-qty")];
+    boxes.forEach((qty) => {
+      const unit = qty.querySelector("[data-unit]");
+      const cell = qty.querySelector("[data-col=menge]");
+      if (!unit || unit.value === "pt" || !cell) return;
+      const raw = cell.innerText.trim();
+      if (!raw) return;
+      cell.textContent = formatPt(parseNum(raw) / perPt(unit.value));
+      unit.value = "pt";
+    });
+  }
+
+  function settleCurrency(root) {
+    const boxes =
+      root?.classList?.contains("kalk-qty")
+        ? [root]
+        : [...(root || host).querySelectorAll(".kalk-qty")];
+    boxes.forEach((qty) => {
+      const ccy = qty.querySelector("[data-ccy]");
+      const cell = qty.querySelector("[data-col=menge]");
+      if (!ccy || ccy.value !== "usd" || !cell) return;
+      const raw = cell.innerText.trim();
+      if (!raw) return;
+      cell.textContent = formatMoney(parseNum(raw) / usdPerEur);
+      ccy.value = "eur";
+    });
+  }
+
   function csvCell(value) {
     const text = String(value ?? "");
     if (/[";\n]/.test(text)) return `"${text.replaceAll('"', '""')}"`;
@@ -111,8 +194,17 @@
       });
   }
 
+  function formatMoney(n) {
+    const rounded = Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+    return rounded.toFixed(2).replace(".", ",");
+  }
+
   function euro(n) {
-    return `${n.toFixed(2).replace(".", ",")} €`;
+    return `${formatMoney(n)} €`;
+  }
+
+  function moneyTitle() {
+    return `Ohne Wahl sind es Euro. 1 € = ${usdPerEur.toFixed(4).replace(".", ",")} $.`;
   }
 
   function rowsOf(block, art) {
@@ -128,8 +220,8 @@
   }
 
   function bruttoFor(block, spec) {
-    const pt = rowsOf(block, "pt").reduce((sum, tr) => sum + parseNum(lineValues(tr).menge), 0);
-    const sach = rowsOf(block, "sach").reduce((sum, tr) => sum + parseNum(lineValues(tr).menge), 0);
+    const pt = rowsOf(block, "pt").reduce((sum, tr) => sum + linePt(tr), 0);
+    const sach = rowsOf(block, "sach").reduce((sum, tr) => sum + lineMoney(tr), 0);
     let labor = pt * spec.rate;
     if (spec.cit) labor = labor * (1 + CIT_OH) * (1 + CIT_PROFIT);
     return { pt, sach, brutto: labor + sach };
@@ -175,12 +267,25 @@
       lines.push(row([pt || "", "Gesamt Personentage", "", ""]));
       lines.push(row(["", "", "", ""]));
       lines.push(row(["Personentage", "Aufschlüsselung / Beschreibung", "", ""]));
-      padLines(rowsOf(block, "pt").map(lineValues)).forEach((item) => {
+      padLines(rowsOf(block, "pt").map((tr) => {
+        const item = lineValues(tr);
+        const unit = tr.querySelector("[data-unit]")?.value;
+        if (unit && unit !== "pt" && item.menge) {
+          item.menge = formatPt(parseNum(item.menge) / perPt(unit));
+        }
+        return item;
+      })).forEach((item) => {
         lines.push(row([item.menge, item.beschreibung, "", ""]));
       });
       lines.push(row(["", "", "", ""]));
       lines.push(row(["Sach-/Lizenzkosten", "Aufschlüsselung / Beschreibung", "", ""]));
-      padLines(rowsOf(block, "sach").map(lineValues)).forEach((item) => {
+      padLines(rowsOf(block, "sach").map((tr) => {
+        const item = lineValues(tr);
+        if (tr.querySelector("[data-ccy]")?.value === "usd" && item.menge) {
+          item.menge = formatMoney(parseNum(item.menge) / usdPerEur);
+        }
+        return item;
+      })).forEach((item) => {
         lines.push(row([item.menge, item.beschreibung, "", ""]));
       });
       lines.push(row(["", "", "", ""]));
@@ -206,6 +311,23 @@
   }
 
   let dirty = false;
+  let saveTimer = 0;
+  let saving = false;
+
+  async function persistShare(csv) {
+    if (!SHARE) return;
+    try {
+      const r = await fetch(`/aufwand/${SHARE}`, {
+        method: "PUT",
+        headers: { "Content-Type": "text/csv; charset=utf-8" },
+        body: csv,
+      });
+      if (!r.ok) throw new Error("save failed");
+    } catch (_) {
+      /* offline / kurzzeitig — nächster flush versucht erneut */
+      dirty = true;
+    }
+  }
 
   function flush() {
     renderTotals();
@@ -214,19 +336,50 @@
     if (window.opener && !window.opener.closed) {
       window.opener.postMessage({ type: TYPE, csv }, window.location.origin);
     }
+    if (!SHARE) {
+      dirty = false;
+      return;
+    }
+    window.clearTimeout(saveTimer);
+    saveTimer = window.setTimeout(() => {
+      if (saving) return;
+      saving = true;
+      dirty = false;
+      void persistShare(csv).finally(() => {
+        saving = false;
+      });
+    }, 700);
   }
 
   function addLine(tbody, values) {
     const tr = document.createElement("tr");
-    tr.innerHTML =
-      `<td contenteditable="true" data-col="menge">${values?.menge || ""}</td>` +
-      `<td contenteditable="true" data-col="beschreibung">${values?.beschreibung || ""}</td>`;
+    const menge = values?.menge || "";
+    if (tbody.dataset.art === "pt") {
+      tr.innerHTML =
+        `<td class="kalk-qty">` +
+        `<span contenteditable="true" data-col="menge">${menge}</span>` +
+        `<select data-unit aria-label="Einheit" title="Ohne Wahl sind es Personentage. 1 PT = 8 Stunden.">` +
+        `<option value="pt" selected>PT</option>` +
+        `<option value="h">h</option>` +
+        `<option value="min">min</option>` +
+        `</select></td>` +
+        `<td contenteditable="true" data-col="beschreibung">${values?.beschreibung || ""}</td>`;
+    } else {
+      tr.innerHTML =
+        `<td class="kalk-qty">` +
+        `<span contenteditable="true" data-col="menge">${menge}</span>` +
+        `<select data-ccy aria-label="Währung" title="${moneyTitle()}">` +
+        `<option value="eur" selected>€</option>` +
+        `<option value="usd">$</option>` +
+        `</select></td>` +
+        `<td contenteditable="true" data-col="beschreibung">${values?.beschreibung || ""}</td>`;
+    }
     tbody.appendChild(tr);
   }
 
   function table(art, qtyLabel) {
     const wrap = document.createElement("div");
-    wrap.className = "kalk-table";
+    wrap.className = art === "pt" ? "kalk-table is-pt" : "kalk-table is-money";
     wrap.innerHTML =
       `<table><thead><tr><th>${qtyLabel}</th><th>Aufschlüsselung / Beschreibung</th></tr></thead>` +
       `<tbody data-art="${art}"></tbody>` +
@@ -354,32 +507,101 @@
     flush();
   });
 
+  function leaveMinuteFields(target) {
+    let changed = false;
+    host.querySelectorAll(".kalk-qty").forEach((qty) => {
+      if (target && qty.contains(target)) return;
+      const unit = qty.querySelector("[data-unit]");
+      const cell = qty.querySelector("[data-col=menge]");
+      const ccy = qty.querySelector("[data-ccy]");
+      if (!cell?.innerText.trim()) return;
+      if (unit?.value === "pt" && ccy?.value !== "usd") return;
+      if (!unit && ccy?.value !== "usd") return;
+      const before = cell.textContent;
+      if (unit && unit.value !== "pt") settleUnits(qty);
+      if (ccy?.value === "usd") settleCurrency(qty);
+      if (cell.textContent !== before) changed = true;
+    });
+    if (!changed) return;
+    dirty = true;
+    renderTotals();
+    flush();
+  }
+
+  host.addEventListener("focusout", (event) => {
+    const qty = event.target.closest(".kalk-qty");
+    if (!qty || (event.relatedTarget && qty.contains(event.relatedTarget))) return;
+    leaveMinuteFields(event.relatedTarget);
+  });
+
+  document.addEventListener("pointerdown", (event) => {
+    leaveMinuteFields(event.target);
+  });
+
   host.addEventListener("input", () => {
+    dirty = true;
+    renderTotals();
+    flush();
+  });
+  window.addEventListener("pagehide", () => {
+    settleUnits();
+    settleCurrency();
     dirty = true;
     flush();
   });
-  window.addEventListener("pagehide", flush);
-  window.addEventListener("beforeunload", flush);
+  window.addEventListener("beforeunload", () => {
+    settleUnits();
+    settleCurrency();
+    dirty = true;
+    flush();
+  });
   document.getElementById("kalk-save")?.addEventListener("click", () => {
+    settleUnits();
+    settleCurrency();
     dirty = true;
     flush();
     window.close();
   });
+  document.getElementById("kalk-back")?.addEventListener("click", () => {
+    if (window.opener && !window.opener.closed) {
+      window.close();
+      return;
+    }
+    location.href = "/workspace";
+  });
+
+  function loadRate() {
+    fetch("https://api.frankfurter.app/latest?from=EUR&to=USD")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const rate = Number(data?.rates?.USD);
+        if (!Number.isFinite(rate) || rate <= 0) return;
+        usdPerEur = rate;
+        host.querySelectorAll("[data-ccy]").forEach((el) => {
+          el.title = moneyTitle();
+        });
+        renderTotals();
+      })
+      .catch(() => {});
+  }
 
   async function boot() {
     if (!SHARE) {
       paint({});
-      renderTotals();
-      return;
-    }
-    try {
-      const r = await fetch(`/aufwand/${SHARE}/data`);
-      const csv = r.ok ? await r.text() : "";
-      paint(fromCsv(csv) || {});
-    } catch {
-      paint({});
+    } else {
+      try {
+        const r = await fetch(`/aufwand/${SHARE}/data`);
+        const csv = r.ok ? await r.text() : "";
+        paint(fromCsv(csv) || {});
+        const meta = await fetch(`/aufwand/${SHARE}/meta`).then((res) => (res.ok ? res.json() : {}));
+        if (meta.key) showIssueKey(meta.key, meta.url);
+        if (forEl && !forTitle && meta.title) forEl.textContent = meta.title;
+      } catch {
+        paint({});
+      }
     }
     renderTotals();
+    loadRate();
   }
 
   boot();

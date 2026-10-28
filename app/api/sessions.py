@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request, status
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.config import ROOT
@@ -33,6 +35,7 @@ from app.services.effort_sheet import (
     effort_sync_fields,
     fetch_effort_sheet,
     kalkulation_xlsx,
+    ensure_effort_share,
     load_share_csv,
     template_bytes,
 )
@@ -61,14 +64,18 @@ def get_assistant(
     db: Session = Depends(get_db),
     service: IntakeService = Depends(get_service),
 ) -> AssistantService:
-    return AssistantService(db=db, intake=service)
+    provider = build_provider_from_runtime(get_runtime_config(db))
+    return AssistantService(db=db, intake=service, provider=provider)
 
 
-def _load(service: IntakeService, session_id: str):
+def _load(service: IntakeService, session_id: str, user: User | None = None):
     try:
-        return service.load_session(session_id)
+        session = service.load_session(session_id)
     except SessionNotFound:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Session unbekannt") from None
+    if user is not None and session.user_id and session.user_id != user.id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Session gehört einem anderen Nutzer")
+    return session
 
 
 @router.post("")
@@ -78,6 +85,54 @@ def create_session(
 ) -> dict:
     session = service.create_session(user)
     return {"sessionId": session.id}
+
+
+@router.get("/hub-chats")
+def list_hub_chats(
+    assistant: AssistantService = Depends(get_assistant),
+    user: User = Depends(current_actor),
+    limit: int = Query(8, ge=1, le=20),
+) -> dict:
+    return {"items": assistant.list_hub_chats(user, limit=limit)}
+
+
+@router.get("/{session_id}/history")
+def get_session_history(
+    session_id: str,
+    assistant: AssistantService = Depends(get_assistant),
+    user: User = Depends(current_actor),
+) -> dict:
+    session = _load(assistant.intake, session_id, user)
+    return assistant.hub_history_payload(session)
+
+
+@router.post("/{session_id}/message/stream")
+def post_message_stream(
+    session_id: str,
+    payload: MessageIn,
+    assistant: AssistantService = Depends(get_assistant),
+    user: User = Depends(current_actor),
+) -> StreamingResponse:
+    session = _load(assistant.intake, session_id, user)
+    client = payload.client.model_dump() if payload.client else None
+
+    def events():
+        try:
+            for event in assistant.handle_stream(
+                session, payload.text, client, actor=user
+            ):
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        except Exception as err:  # noqa: BLE001 — SSE-Fehler an Client
+            yield f"data: {json.dumps({'event': 'done', 'payload': {'type': 'answer', 'text': str(err)}}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/publish")
@@ -129,7 +184,7 @@ def post_publish(
 def post_polish(
     payload: PolishIn,
     db: Session = Depends(get_db),
-    _: User = Depends(current_actor),
+    user: User = Depends(current_actor),
 ) -> dict:
     try:
         return {
@@ -150,7 +205,7 @@ def post_polish(
 def post_benefit(
     payload: PolishIn,
     db: Session = Depends(get_db),
-    _: User = Depends(current_actor),
+    user: User = Depends(current_actor),
 ) -> dict:
     try:
         return {"text": infer_benefit(db, payload.text, payload.title)}
@@ -162,7 +217,7 @@ def post_benefit(
 def post_reason(
     payload: ReasonIn,
     db: Session = Depends(get_db),
-    _: User = Depends(current_actor),
+    user: User = Depends(current_actor),
 ) -> dict:
     try:
         return {
@@ -178,7 +233,7 @@ def post_reason(
 def post_solution(
     payload: SolutionIn,
     db: Session = Depends(get_db),
-    _: User = Depends(current_actor),
+    user: User = Depends(current_actor),
 ) -> dict:
     try:
         return {
@@ -198,7 +253,7 @@ def post_solution(
 def post_risks(
     payload: RiskIn,
     db: Session = Depends(get_db),
-    _: User = Depends(current_actor),
+    user: User = Depends(current_actor),
 ) -> dict:
     try:
         return {
@@ -219,7 +274,7 @@ def post_risks(
 def post_overview(
     payload: PolishIn,
     db: Session = Depends(get_db),
-    _: User = Depends(current_actor),
+    user: User = Depends(current_actor),
 ) -> dict:
     try:
         return infer_overview(db, payload.text, payload.title)
@@ -231,7 +286,7 @@ def post_overview(
 def post_effort(
     payload: EffortIn,
     db: Session = Depends(get_db),
-    _: User = Depends(current_actor),
+    user: User = Depends(current_actor),
 ) -> dict:
     """Prüft Nutzer-PT und schlägt eine Spanne aus Detailgrad + Web vor."""
     try:
@@ -248,6 +303,19 @@ def post_effort(
 
 
 def _public_base(request: Request) -> str:
+    from app.config import get_settings
+
+    configured = (get_settings().public_base_url or "").strip().rstrip("/")
+    if configured and "127.0.0.1" not in configured and "localhost" not in configured:
+        return configured
+    # Fallback: Cidaas-Redirect-Host (Prod) oder Request-Host
+    redirect = (get_settings().cidaas_redirect_url or "").strip()
+    if redirect.startswith("http"):
+        from urllib.parse import urlparse
+
+        parsed = urlparse(redirect)
+        if parsed.scheme and parsed.netloc and "127.0.0.1" not in parsed.netloc:
+            return f"{parsed.scheme}://{parsed.netloc}"
     proto = (request.headers.get("x-forwarded-proto") or request.url.scheme).split(",")[0].strip()
     host = (
         request.headers.get("x-forwarded-host")
@@ -260,7 +328,7 @@ def _public_base(request: Request) -> str:
 @router.get("/effort-sheet/template")
 def get_effort_sheet_template(
     dummy: bool = Query(default=False),
-    _: User = Depends(current_actor),
+    user: User = Depends(current_actor),
 ) -> Response:
     content = dummy_template_bytes() if dummy else template_bytes()
     name = "aufwand-dummy.csv" if dummy else "aufwand-vorlage.csv"
@@ -274,7 +342,7 @@ def get_effort_sheet_template(
 @router.post("/effort-sheet")
 def post_effort_sheet(
     payload: EffortSheetIn,
-    _: User = Depends(current_actor),
+    user: User = Depends(current_actor),
 ) -> dict:
     try:
         return fetch_effort_sheet(payload.url)
@@ -285,7 +353,7 @@ def post_effort_sheet(
 @router.post("/effort-sheet/xlsx")
 def post_effort_sheet_xlsx(
     payload: EffortSheetCommitIn,
-    _: User = Depends(current_actor),
+    user: User = Depends(current_actor),
 ) -> Response:
     try:
         data = kalkulation_xlsx(payload.csv)
@@ -303,7 +371,7 @@ def post_effort_sheet_commit(
     payload: EffortSheetCommitIn,
     request: Request,
     db: Session = Depends(get_db),
-    _: User = Depends(current_actor),
+    user: User = Depends(current_actor),
 ) -> dict:
     try:
         parsed = commit_effort_csv(
@@ -311,12 +379,18 @@ def post_effort_sheet_commit(
         )
     except EffortSheetError as err:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(err)) from err
-    if payload.request_id:
-        from app.services.requests_service import get_request, update_request
+    from app.services.jira_inbox import find_request_by_effort_share
+    from app.services.requests_service import get_request, update_request
 
+    ticket = None
+    if payload.request_id:
         ticket = get_request(db, payload.request_id)
-        if ticket:
-            update_request(db, ticket, effort_sync_fields(parsed))
+    if not ticket and parsed.get("share_id"):
+        ticket = find_request_by_effort_share(db, str(parsed.get("share_id")))
+    if ticket:
+        update_request(db, ticket, effort_sync_fields(parsed))
+        parsed["request_id"] = ticket.id
+        parsed["reference"] = ticket.reference
     return parsed
 
 
@@ -324,7 +398,7 @@ def post_effort_sheet_commit(
 def post_priority(
     payload: ContextIn,
     db: Session = Depends(get_db),
-    _: User = Depends(current_actor),
+    user: User = Depends(current_actor),
 ) -> dict:
     return priority_payload(payload.text, db=db, use_llm=True)
 
@@ -333,7 +407,7 @@ def post_priority(
 def post_kind(
     payload: ContextIn,
     db: Session = Depends(get_db),
-    _: User = Depends(current_actor),
+    user: User = Depends(current_actor),
 ) -> dict:
     return kind_payload(payload.text, db=db, use_llm=True)
 
@@ -345,7 +419,7 @@ def post_message(
     assistant: AssistantService = Depends(get_assistant),
     user: User = Depends(current_actor),
 ) -> dict:
-    session = _load(assistant.intake, session_id)
+    session = _load(assistant.intake, session_id, user)
     client = payload.client.model_dump() if payload.client else None
     return assistant.handle(session, payload.text, client, actor=user)
 
@@ -355,9 +429,9 @@ def post_override(
     session_id: str,
     payload: OverrideIn,
     service: IntakeService = Depends(get_service),
-    _: User = Depends(current_actor),
+    user: User = Depends(current_actor),
 ) -> dict:
-    session = _load(service, session_id)
+    session = _load(service, session_id, user)
     try:
         return service.override(session, kind=payload.kind, priority=payload.priority)
     except NotReadyForCreation as err:
@@ -369,9 +443,9 @@ def patch_draft(
     session_id: str,
     payload: DraftPatchIn,
     service: IntakeService = Depends(get_service),
-    _: User = Depends(current_actor),
+    user: User = Depends(current_actor),
 ) -> dict:
-    session = _load(service, session_id)
+    session = _load(service, session_id, user)
     try:
         return service.patch_draft(session, payload.fields)
     except NotReadyForCreation as err:
@@ -387,7 +461,7 @@ def post_ai_fill(
 ) -> dict:
     # AssistantService hat Zugriff auf die Intake-Service, wir nutzen aber
     # direkt den Intake-Service für den Draft-Writeback.
-    session = _load(assistant.intake, session_id)
+    session = _load(assistant.intake, session_id, user)
     return assistant.intake.ai_fill(session, field_key=payload.fieldKey, overwrite=payload.overwrite, user=user)
 
 
@@ -398,7 +472,7 @@ def post_confirm(
     user: User = Depends(current_actor),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> dict:
-    session = _load(service, session_id)
+    session = _load(service, session_id, user)
     try:
         payload = service.confirm(session, idempotency_key=idempotency_key, user=user)
     except NotReadyForCreation as err:
@@ -417,9 +491,8 @@ share_router = APIRouter(tags=["intake"])
 
 @share_router.get("/aufwand/{share_id}/xlsx")
 def effort_sheet_share_xlsx(share_id: str, db: Session = Depends(get_db)) -> Response:
-    csv_text = load_share_csv(db, share_id)
-    if not csv_text:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Aufwandstabelle unbekannt")
+    csv_text = ensure_effort_share(db, share_id)
+    db.commit()
     data = kalkulation_xlsx(csv_text)
     return Response(
         content=data,
@@ -430,11 +503,24 @@ def effort_sheet_share_xlsx(share_id: str, db: Session = Depends(get_db)) -> Res
     )
 
 
+@share_router.get("/aufwand/{share_id}/meta")
+def effort_sheet_share_meta(share_id: str, db: Session = Depends(get_db)) -> dict:
+    from app.ports.jira_v3 import public_browse_url
+    from app.services.jira_inbox import find_request_by_effort_share
+
+    ticket = find_request_by_effort_share(db, share_id)
+    if not ticket:
+        return {"key": "", "url": "", "title": ""}
+    ref = ticket.external_refs[0] if ticket.external_refs else None
+    key = str((ref.external_key if ref else "") or ticket.reference or "").strip()
+    url = public_browse_url(ref.external_url if ref else "", key) if key else ""
+    return {"key": key, "url": url, "title": ticket.title or ""}
+
+
 @share_router.get("/aufwand/{share_id}/data")
 def effort_sheet_share_data(share_id: str, db: Session = Depends(get_db)) -> Response:
-    csv_text = load_share_csv(db, share_id)
-    if not csv_text:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Aufwandstabelle unbekannt")
+    csv_text = ensure_effort_share(db, share_id)
+    db.commit()
     body = csv_text if isinstance(csv_text, str) else csv_text.decode("utf-8")
     if not body.startswith("\ufeff"):
         body = f"\ufeff{body}"
@@ -447,8 +533,49 @@ def effort_sheet_share_data(share_id: str, db: Session = Depends(get_db)) -> Res
     )
 
 
+@share_router.put("/aufwand/{share_id}")
+@share_router.post("/aufwand/{share_id}")
+async def effort_sheet_share_save(
+    share_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Öffentlicher Speicherpunkt für den Aufwand-Link (Jira / Share)."""
+    from app.config import get_settings
+    from app.services.jira_inbox import find_request_by_effort_share
+    from app.services.requests_service import update_request
+
+    raw = (await request.body()).decode("utf-8", errors="replace")
+    csv_text = raw.lstrip("\ufeff").strip()
+    if len(csv_text) < 8:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "CSV fehlt")
+    base = (get_settings().public_base_url or "").rstrip("/")
+    if not base or "127.0.0.1" in base or "localhost" in base:
+        redirect = (get_settings().cidaas_redirect_url or "").strip()
+        if redirect.startswith("http"):
+            from urllib.parse import urlparse
+
+            parsed_u = urlparse(redirect)
+            base = f"{parsed_u.scheme}://{parsed_u.netloc}"
+        else:
+            base = _public_base(request)
+    ensure_effort_share(db, share_id, public_base=base)
+    try:
+        parsed = commit_effort_csv(db, csv_text, base, share_id=share_id)
+    except EffortSheetError as err:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(err)) from err
+    ticket = find_request_by_effort_share(db, share_id)
+    if ticket:
+        update_request(db, ticket, effort_sync_fields(parsed))
+        parsed["request_id"] = ticket.id
+        parsed["reference"] = ticket.reference
+    db.commit()
+    return {"ok": True, "share_id": share_id, "synced": bool(ticket), **{k: parsed.get(k) for k in ("request_id", "reference", "total_costs", "costs") if parsed.get(k)}}
+
+
 @share_router.get("/aufwand/{share_id}")
 def effort_sheet_share(share_id: str, db: Session = Depends(get_db)) -> FileResponse:
-    if not load_share_csv(db, share_id):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Aufwandstabelle unbekannt")
+    # Fehlende Shares (z. B. alter Jira-Link) automatisch anlegen statt 404.
+    ensure_effort_share(db, share_id)
+    db.commit()
     return FileResponse(ROOT / "static" / "effort-sheet.html", media_type="text/html")

@@ -96,6 +96,40 @@ class OllamaProvider:
         except (httpx.HTTPError, KeyError, ValueError) as err:
             raise LlmUnavailable(str(err)[:300]) from err
 
+    def stream_text(self, system: str, user: str):
+        payload = {
+            "model": self._model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": f"/no_think\n{user}"},
+            ],
+            "stream": True,
+            "options": {"temperature": 0.3, "num_predict": 1600, "num_ctx": 8192},
+            "keep_alive": "30m",
+        }
+        try:
+            with httpx.stream(
+                "POST",
+                f"{self._base_url}/api/chat",
+                json=payload,
+                timeout=self._timeout,
+            ) as response:
+                response.raise_for_status()
+                for line in response.iter_lines():
+                    if not line:
+                        continue
+                    try:
+                        data = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    piece = str((data.get("message") or {}).get("content") or "")
+                    if piece:
+                        yield piece
+                    if data.get("done"):
+                        break
+        except httpx.HTTPError as err:
+            raise LlmUnavailable(str(err)[:300]) from err
+
 
 def normalize_openai_base_url(base_url: str) -> str:
     """Nur die Root bis /v1. /chat/completions haengt der Client selbst an."""
@@ -250,6 +284,61 @@ class OpenAiProvider:
         except (httpx.HTTPError, KeyError, ValueError, IndexError, TypeError) as err:
             raise LlmUnavailable(str(err)[:300]) from err
 
+    def stream_text(self, system: str, user: str):
+        if not self._api_key:
+            raise LlmUnavailable("OpenAI API-Key fehlt")
+        if not self._base_url:
+            raise LlmUnavailable("OpenAI Base-URL fehlt")
+        model = self.ensure_model()
+        payload = {
+            "model": model,
+            "temperature": 0.3,
+            "max_tokens": 2000,
+            "stream": True,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "chat_template_kwargs": {"enable_thinking": False},
+        }
+        try:
+            with httpx.stream(
+                "POST",
+                f"{self._base_url}/chat/completions",
+                json=payload,
+                headers={"Authorization": f"Bearer {self._api_key}"},
+                timeout=self._timeout,
+            ) as response:
+                if response.status_code >= 400:
+                    body = response.read().decode("utf-8", errors="replace")[:240]
+                    raise LlmUnavailable(f"HTTP {response.status_code}: {body}")
+                for line in response.iter_lines():
+                    if not line:
+                        continue
+                    if line.startswith("data:"):
+                        raw = line[5:].strip()
+                    else:
+                        raw = line.strip()
+                    if not raw or raw == "[DONE]":
+                        if raw == "[DONE]":
+                            break
+                        continue
+                    try:
+                        data = json.loads(raw)
+                    except json.JSONDecodeError:
+                        continue
+                    choices = data.get("choices") or []
+                    if not choices:
+                        continue
+                    delta = choices[0].get("delta") or {}
+                    piece = str(delta.get("content") or "")
+                    if piece:
+                        yield piece
+        except LlmUnavailable:
+            raise
+        except httpx.HTTPError as err:
+            raise LlmUnavailable(str(err)[:300]) from err
+
 
 class AnthropicProvider:
     def __init__(self, base_url: str, model: str, api_key: str, timeout: int) -> None:
@@ -287,6 +376,38 @@ class AnthropicProvider:
         except (httpx.HTTPError, KeyError, ValueError) as err:
             raise LlmUnavailable(str(err)[:300]) from err
 
+    def complete_text(self, system: str, user: str) -> str:
+        if not self._api_key:
+            raise LlmUnavailable("Anthropic API-Key fehlt")
+        payload = {
+            "model": self._model,
+            "max_tokens": 2048,
+            "temperature": 0.4,
+            "system": system,
+            "messages": [{"role": "user", "content": user}],
+        }
+        try:
+            response = httpx.post(
+                f"{self._base_url}/v1/messages",
+                json=payload,
+                headers={
+                    "x-api-key": self._api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                timeout=self._timeout,
+            )
+            response.raise_for_status()
+            blocks = response.json().get("content") or []
+            text = "".join(b.get("text", "") for b in blocks if b.get("type") == "text").strip()
+            if not text:
+                raise LlmUnavailable("leere Modell-Antwort")
+            return text
+        except LlmUnavailable:
+            raise
+        except (httpx.HTTPError, KeyError, ValueError) as err:
+            raise LlmUnavailable(str(err)[:300]) from err
+
 
 class GeminiProvider:
     def __init__(self, base_url: str, model: str, api_key: str, timeout: int) -> None:
@@ -321,11 +442,42 @@ class GeminiProvider:
         except (httpx.HTTPError, KeyError, ValueError, IndexError) as err:
             raise LlmUnavailable(str(err)[:300]) from err
 
+    def complete_text(self, system: str, user: str) -> str:
+        if not self._api_key:
+            raise LlmUnavailable("Gemini API-Key fehlt")
+        url = (
+            f"{self._base_url}/models/{self._model}:generateContent"
+            f"?key={self._api_key}"
+        )
+        payload = {
+            "systemInstruction": {"parts": [{"text": system}]},
+            "contents": [{"role": "user", "parts": [{"text": user}]}],
+            "generationConfig": {
+                "temperature": 0.4,
+                "maxOutputTokens": 2048,
+            },
+        }
+        try:
+            response = httpx.post(url, json=payload, timeout=self._timeout)
+            response.raise_for_status()
+            parts = response.json()["candidates"][0]["content"]["parts"]
+            text = "".join(p.get("text", "") for p in parts).strip()
+            if not text:
+                raise LlmUnavailable("leere Modell-Antwort")
+            return text
+        except LlmUnavailable:
+            raise
+        except (httpx.HTTPError, KeyError, ValueError, IndexError) as err:
+            raise LlmUnavailable(str(err)[:300]) from err
+
 
 class NoLlmProvider:
     name = "heuristik"
 
     def complete_json(self, system: str, user: str) -> dict[str, Any]:
+        raise LlmUnavailable("kein LLM konfiguriert")
+
+    def complete_text(self, system: str, user: str) -> str:
         raise LlmUnavailable("kein LLM konfiguriert")
 
 

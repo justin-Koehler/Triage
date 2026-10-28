@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>CRITR</title>
-    <link rel="stylesheet" href="/styles.css?v=v0-3-52" />
+    <link rel="stylesheet" href="/styles.css?v=v0-5-11" />
   </head>
   <body class="gated">
     <header class="chrome">
@@ -13,7 +13,7 @@
           <a class="brand" href="/" id="brand">CRITR</a>
           <div class="app-version" id="app-version">
             <a class="app-version-label" id="app-version-info" href="/was-neu" title="Was neu ist">
-              v0.3.52
+              v0.5.11
             </a>
           </div>
         </div>
@@ -27,6 +27,7 @@
           <header class="ticket-head">
             <nav class="ticket-nav" id="ticket-nav" aria-label="Navigation">
               <button type="button" class="ticket-back" id="ticket-back">← Changes</button>
+              <button type="button" class="ticket-nav-action" id="ticket-duplicate" hidden>Duplizieren</button>
               <span class="ticket-nav-context" id="ticket-nav-context" hidden></span>
             </nav>
             <div class="ticket-hero">
@@ -43,7 +44,7 @@
               <div class="comment-stand-lead">
                 <header class="comment-stand-head">
                   <p class="comment-stand-label">Status</p>
-                  <button type="button" class="comment-stand-health status-update-open" id="status-update-open">Status update</button>
+                  <button type="button" class="comment-stand-health status-update-open" id="status-update-open" title="Grün im Plan, Blau im Blick, Gelb kritisch, Rot überzogen, Grau on hold">Status update</button>
                   <p class="comment-stand-meta" id="comment-stand-meta"></p>
                 </header>
                 <p class="comment-ablauf" id="comment-ablauf"></p>
@@ -103,6 +104,26 @@
           <button type="button" class="jira-create ticket-jira-create" id="jira-create-ticket" hidden>
             In Jira Anlegen
           </button>
+          <section class="ticket-section" id="ticket-phases" hidden>
+            <h3 class="ticket-section-title">Phasen</h3>
+            <div class="phase-row">
+              <label class="phase-own">
+                Dieser Change
+                <select id="ticket-phase" aria-label="Phase dieses Changes">
+                  <option value="">Ohne Phase</option>
+                  <option>Phase 1</option>
+                  <option>Phase 2</option>
+                  <option>Phase 3</option>
+                </select>
+              </label>
+            </div>
+            <ul class="phase-list" id="ticket-phase-list"></ul>
+            <label class="phase-search">
+              Anderen Change verknüpfen
+              <input id="ticket-phase-search" type="search" placeholder="Titel oder Nummer" autocomplete="off" />
+            </label>
+            <div class="phase-hits" id="ticket-phase-hits"></div>
+          </section>
           <section class="ticket-comments" id="ticket-comments" hidden>
             <div class="ticket-comments-head">
               <h3 class="ticket-section-title">Kommentare</h3>
@@ -143,20 +164,43 @@
 
       <section class="hub" id="hub" aria-label="Jira-Tickets">
         <div class="hub-bar">
-          <p class="hub-kicker">Changes</p>
           <div class="hub-view-switch" role="group" aria-label="Ansicht">
             <button type="button" class="hub-view-btn is-active" id="hub-view-chat" data-view="chat">
               Chat
             </button>
             <button type="button" class="hub-view-btn" id="hub-view-list" data-view="list">
-              Liste
+              Changes
             </button>
-            <button type="button" class="hub-view-btn" id="hub-view-board" data-view="board">
-              Board
-            </button>
-            <button type="button" class="hub-view-btn" id="hub-view-report" data-view="report">
-              Auswertung
-            </button>
+            <span class="hub-view-tools" id="hub-view-tools" hidden>
+              <button type="button" class="hub-view-icon" id="hub-view-rows" data-view="list" title="Liste" aria-label="Liste">
+                <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4">
+                  <path d="M2 4h12M2 8h12M2 12h12"></path>
+                </svg>
+              </button>
+              <button type="button" class="hub-view-icon" id="hub-view-board" data-view="board" title="Board" aria-label="Board">
+                <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4">
+                  <rect x="1.5" y="2" width="3.2" height="12" rx="0.6"></rect>
+                  <rect x="6.4" y="2" width="3.2" height="12" rx="0.6"></rect>
+                  <rect x="11.3" y="2" width="3.2" height="12" rx="0.6"></rect>
+                </svg>
+              </button>
+              <button type="button" class="hub-view-icon" id="hub-view-report" data-view="report" title="Auswertung" aria-label="Auswertung">
+                <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="currentColor">
+                  <rect x="1.5" y="8" width="3" height="6"></rect>
+                  <rect x="6.5" y="4.5" width="3" height="9.5"></rect>
+                  <rect x="11.5" y="2" width="3" height="12"></rect>
+                </svg>
+              </button>
+            </span>
+          </div>
+          <div class="hub-owner">
+            <button type="button" class="hub-owner-label" id="hub-owner-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="hub-owner-menu">Filter</button>
+            <select id="hub-owner" class="hub-owner-select" tabindex="-1" aria-hidden="true">
+              <option value="">Alle</option>
+              <option value="mine">Meine</option>
+              <option value="assigned">Mir zugewiesen</option>
+            </select>
+            <div class="hub-owner-menu" id="hub-owner-menu" role="listbox" hidden></div>
           </div>
           <label class="search hub-search" for="hub-search">
             <span class="search-icon" aria-hidden="true">/</span>
@@ -227,17 +271,6 @@
         <p class="hub-board-hint" id="hub-board-hint" hidden>Weiter</p>
         <div class="hub-chat" id="hub-chat" hidden>
           <div class="hub-chat-panel is-empty" id="hub-chat-panel">
-            <div class="hub-chat-toolbar">
-              <div class="hub-chat-tools">
-                <div class="hub-chat-history-wrap">
-                  <button type="button" class="hub-chat-tool" id="hub-chat-history" aria-haspopup="menu" aria-expanded="false" title="Verlauf">
-                    Verlauf
-                  </button>
-                  <div class="hub-chat-history-menu" id="hub-chat-history-menu" role="menu" hidden></div>
-                </div>
-                <button type="button" class="hub-chat-tool" id="hub-chat-reset" title="Neuer Chat">Neu</button>
-              </div>
-            </div>
             <div class="hub-chat-thread" id="hub-chat-thread" aria-live="polite"></div>
             <div class="hub-chat-dock">
             <button type="button" class="hub-chat-jump" id="hub-chat-jump" hidden>Nach unten</button>
@@ -257,13 +290,24 @@
                 Was wartet auf mich?
               </button>
             </div>
+            <div class="hub-chat-toolbar">
+              <div class="hub-chat-tools">
+                <div class="hub-chat-history-wrap">
+                  <button type="button" class="hub-chat-tool" id="hub-chat-history" aria-haspopup="menu" aria-expanded="false" title="Verlauf">
+                    Verlauf
+                  </button>
+                  <div class="hub-chat-history-menu" id="hub-chat-history-menu" role="menu" hidden></div>
+                </div>
+                <button type="button" class="hub-chat-tool" id="hub-chat-reset" title="Neuer Chat">Neu</button>
+              </div>
+            </div>
             <form class="hub-chat-form" id="hub-chat-form">
               <p class="hub-chat-edit-hint" id="hub-chat-edit-hint" hidden>Ersetzt die letzte Nachricht</p>
               <label class="hub-chat-composer" for="hub-chat-input">
                 <textarea
                   id="hub-chat-input"
                   rows="1"
-                  placeholder="Nachricht schreiben"
+                  placeholder="Hier eine Nachricht schreiben…"
                   autocomplete="off"
                 ></textarea>
                 <button type="submit" class="hub-chat-send" id="hub-chat-send" aria-label="Senden" disabled>
@@ -278,6 +322,7 @@
                   </svg>
                 </button>
               </label>
+              <p class="hub-chat-note">Enter sendet. Umschalt+Enter für eine neue Zeile.</p>
             </form>
             </div>
           </div>
@@ -309,6 +354,9 @@
           </div>
           <button type="button" class="jira-create" id="start-change">
             Neuen Change anlegen
+          </button>
+          <button type="button" class="jira-create is-quiet" id="cancel-change" hidden>
+            Abbrechen
           </button>
           <button type="button" class="jira-create" id="ai-review-ok" hidden>
             Ich habe alles geprüft
@@ -375,6 +423,6 @@
 
     <script src="/auth.js?v=v0-3-33"></script>
     <script src="/app.js?v=v0-3-33"></script>
-    <script src="/workspace.js?v=v0-3-52"></script>
+    <script src="/workspace.js?v=v0-5-11"></script>
   </body>
 </html>

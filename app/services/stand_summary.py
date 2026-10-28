@@ -12,12 +12,14 @@ from app.domain.fieldspec import get_rules
 from app.domain.types import RequestKind, parse_kind
 from app.models import Request
 from app.services import requests_service as svc
-from app.triage.providers import LlmUnavailable, build_provider
+from app.services.prose import complete_prose
+from app.services.settings_service import get_runtime_config
+from app.triage.providers import LlmUnavailable, build_provider, build_provider_from_runtime
 
 MAX_BRIEF = 800
 MAX_LINE = 120
 MAX_COMMENTS = 5
-PROMPT_VERSION = "v2-last5"
+PROMPT_VERSION = "v4-summary"
 
 # Felder (UI: Body = comment_ablauf, Hub = stand_summary)
 BRIEF_KEY = "comment_ablauf"
@@ -25,19 +27,17 @@ LINE_KEY = "stand_summary"
 DIGEST_KEY = "stand_digest"
 SOURCE_KEY = "stand_source"
 
-SYSTEM = """Du schreibst ein kurzes Briefing zum aktuellen Stand eines Changes.
+SYSTEM = """Du fasst die letzten Kommentare zu einem verständlichen Stand zusammen.
 
-Quellen: comments (nur die letzten fünf), status_updates und ticket. Nur daraus schöpfen, nichts erfinden.
-Der neueste Kommentar wiegt am schwersten. Offene Aufgaben nicht auflisten.
-Gibt es weder Kommentare noch Status-Einträge, beschreibe knapp den Stand aus dem ticket
-(Vorhaben, Workflow-Status, Zeitraum) und sag klar, dass noch keine Rückmeldung vorliegt.
-Erfinde keinen Fortschritt.
+Quellen: comments (chronologisch, die letzten fünf), status_updates und ticket. Nur daraus, nichts erfinden.
+Der letzte Kommentar ist der aktuelle Stand. Liegt er mit einem älteren im Widerspruch, gilt der letzte:
+wurde abgebrochen und später doch nicht, ist es nicht abgebrochen.
+Ein Plan, den ein späterer Kommentar aufhebt, bleibt weg, auch wenn der Abbruch danach zurückgenommen wird.
+Schreib in eigenen Worten, nicht als Zitat und nicht als Liste der Kommentare.
+Denselben Satz nicht zweimal. Kein „Nächster Schritt:“.
 
-brief: 2–4 kurze Hauptsätze als Fließtext.
-  Als würde ein Kollege dich gerade updaten: Wo stehen wir jetzt? Was ist geklärt? Was läuft oder blockiert?
-  Keine Chronik, keine „Danach/Anschließend“, keine Stichpunkte, keine Autor:Text-Zitate.
-
-line: EIN kurzer Satz für die Übersichtsliste (aktueller Stand).
+brief: 2–3 kurze Sätze. Zuerst, wo es jetzt steht. Dann, was noch offen oder blockiert ist.
+line: EIN Satz, der nur den aktuellen Stand sagt.
 
 JSON: {"brief": "...", "line": "..."}"""
 
@@ -68,10 +68,15 @@ def _brief(text: str, limit: int = MAX_BRIEF) -> str:
 
 
 def list_stand(values: dict[str, str]) -> str:
-    line = _one_line(values.get(LINE_KEY) or values.get("comment_summary") or values.get("status_summary") or "")
-    if line:
-        return line
-    return _one_line(values.get(BRIEF_KEY) or values.get("status_ablauf") or values.get("current_status") or "")
+    """Hub-Zeile: immer aus dem Ticket-Stand (Ablauf), damit Liste und Ticket denselben Stand zeigen."""
+    brief = _one_line(
+        values.get(BRIEF_KEY) or values.get("status_ablauf") or values.get("current_status") or ""
+    )
+    if brief:
+        return brief
+    return _one_line(
+        values.get(LINE_KEY) or values.get("comment_summary") or values.get("status_summary") or ""
+    )
 
 
 STAND_HEALTH = {
@@ -194,45 +199,170 @@ def _ticket_payload(request: Request) -> dict[str, str]:
 def _ticket_fallback(ticket: dict[str, str]) -> tuple[str, str]:
     """Ohne Kommentare und Status: knapper, ehrlicher Satz aus den Ticketdaten."""
     status = (ticket.get("workflow_status") or "").strip()
+    early = status.casefold() in {"", "steckbrief", "entwurf"}
     frame = ""
     if ticket.get("start") and ticket.get("end"):
         frame = f" Zeitraum {ticket['start']} bis {ticket['end']}."
     elif ticket.get("start"):
         frame = f" Start {ticket['start']}."
-    head = f"Steht auf {status}" if status else "Steckbrief liegt vor"
     first = next(
         (p.strip() for p in _SENTENCE.split(ticket.get("description") or "") if p.strip()),
         "",
     )
-    body = f" {first.rstrip('.')}." if first else ""
-    brief = f"{head}.{body}{frame} Noch keine Rückmeldung im Ticket."
-    return _brief(brief), _one_line(f"{head}, noch keine Rückmeldung.")
+    if first:
+        # Beschreibung trägt den Stand — Workflow-Stufe nur nennen, wenn sie über Steckbrief hinaus ist.
+        head = f"Steht auf {status}. " if status and not early else ""
+        brief = f"{head}{first.rstrip('.')}." + frame
+        line = (
+            _one_line(f"Steht auf {status}: {first}")
+            if status and not early
+            else _one_line(first)
+        )
+        return _brief(brief), line
+    if status and not early:
+        return (
+            _brief(f"Steht auf {status}.{frame}"),
+            _one_line(f"Steht auf {status}."),
+        )
+    return (
+        _brief(f"Steckbrief liegt vor.{frame} Noch keine Rückmeldung im Ticket."),
+        _one_line("Noch keine Rückmeldung."),
+    )
+
+
+def _norm(text: str) -> str:
+    return re.sub(r"[^a-z0-9äöüß]+", "", str(text or "").lower())
+
+
+def _echoes(a: str, b: str) -> bool:
+    """Gleicher oder enthaltener Satz — kurze Wörter zählen nicht als Wiederholung."""
+    na, nb = _norm(a), _norm(b)
+    if not na or not nb:
+        return False
+    if na == nb:
+        return True
+    short, long = (na, nb) if len(na) <= len(nb) else (nb, na)
+    return len(short) >= 12 and short in long
+
+
+_STOP = re.compile(
+    r"(?<!nicht )(?<!kein )(?<!keine )"
+    r"(abgebrochen|abgesagt|gestoppt|eingestellt|pausiert|verschoben|gecancelt)",
+    re.I,
+)
+_FUTURE = re.compile(r"\bstartet\b|\bgeht live\b|go-live", re.I)
+
+
+def _overruled(core: str, newest: str, older: list[str]) -> bool:
+    """Älterer Plan, den der neueste Kommentar aufhebt."""
+    if not newest or _echoes(core, newest):
+        return False
+    if not _STOP.search(newest):
+        return False
+    if _FUTURE.search(core) and not _STOP.search(core):
+        return True
+    return any(_echoes(core, old) for old in older)
+_STEP_PREFIX = re.compile(
+    r"^(nächste[rs]\s+schritt|nächste\s+schritte)\s*:\s*",
+    re.I,
+)
+
+
+def _core(sentence: str) -> str:
+    return _STEP_PREFIX.sub("", str(sentence or "").strip()).strip()
+
+
+def _align_to_latest(brief: str, comments: list[dict]) -> str:
+    """Ältere Pläne und doppelte Sätze raus, wenn ein neuerer Kommentar sie überholt."""
+    newest = str(comments[-1].get("body") or "").strip() if comments else ""
+    older = [str(row.get("body") or "").strip() for row in comments[:-1]] if comments else []
+    kept: list[str] = []
+    for part in _SENTENCE.split(str(brief or "")):
+        core = _core(part).rstrip(".")
+        if not core:
+            continue
+        if any(_echoes(core, prev) for prev in kept):
+            continue
+        if _overruled(core, newest, older):
+            continue
+        kept.append(core)
+    if not kept:
+        return ""
+    return _brief(". ".join(item.rstrip(".") for item in kept) + ".")
+
+
+def _drop_stale_next(request: Request, comments: list[dict]) -> None:
+    """Gespeicherter nächster Schritt, der nur einen älteren Kommentar wiederholt."""
+    if len(comments) < 2 or not request.status_updates:
+        return
+    newest = str(comments[-1].get("body") or "")
+    if not _STOP.search(newest):
+        return
+    older = [str(row.get("body") or "") for row in comments[:-1]]
+    last = max(
+        request.status_updates,
+        key=lambda item: (
+            str(item.reported_on or ""),
+            item.created_at.isoformat() if item.created_at else "",
+        ),
+    )
+    step = str(last.next_steps or "").strip()
+    if step and _overruled(step, newest, older):
+        last.next_steps = ""
+
+
+_REVERSAL = re.compile(r"doch nicht abgebrochen|nicht abgebrochen|nicht gestoppt|nicht abgesagt", re.I)
 
 
 def _fallback(comments: list[dict], updates: list[dict]) -> tuple[str, str]:
-    """Nur die neuesten Signale — neuester Kommentar zuerst."""
+    """Letzte Kommentare zum aktuellen Stand, nicht als Zitatliste."""
+    bodies = [
+        " ".join(str(row.get("body") or "").split()).strip()
+        for row in comments[-MAX_COMMENTS:]
+    ]
+    bodies = [body for body in bodies if len(body) > 2]
+    newest = bodies[-1] if bodies else ""
+    older = bodies[:-1]
+    if _REVERSAL.search(newest):
+        match = re.search(r"\b((?:es |man )?muss\b.+)$", newest, re.I)
+        need = (match.group(1).strip().rstrip(".") if match else "")
+        if need[:1].islower():
+            need = need[:1].upper() + need[1:]
+        brief = "Der Change ist nicht abgebrochen."
+        if need:
+            brief = f"{brief} {need}."
+        return _brief(brief), _one_line(brief)
     bits: list[str] = []
-    if comments:
-        for row in reversed(comments[-2:]):
-            body = str(row.get("body") or "").strip().rstrip(".")
-            if body:
-                bits.append(body)
-    if updates:
+    if newest and not _STOP.search(newest):
+        bits.append(newest.rstrip("."))
+    elif newest:
+        bits.append(newest.rstrip("."))
+    for raw in reversed(older):
+        if len(bits) >= 2 or _echoes(raw, newest) or _overruled(raw, newest, older):
+            continue
+        if _STOP.search(newest) and not _STOP.search(raw):
+            continue
+        bits.append(raw.rstrip("."))
+    if not bodies and updates:
+        for row in updates:
+            core = _core(str(row.get("summary") or "")).rstrip(".")
+            if core and not any(_echoes(core, bit) for bit in bits):
+                bits.append(core)
+    elif updates:
         last = updates[-1]
-        chunk = " ".join(
-            part
-            for part in (
-                str(last.get("summary") or "").strip(),
-                f"Nächster Schritt: {last['next_steps']}" if last.get("next_steps") else "",
-            )
-            if part
-        )
-        if chunk:
-            bits.append(chunk.rstrip("."))
+        for raw in (
+            str(last.get("summary") or "").strip(),
+            str(last.get("next_steps") or "").strip(),
+        ):
+            core = _core(raw).rstrip(".")
+            if not core or any(_echoes(core, bit) for bit in bits):
+                continue
+            if _overruled(core, newest, older):
+                continue
+            bits.append(core)
     if not bits:
         return "", ""
     brief = _brief(". ".join(bits) + ".")
-    # line = neuester Kommentar (erstes Bit), sonst letztes Signal
     return brief, _one_line(bits[0])
 
 
@@ -313,8 +443,27 @@ def backfill_missing(db: Session, *, limit: int = 5, llm: bool = True) -> int:
     return done
 
 
+def _digest(comments: list[dict], updates: list[dict], ticket: dict) -> str:
+    return hashlib.sha256(
+        json.dumps(
+            {"c": comments, "u": updates, "t": ticket, "v": PROMPT_VERSION},
+            ensure_ascii=False,
+            sort_keys=True,
+        ).encode()
+    ).hexdigest()[:16]
+
+
+def stand_needs_refresh(db: Session, request: Request) -> bool:
+    comments, updates = _sources(db, request)
+    digest = _digest(comments, updates, _ticket_payload(request))
+    stored = (request.field_values().get(DIGEST_KEY) or "").strip()
+    return stored not in {digest, f"draft:{digest}"}
+
+
 def refresh_stand(db: Session, request: Request, *, llm: bool = True) -> dict:
     db.flush()
+    comments, _updates = _sources(db, request)
+    _drop_stale_next(request, comments)
     comments, updates = _sources(db, request)
     ticket = _ticket_payload(request)
     ticket_only = not comments and not updates
@@ -333,13 +482,7 @@ def refresh_stand(db: Session, request: Request, *, llm: bool = True) -> dict:
     else:
         source = "ticket"
 
-    digest = hashlib.sha256(
-        json.dumps(
-            {"c": comments, "u": updates, "t": ticket, "v": PROMPT_VERSION},
-            ensure_ascii=False,
-            sort_keys=True,
-        ).encode()
-    ).hexdigest()[:16]
+    digest = _digest(comments, updates, ticket)
 
     values = request.field_values()
     cached_brief = (values.get(BRIEF_KEY) or "").strip()
@@ -381,8 +524,17 @@ def refresh_stand(db: Session, request: Request, *, llm: bool = True) -> dict:
         )
         brief = brief or fb_brief
         line = line or fb_line
-    if not line and brief:
+    brief = _align_to_latest(brief, comments) or brief
+    # Hub und Ticket teilen denselben Stand: Kurzzeile = erster Satz des Ablaufs.
+    if brief:
         line = _one_line(brief)
+    elif not line:
+        line = ""
+    if comments and line:
+        newest = str(comments[-1].get("body") or "")
+        older = [str(row.get("body") or "") for row in comments[:-1]]
+        if _overruled(line, newest, older):
+            line = _one_line(brief)
 
     # Digest nur speichern, wenn LLM lief (oder kein LLM verfügbar → Fallback final)
     store_digest = digest if llm else f"draft:{digest}"
@@ -394,3 +546,124 @@ def refresh_stand(db: Session, request: Request, *, llm: bool = True) -> dict:
         "line": line,
         "unchanged": False,
     }
+
+
+NEXT_SYSTEM = """Du nennst, was als Nächstes zu tun ist.
+
+Der neueste Kommentar ist der aktuelle Stand. Hebt er einen älteren Plan auf
+(abgebrochen, gestoppt, verschoben), gilt nur noch dieser Stand.
+Den überholten Plan nicht wiederholen und nicht als nächsten Schritt nennen.
+Nur aus den Angaben. Nichts erfinden, keine Namen oder Termine dazuerfinden.
+Ein bis drei kurze Sätze. Keine Überschrift, keine Aufzählungszeichen.
+Wenn nichts Offenes erkennbar ist, ein Satz, worauf es jetzt ankommt.
+"""
+
+
+RISK_SYSTEM = """Du schätzt die Risiken zum aktuellen Stand ein.
+
+Das ist nicht die Liste der bekannten Risiken aus dem Steckbrief.
+Der neueste Kommentar ist der Stand. Nur was daraus jetzt schiefgehen kann.
+Bekannte Risiken nur nennen, wenn sie zu diesem Stand noch gelten.
+Wenn nichts darauf hindeutet, genau dieser Satz: Keine aktuellen Risiken.
+Ein bis drei kurze Sätze. Keine Überschrift, keine Aufzählung.
+"""
+
+NO_CURRENT_RISK = "Keine aktuellen Risiken."
+
+
+def _stand_lines(request: Request) -> tuple[list, list[str]]:
+    values = request.field_values()
+    comments = sorted(request.comments or [], key=lambda row: row.created_at or "")
+    updates = list(request.status_updates or [])
+    lines = [
+        f"Titel: {request.steckbrief_name or request.title or ''}".strip(),
+        f"Beschreibung: {_brief(request.description or values.get('description') or '', 700)}",
+    ]
+    for key, label in (
+        ("benefit", "Nutzen"),
+        ("reason", "Begründung"),
+        ("solution", "Lösung"),
+    ):
+        text = str(values.get(key) or "").strip()
+        if text:
+            lines.append(f"{label}: {_brief(text, 400)}")
+    known = " ".join(
+        str(values.get(key) or "").strip()
+        for key in ("risks", "risks_obstacles")
+        if str(values.get(key) or "").strip()
+    ).strip()
+    if known:
+        lines.append(f"Bekannte Risiken im Steckbrief, nicht der aktuelle Stand: {_brief(known, 400)}")
+    recent = comments[-6:]
+    for index, row in enumerate(recent):
+        body = " ".join(str(row.body or "").split())
+        if not body:
+            continue
+        tag = "Neuester Kommentar, das gilt" if index == len(recent) - 1 else "Älterer Kommentar"
+        lines.append(f"{tag}, {row.author_name}: {_brief(body, 300)}")
+    return comments, lines
+
+
+def suggest_status_risks(db: Session, request: Request) -> str:
+    """Risiken zum jetzigen Stand, nicht die bekannten Risiken aus dem Steckbrief."""
+    _comments, lines = _stand_lines(request)
+    provider = build_provider_from_runtime(get_runtime_config(db))
+    try:
+        text = complete_prose(provider, RISK_SYSTEM, "\n".join(lines))
+    except LlmUnavailable:
+        text = ""
+    text = _brief(" ".join(str(text or "").split()), 500)
+    return text or NO_CURRENT_RISK
+
+
+def suggest_next_steps(db: Session, request: Request) -> str:
+    """Nächste Schritte nur aus dem, was auf dem Ticket steht."""
+    comments, lines = _stand_lines(request)
+    updates = list(request.status_updates or [])
+    for item in list(reversed(updates))[-3:]:
+        chunk = " ".join(
+            part
+            for part in (
+                str(item.summary or "").strip(),
+                str(item.decisions or "").strip(),
+                str(item.risks or "").strip(),
+            )
+            if part
+        )
+        if chunk:
+            lines.append(f"Status: {_brief(chunk, 300)}")
+    provider = build_provider_from_runtime(get_runtime_config(db))
+    try:
+        text = complete_prose(provider, NEXT_SYSTEM, "\n".join(lines))
+    except LlmUnavailable:
+        text = ""
+    newest = " ".join(str(comments[-1].body or "").split()) if comments else ""
+    older = [" ".join(str(row.body or "").split()) for row in comments[:-1]]
+    kept: list[str] = []
+    for part in _SENTENCE.split(text):
+        core = _core(part).rstrip(".")
+        if not core or _overruled(core, newest, older):
+            continue
+        if any(_echoes(core, prev) for prev in kept):
+            continue
+        kept.append(core)
+    if not kept:
+        return _next_from_comments(comments)
+    return _brief(". ".join(kept) + ".", 500)
+
+
+def _next_from_comments(comments: list) -> str:
+    """Wenn das Modell nichts liefert: der offene Punkt aus dem neuesten Kommentar."""
+    if not comments:
+        return ""
+    newest = " ".join(str(comments[-1].body or "").split())
+    older = [" ".join(str(row.body or "").split()) for row in comments[:-1]]
+    match = re.search(r"\b((?:es |man )?muss\b.+)$", newest, re.I)
+    text = (match.group(1) if match else newest).strip()
+    if text[:1].islower():
+        text = text[:1].upper() + text[1:]
+    if text and not text.endswith((".", "!", "?")):
+        text += "."
+    if not text or _overruled(text, newest, older):
+        return ""
+    return _brief(text, 500)

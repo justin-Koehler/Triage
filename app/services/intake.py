@@ -553,6 +553,19 @@ class IntakeService:
         identity = _jira_identity(user)
         if identity:
             draft.values["author"] = identity
+        lead = str(draft.values.get("change_lead") or "").strip()
+        if lead and user:
+            from app.services.requests_service import SELF_AS_LEAD, lead_is_creator
+
+            if lead_is_creator(
+                lead,
+                identity,
+                user.display_name,
+                user.email,
+                user.external_subject,
+                draft.values.get("author"),
+            ):
+                raise NotReadyForCreation(SELF_AS_LEAD)
         if not draft.kind or not draft.title:
             raise NotReadyForCreation("Art oder Titel fehlt")
 

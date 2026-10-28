@@ -215,6 +215,7 @@ class FakeTicketSystem:
         *,
         user_token: str | None = None,
         user_email: str | None = None,
+        request_id: str | None = None,
     ) -> None:
         with self._session_factory() as db:
             issue = db.get(FakeExternalIssue, key)
@@ -242,6 +243,7 @@ class FakeTicketSystem:
             "status": str(fields.get("status") or "Offen"),
             "priority": (issue.priority or "medium").lower(),
             "kind": "it_request" if "it" in (issue.issue_type or "").lower() else "change_request",
+            "createdAt": issue.created_at.isoformat() if issue.created_at else "",
             "updatedAt": issue.updated_at.isoformat() if issue.updated_at else "",
             "url": f"/external/{issue.key}",
             "values": values,
@@ -252,12 +254,13 @@ class FakeTicketSystem:
         *,
         query: str = "",
         limit: int = 50,
+        include_closed: bool = False,
         user_token: str | None = None,
         user_email: str | None = None,
     ) -> list[dict[str, Any]]:
         needle = (query or "").strip().lower()
         with self._session_factory() as db:
-            stmt = select(FakeExternalIssue).order_by(FakeExternalIssue.updated_at.desc())
+            stmt = select(FakeExternalIssue).order_by(FakeExternalIssue.created_at.desc())
             if needle:
                 stmt = stmt.where(func.lower(FakeExternalIssue.summary).contains(needle))
             rows = db.scalars(stmt.limit(limit)).all()

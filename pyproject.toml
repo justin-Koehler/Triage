@@ -1,6 +1,6 @@
 [project]
 name = "cms"
-version = "0.3.52"
+version = "0.5.11"
 description = "CRITR — Change-Management, eigener Workspace, Jira nur als Adapter"
 requires-python = ">=3.11"
 

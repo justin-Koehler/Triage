@@ -99,6 +99,32 @@ def test_import_mirrors_ticket_into_workspace(client):
     assert listed["requestId"] == detail["id"]
 
 
+def test_webhook_imports_new_jira_ticket(client, monkeypatch):
+    monkeypatch.setenv("JIRA_WEBHOOK_SECRET", "test-secret")
+    from app.config import get_settings
+    from app.db import SessionLocal
+    from app.models import ExternalRef, Request
+    from sqlalchemy import select
+
+    get_settings.cache_clear()
+
+    r = client.post(
+        "/api/jira/hooks/sync?secret=test-secret",
+        json={"issue": {"key": "TRI-42"}, "webhookEvent": "jira:issue_created"},
+    )
+    assert r.status_code == 200
+    assert r.json()["queued"] is True
+
+    with SessionLocal() as db:
+        ref = db.scalars(select(ExternalRef).where(ExternalRef.external_key == "TRI-42")).first()
+        assert ref is not None
+        req = db.get(Request, ref.request_id)
+        assert req is not None
+        assert "SAP" in req.title or "Schnittstelle" in req.title
+        assert f"/workspace/{req.id}" in (req.description or "")
+    get_settings.cache_clear()
+
+
 def test_patch_syncs_field_back_to_jira(client):
     from datetime import UTC, datetime
 

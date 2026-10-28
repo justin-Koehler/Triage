@@ -145,6 +145,8 @@ class Request(Base, TimestampMixin):
     description: Mapped[str] = mapped_column(Text, default="")
     company: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
     change_lead: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
+    phase_label: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    phase_links: Mapped[list[Any] | None] = mapped_column(JSON, nullable=True)
     incomplete: Mapped[bool] = mapped_column(Boolean, default=False)
     triage_failed: Mapped[bool] = mapped_column(Boolean, default=False)
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)

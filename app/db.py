@@ -47,6 +47,8 @@ def ensure_columns(bind: Engine | None = None) -> None:
         ("requests", "change_lead", "VARCHAR(80)"),
         ("messages", "field_key", "VARCHAR(80)"),
         ("comments", "external_id", "VARCHAR(64)"),
+        ("requests", "phase_label", "VARCHAR(40)"),
+        ("requests", "phase_links", "JSON"),
     ]
     with bind.begin() as conn:
         for table, column, coltype in added:

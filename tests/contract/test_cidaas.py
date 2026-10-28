@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
+import re
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 import pytest
 from fastapi.testclient import TestClient
@@ -92,11 +94,17 @@ def test_auth_config_flags_cidaas(client):
     assert body["devLogin"] is False
 
 
+def _authorize_target(body: str) -> str:
+    match = re.search(r"location\.replace\((.*?)\)</script>", body)
+    assert match
+    return json.loads(match.group(1))
+
+
 def test_cidaas_start_redirects_with_pkce(client):
     c, _ = client
     res = c.get("/api/auth/cidaas/start?next=/workspace", follow_redirects=False)
-    assert res.status_code == 302
-    loc = urlparse(res.headers["location"])
+    assert res.status_code == 200
+    loc = urlparse(_authorize_target(res.text))
     assert loc.netloc == "account.bildungscampus.life"
     qs = parse_qs(loc.query)
     assert qs["response_type"] == ["code"]
@@ -106,18 +114,30 @@ def test_cidaas_start_redirects_with_pkce(client):
     assert "cidaas_oidc" in res.cookies
 
 
+def test_cidaas_callback_without_cookie_returns_to_login(client):
+    c, _ = client
+    res = c.get(
+        "/api/auth/cidaas/callback?code=abc&state=missing",
+        follow_redirects=False,
+    )
+    assert res.status_code == 302
+    loc = res.headers["location"]
+    assert loc.startswith("/login?error=")
+    assert "abgelaufen" in unquote(loc)
+
+
 def test_cidaas_callback_sets_session(client, monkeypatch):
     c, Session = client
     start = c.get("/api/auth/cidaas/start?next=/", follow_redirects=False)
-    loc = urlparse(start.headers["location"])
+    loc = urlparse(_authorize_target(start.text))
     state = parse_qs(loc.query)["state"][0]
 
     monkeypatch.setattr(
-        "app.services.cidaas.exchange_code",
+        "app.api.auth.exchange_code",
         lambda code, verifier, settings=None: {"access_token": "tok"},
     )
     monkeypatch.setattr(
-        "app.services.cidaas.userinfo",
+        "app.api.auth.userinfo",
         lambda token, settings=None: {
             "sub": "cidaas-1",
             "email": "ada@campus.example",

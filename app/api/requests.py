@@ -11,7 +11,15 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.domain.types import Priority, RequestKind, RequestStatus
 from app.models import StatusUpdate, User
-from app.schemas import AiFillIn, CommentIn, MessageIn, RequestPatch, StatusUpdateIn
+from app.schemas import (
+    AiFillIn,
+    CommentIn,
+    MessageIn,
+    PhaseLabelIn,
+    PhaseLinkIn,
+    RequestPatch,
+    StatusUpdateIn,
+)
 from app.security import current_actor, optional_user, required_user
 from app.services import requests_service as svc
 from app.services.settings_service import get_runtime_config
@@ -25,21 +33,27 @@ router = APIRouter(prefix="/api/requests", tags=["requests"])
 
 def _sync_request_later(request_id: str) -> None:
     import logging
+    import time
 
     from app.db import SessionLocal
     from app.ports import build_ticket_port
     from app.sync.outbox import process_request
 
     log = logging.getLogger("triage.sync")
-    with SessionLocal() as session:
-        try:
-            stats = process_request(session, build_ticket_port(), request_id)
-            session.commit()
-            if any(stats.values()):
-                log.info("comment sync %s %s", request_id[:8], stats)
-        except Exception:
-            session.rollback()
-            log.exception("comment sync fehlgeschlagen %s", request_id)
+    last_err: Exception | None = None
+    for attempt in range(4):
+        with SessionLocal() as session:
+            try:
+                stats = process_request(session, build_ticket_port(), request_id)
+                session.commit()
+                if any(stats.values()):
+                    log.info("outbox sync %s %s", request_id[:8], stats)
+                return
+            except Exception as err:
+                session.rollback()
+                last_err = err
+                time.sleep(0.4 * (2**attempt))
+    log.error("outbox sync fehlgeschlagen %s: %s", request_id[:8], last_err, exc_info=last_err)
 
 
 def _stand_later(request_id: str, expect_comment_id: str | None = None) -> None:
@@ -101,6 +115,13 @@ def filters(db: Session = Depends(get_db)) -> dict:
 @router.get("/meta/stats")
 def stats(db: Session = Depends(get_db)) -> dict:
     return svc.status_counts(db)
+
+
+@router.get("/evaluation")
+def evaluation(db: Session = Depends(get_db), user: User = Depends(current_actor)) -> dict:
+    from app.services.effort_report import effort_evaluation
+
+    return effort_evaluation(db, user)
 
 
 @router.get("")
@@ -184,9 +205,11 @@ def get_request(
     request = svc.get_request(db, request_id)
     if not request:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Anliegen unbekannt")
+    from app.services.stand_summary import stand_needs_refresh
+
     detail = svc.to_detail(request, actor=user)
-    # Fehlt der Stand (z. B. Ticket kam nur über den Jira-Sync), nachträglich bauen.
-    if not (detail.get("standSummary") or "").strip():
+    # Stand nie im Request-Pfad berechnen — sonst hängt „Ticket öffnen“.
+    if stand_needs_refresh(db, request) or not (detail.get("standSummary") or "").strip():
         background_tasks.add_task(_stand_later, request_id)
     return detail
 
@@ -234,9 +257,14 @@ def patch_request(
     changes = payload.changes()
     if not changes:
         return svc.to_detail(request)
-    updated = svc.update_request(db, request, changes)
-    if any(k in changes for k in ("change_lead", "status", "priority")):
-        background_tasks.add_task(_sync_request_later, request_id)
+    try:
+        updated = svc.update_request(db, request, changes)
+    except ValueError as err:
+        if str(err) != svc.SELF_AS_LEAD:
+            raise
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(err)) from err
+    # Übersicht/Felder ebenfalls sofort in die Outbox — nicht nur Lead/Status/Prio.
+    background_tasks.add_task(_sync_request_later, request_id)
     return svc.to_detail(updated)
 
 
@@ -267,6 +295,65 @@ def delete_request(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Anliegen unbekannt")
     svc.delete_request(db, request)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{request_id}/duplicate")
+def duplicate_request(
+    request_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(required_user),
+) -> dict:
+    request = svc.get_request(db, request_id)
+    if not request:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Anliegen unbekannt")
+    copy = svc.duplicate_request(db, request, user)
+    return svc.to_detail(copy, actor=user)
+
+
+@router.put("/{request_id}/phase")
+def put_phase(
+    request_id: str,
+    payload: PhaseLabelIn,
+    db: Session = Depends(get_db),
+    _user: User = Depends(required_user),
+) -> dict:
+    request = svc.get_request(db, request_id)
+    if not request:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Anliegen unbekannt")
+    updated = svc.set_phase_label(db, request, payload.phase)
+    return svc.to_detail(updated)
+
+
+@router.post("/{request_id}/links")
+def post_link(
+    request_id: str,
+    payload: PhaseLinkIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(required_user),
+) -> dict:
+    request = svc.get_request(db, request_id)
+    other = svc.get_request(db, payload.otherId)
+    if not request or not other:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Anliegen unbekannt")
+    try:
+        updated = svc.link_requests(db, request, other, payload.phase)
+    except ValueError as err:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(err)) from err
+    return svc.to_detail(updated, actor=user)
+
+
+@router.delete("/{request_id}/links/{other_id}")
+def delete_link(
+    request_id: str,
+    other_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(required_user),
+) -> dict:
+    request = svc.get_request(db, request_id)
+    if not request:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Anliegen unbekannt")
+    updated = svc.unlink_requests(db, request, other_id)
+    return svc.to_detail(updated, actor=user)
 
 
 @router.post("/{request_id}/comments")
@@ -470,6 +557,39 @@ def post_status_summary(
         return summarize_status(db, request)
     except StatusEmpty as err:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(err)) from err
+
+
+@router.post("/{request_id}/next-steps")
+def post_next_steps(
+    request_id: str,
+    db: Session = Depends(get_db),
+    _user: User = Depends(required_user),
+) -> dict:
+    from app.services.stand_summary import suggest_next_steps
+    from app.triage.providers import LlmUnavailable
+
+    request = svc.get_request(db, request_id)
+    if not request:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Anliegen unbekannt")
+    try:
+        text = suggest_next_steps(db, request)
+    except LlmUnavailable as err:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(err)) from err
+    return {"nextSteps": text}
+
+
+@router.post("/{request_id}/status-risks")
+def post_status_risks(
+    request_id: str,
+    db: Session = Depends(get_db),
+    _user: User = Depends(required_user),
+) -> dict:
+    from app.services.stand_summary import suggest_status_risks
+
+    request = svc.get_request(db, request_id)
+    if not request:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Anliegen unbekannt")
+    return {"risks": suggest_status_risks(db, request)}
 
 
 @router.post("/{request_id}/status-updates")

@@ -238,6 +238,10 @@ def list_inbox(
                 "commentCount": len(request.comments or []) if request else 0,
                 "attachmentCount": len(request.attachments or []) if request else 0,
                 "assignee": str(item.get("assignee") or "").strip(),
+                "changeLead": str(request.change_lead or "").strip() if request else "",
+                "createdBy": (
+                    request.author.display_name if request and request.author else ""
+                ),
                 "reporter": str(item.get("reporter") or "").strip(),
                 "authors": authors,
                 "authorsText": " · ".join(authors),
@@ -552,14 +556,71 @@ def refresh_stand_after_sync(db: Session, request: Request, *, changed: bool, ll
 
 
 
-def apply_effort_share_to_request(db: Session, request: Request) -> bool:
-    """Lokales Aufwand-Sheet (/aufwand/…) in CRITR-Felder übernehmen (ohne Outbox)."""
+def _push_sheet_over_jira(db: Session, request: Request, drift: dict[str, str]) -> None:
+    """Abweichende Aufwand-/Kostenfelder in Jira durch das Sheet ersetzen."""
+    if not drift:
+        return
+    if not any(str(ref.external_key or "").strip() for ref in request.external_refs):
+        return
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from app.domain.types import OutboxOperation, SyncState
+    from app.models import OutboxJob
+    from app.services.effort_sheet import amounts_match
+    from app.sync.outbox import enqueue
+
+    pending = [
+        obj
+        for obj in db.new
+        if isinstance(obj, OutboxJob)
+        and obj.request_id == request.id
+        and obj.operation == OutboxOperation.UPDATE_FIELDS
+        and obj.state == SyncState.PENDING
+    ]
+    pending.extend(
+        db.scalars(
+            select(OutboxJob).where(
+                OutboxJob.request_id == request.id,
+                OutboxJob.operation == OutboxOperation.UPDATE_FIELDS,
+                OutboxJob.state == SyncState.PENDING,
+            )
+        ).all()
+    )
+    for job in pending:
+        fields = dict((job.payload or {}).get("fields") or {})
+        if all(amounts_match(fields.get(key), value) for key, value in drift.items()):
+            return
+    for job in pending:
+        payload = dict(job.payload or {})
+        fields = dict(payload.get("fields") or {})
+        fields.update(drift)
+        payload["fields"] = fields
+        job.payload = payload
+        flag_modified(job, "payload")
+        return
+    enqueue(
+        db,
+        request.id,
+        OutboxOperation.UPDATE_FIELDS,
+        {"fields": dict(drift), "priority": str(request.priority)},
+    )
+
+
+def apply_effort_share_to_request(
+    db: Session,
+    request: Request,
+    jira_values: dict | None = None,
+    *,
+    push_jira: bool = True,
+) -> bool:
+    """Lokales Aufwand-Sheet übernehmen. Weicht Jira ab, wird das Sheet zurückgeschrieben."""
     from app.services.effort_sheet import (
         EFFORT_SYNC_KEYS,
         effort_sync_fields,
         load_share_csv,
         parse_effort_csv,
         share_id_from_url,
+        sheet_drift,
     )
 
     values = request.field_values()
@@ -589,6 +650,9 @@ def apply_effort_share_to_request(db: Session, request: Request) -> bool:
         if alias:
             _upsert_field(request, alias, text)
         changed = True
+    drift = sheet_drift(jira_values, parsed)
+    if drift and push_jira:
+        _push_sheet_over_jira(db, request, drift)
     return changed
 
 
@@ -1042,8 +1106,18 @@ def import_issue(
     ref.synced_at = utcnow()
     ref.last_error = None
 
+    from app.services.effort_sheet import JIRA_SHEET_KEYS, share_id_from_url
+
+    known_sheet = str(values.get("effort_sheet_url") or "").strip()
+    if not known_sheet:
+        known_sheet = str(request.field_values().get("effort_sheet_url") or "").strip()
+    sheet_blob = f"{known_sheet}\n{description}\n{values.get('description') or ''}"
+    sheet_owns = share_id_from_url(sheet_blob) is not None
+    locked_from_jira = set(JIRA_SHEET_KEYS) | {"effort_fb", "effort_it"}
     for field_key, raw in values.items():
         if field_key in SKIP_VALUES:
+            continue
+        if sheet_owns and field_key in locked_from_jira:
             continue
         text = str(raw or "").strip()
         if not text:
@@ -1068,6 +1142,9 @@ def import_issue(
     if sid:
         ensure_effort_share(db, sid)
     db.flush()
+    apply_effort_share_to_request(
+        db, request, jira_values=values if sheet_owns else None, push_jira=False
+    )
     if defer_enrich:
         # Schnelles Öffnen: Felder sofort, Kommentare/Anhänge im Hintergrund.
         return request
@@ -1083,7 +1160,6 @@ def import_issue(
     sync_attachments_from_jira(
         db, port, request, user_token=user_token, user_email=user_email
     )
-    apply_effort_share_to_request(db, request)
     # Stand sofort ohne LLM setzen, damit das Feld direkt nach dem Import steht.
     refresh_stand_after_sync(db, request, changed=True, llm=False)
     return request

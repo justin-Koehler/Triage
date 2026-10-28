@@ -207,6 +207,15 @@ class RequestPatch(BaseModel):
         return {k: (v.value if hasattr(v, "value") else v) for k, v in payload.items()}
 
 
+class PhaseLinkIn(BaseModel):
+    otherId: str = Field(min_length=8, max_length=64)
+    phase: str = Field(default="", max_length=40)
+
+
+class PhaseLabelIn(BaseModel):
+    phase: str = Field(default="", max_length=40)
+
+
 class CommentIn(BaseModel):
     body: str = Field(min_length=1, max_length=8000)
 

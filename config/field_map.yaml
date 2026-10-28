@@ -170,12 +170,14 @@ fields:
     required: false
     jira_type: option
     kinds: [it_request]
+    create: false
   solution_name:
     jira: customfield_11437
     label: Solution
     required: false
     jira_type: option
     kinds: [it_request]
+    create: false
   project_id:
     jira: customfield_16255
     label: Projekt-ID
@@ -195,10 +197,9 @@ fields:
     required: false
     jira_type: string
   costs:
-    jira: customfield_19930
+    jira: null
     label: Kosten
     required: false
-    jira_type: number
   it_costs:
     jira: customfield_10709
     label: IT Cost (one time - in €)
@@ -209,9 +210,10 @@ fields:
     label: Sachkosten
     required: false
   total_costs:
-    jira: null
+    jira: customfield_19930
     label: Gesamtsumme
     required: false
+    jira_type: number
   extra_account:
     jira: null
     label: Zusatzkontierung

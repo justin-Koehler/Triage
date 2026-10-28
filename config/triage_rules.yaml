@@ -105,18 +105,23 @@ common_fields:
     fill: dialog
     type: longtext
   - key: help_needed
-    label: Hilfe benötigt
-    question: Benötigst du Hilfe?
+    label: Unterstützung
+    question: Benötigst du Unterstützung bei dem Projekt? Wenn ja welche?
     hard: false
     group: uebersicht
     fill: dialog
     type: choice
     values:
-      - Ja
-      - Nein
+      - Projektmanagement
+      - Methodisch
+      - Personell
   - key: help_topic
-    label: Hilfe bei
-    question: Bei was genau brauchst du Hilfe?
+    label: Unterstützung bei
+    question: Wobei — Projektmanagement, methodisch oder personell?
+    values:
+      - Projektmanagement
+      - Methodisch
+      - Personell
     hard: false
     group: uebersicht
     fill: dialog
@@ -249,13 +254,13 @@ common_fields:
     question: ""
     hard: false
     group: finanzen
-    fill: workspace
+    fill: controlling
   - key: solution_name
     label: Solution
     question: ""
     hard: false
     group: finanzen
-    fill: workspace
+    fill: controlling
   - key: project_id
     label: Projekt-ID
     question: Gibt es eine Projektnummer?

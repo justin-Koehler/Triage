@@ -120,7 +120,7 @@ QUESTION_WORDS = {
 # Fragezeichen sind Anliegen-Sprache, keine Abfrage auf den Bestand.
 READ_LEAD = {
     "welche", "welches", "welcher", "wieviele", "liste", "übersicht", "uebersicht",
-    "zeig", "zeige", "zeigen", "gibt", "status",
+    "zeig", "zeige", "zeigen", "gibt", "status", "warte", "warten", "inbox",
 }
 
 # Bestandswoerter im Plural. Singular-Signale wie "fehler" oder "zugang" fehlen
@@ -129,6 +129,7 @@ DOMAIN_NOUNS = {
     "ticket", "tickets", "anliegen", "vorgang", "vorgänge", "vorgaenge",
     "request", "requests", "steckbrief", "steckbriefe", "meldung", "meldungen",
     "changes", "änderungen", "aenderungen", "anpassungen", "it-anfragen",
+    "schritte", "todos", "aufgaben",
 }
 DOMAIN_WORDS = {
     *DOMAIN_NOUNS,
@@ -157,7 +158,11 @@ COMMENT_VERBS = {
 }
 PRONOUNS = {"das", "es", "dem", "den", "dieses", "diesen", "dieser", "ihn"}
 STATUS_NOTE = re.compile(
-    r"(?:^|\b)(?:status|stand)\s*:\s*(.+)$",
+    r"(?:^|\b)(?:status|stand)\b"
+    r"(?:\s+(?:für|fuer|zu|von))?"
+    r"(?:\s+(?:AN-\d{3,6}|[A-Z][A-Z0-9]{1,10}-\d{1,6}))?"
+    r"(?:\s+(?:grün|gruen|gelb|rot|green|yellow|red|blau|blue|weiss|weiß|white|hold))?"
+    r"\s*[:\-–]\s*(.+)$",
     re.IGNORECASE | re.DOTALL,
 )
 RAG_WORDS = {
@@ -227,6 +232,7 @@ class Query:
     counting: bool = False
     text: str | None = None
     more: bool = False
+    waiting_on_me: bool = False
 
 
 @dataclass(frozen=True)
@@ -515,11 +521,18 @@ def _query(text: str, words: list[str]) -> Query | Clarify | None:
 
     word_set = set(words)
     counting = _counting(word_set)
+    waiting = _waiting_on_me(text, words)
     kind, statuses, priority, company, responsible = _extract_filters(words)
     nouns = bool(word_set & DOMAIN_NOUNS)
     # "Anliegen von A" ist auch ohne Fragewort eine Abfrage auf den Bestand.
-    if not (word_set & READ_LEAD or counting or (responsible and nouns)):
+    if not (word_set & READ_LEAD or counting or waiting or (responsible and nouns)):
         return None
+    if waiting and not nouns:
+        return Query(
+            label="was auf dich wartet",
+            waiting_on_me=True,
+            counting=counting,
+        )
     if not nouns:
         # "welche?" allein — kurz nachfragen. Laengere Saetze sind Anliegen.
         if len(words) <= 3:
@@ -527,7 +540,9 @@ def _query(text: str, words: list[str]) -> Query | Clarify | None:
         return None
 
     return Query(
-        label=_query_label(kind, statuses, priority, company, None, responsible),
+        label=_query_label(kind, statuses, priority, company, None, responsible)
+        if not waiting
+        else "was auf dich wartet",
         kind=kind,
         statuses=statuses,
         priority=priority,
@@ -535,6 +550,17 @@ def _query(text: str, words: list[str]) -> Query | Clarify | None:
         responsible=responsible,
         reference=reference,
         counting=counting,
+        waiting_on_me=waiting,
+    )
+
+
+def _waiting_on_me(text: str, words: list[str]) -> bool:
+    lowered = (text or "").lower()
+    if "auf mich" in lowered or "meine todos" in lowered or "mein nächster" in lowered:
+        return True
+    word_set = set(words)
+    return bool(word_set & {"warte", "warten", "inbox"}) and (
+        "mich" in word_set or "mir" in word_set or "meine" in word_set or "inbox" in word_set
     )
 
 

@@ -17,7 +17,7 @@
     }
     box.replaceChildren();
     box.hidden = false;
-    box.classList.remove("is-open");
+    box.classList.remove("is-open", "is-inbox-open");
 
     const nameBtn = el("button", "account-name", user.displayName || "Konto");
     nameBtn.type = "button";
@@ -25,6 +25,7 @@
     nameBtn.setAttribute("aria-expanded", "false");
 
     const menu = el("div", "account-menu");
+    menu.id = "account-menu";
     menu.setAttribute("role", "menu");
     menu.hidden = true;
 
@@ -38,42 +39,105 @@
     };
     menu.appendChild(out);
 
-    const setOpen = (open) => {
-      box.classList.toggle("is-open", open);
-      menu.hidden = !open;
-      nameBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    const inboxBtn = el("button", "account-inbox");
+    inboxBtn.type = "button";
+    inboxBtn.id = "account-inbox";
+    inboxBtn.setAttribute("aria-haspopup", "menu");
+    inboxBtn.setAttribute("aria-expanded", "false");
+    inboxBtn.setAttribute("aria-label", "Inbox");
+    inboxBtn.hidden = true;
+    const badge = el("span", "account-inbox-badge");
+    badge.id = "account-inbox-badge";
+    badge.hidden = true;
+    badge.setAttribute("aria-hidden", "true");
+    const inboxLabel = el("span", "account-inbox-label", "Inbox");
+    inboxBtn.append(badge, inboxLabel);
+
+    const inboxMenu = el("div", "account-inbox-menu");
+    inboxMenu.id = "account-inbox-menu";
+    inboxMenu.setAttribute("role", "menu");
+    inboxMenu.hidden = true;
+    const empty = el("p", "account-inbox-empty", "Nichts wartet gerade auf dich.");
+    empty.id = "account-inbox-empty";
+    const list = el("div", "account-inbox-list");
+    list.id = "account-inbox-list";
+    inboxMenu.append(empty, list);
+
+    const closeAll = () => {
+      box.classList.remove("is-open", "is-inbox-open");
+      menu.hidden = true;
+      inboxMenu.hidden = true;
+      nameBtn.setAttribute("aria-expanded", "false");
+      inboxBtn.setAttribute("aria-expanded", "false");
     };
 
     nameBtn.onclick = (event) => {
       event.stopPropagation();
-      setOpen(!box.classList.contains("is-open"));
+      const open = !box.classList.contains("is-open");
+      closeAll();
+      if (open) {
+        box.classList.add("is-open");
+        menu.hidden = false;
+        nameBtn.setAttribute("aria-expanded", "true");
+      }
+    };
+    inboxBtn.onclick = (event) => {
+      event.stopPropagation();
+      const open = !box.classList.contains("is-inbox-open");
+      closeAll();
+      if (open) {
+        box.classList.add("is-inbox-open");
+        inboxMenu.hidden = false;
+        inboxBtn.setAttribute("aria-expanded", "true");
+        if (typeof window.refreshAccountInbox === "function") {
+          window.refreshAccountInbox();
+        }
+      }
     };
     menu.addEventListener("click", (event) => event.stopPropagation());
+    inboxMenu.addEventListener("click", (event) => event.stopPropagation());
 
     if (!showAccount._outsideBound) {
       showAccount._outsideBound = true;
       document.addEventListener("click", () => {
         const acc = document.getElementById("account");
-        if (!acc?.classList.contains("is-open")) return;
-        acc.classList.remove("is-open");
-        const m = acc.querySelector(".account-menu");
+        if (!acc) return;
+        if (!acc.classList.contains("is-open") && !acc.classList.contains("is-inbox-open")) {
+          return;
+        }
+        acc.classList.remove("is-open", "is-inbox-open");
+        const m = acc.querySelector("#account-menu");
+        const im = acc.querySelector("#account-inbox-menu");
         const n = acc.querySelector(".account-name");
+        const ib = acc.querySelector("#account-inbox");
         if (m) m.hidden = true;
+        if (im) im.hidden = true;
         if (n) n.setAttribute("aria-expanded", "false");
+        if (ib) ib.setAttribute("aria-expanded", "false");
       });
       document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape") return;
         const acc = document.getElementById("account");
-        if (!acc?.classList.contains("is-open")) return;
-        acc.classList.remove("is-open");
-        const m = acc.querySelector(".account-menu");
+        if (!acc) return;
+        if (!acc.classList.contains("is-open") && !acc.classList.contains("is-inbox-open")) {
+          return;
+        }
+        acc.classList.remove("is-open", "is-inbox-open");
+        const m = acc.querySelector("#account-menu");
+        const im = acc.querySelector("#account-inbox-menu");
         const n = acc.querySelector(".account-name");
+        const ib = acc.querySelector("#account-inbox");
         if (m) m.hidden = true;
+        if (im) im.hidden = true;
         if (n) n.setAttribute("aria-expanded", "false");
+        if (ib) ib.setAttribute("aria-expanded", "false");
       });
     }
 
-    box.append(nameBtn, menu);
+    box.append(nameBtn, inboxBtn, menu, inboxMenu);
+    if (typeof window.refreshAccountInbox === "function") {
+      window.refreshAccountInbox();
+    }
   }
 
   function gate() {
@@ -229,6 +293,7 @@
     const btn = document.getElementById("app-version-info");
     const pop = document.getElementById("app-version-pop");
     if (!wrap || !btn || !pop) return;
+    if (btn.tagName === "A") return;
     const setOpen = (open) => {
       wrap.classList.toggle("is-open", open);
       pop.hidden = !open;

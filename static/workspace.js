@@ -489,6 +489,12 @@
   }
 
   function syncTicketModeClass() {
+    const cancelChangeBtn = document.getElementById("cancel-change");
+    if (cancelChangeBtn) cancelChangeBtn.hidden = !isCreatingChange();
+    const duplicateBtn = document.getElementById("ticket-duplicate");
+    if (duplicateBtn) duplicateBtn.hidden = !loadedTicket;
+    const phases = document.getElementById("ticket-phases");
+    if (phases && !loadedTicket) phases.hidden = true;
     document.body.classList.toggle("ticket-creating", isCreatingChange());
     document.body.classList.toggle("ticket-open", loadedTicket);
     document.body.classList.toggle(
@@ -576,10 +582,13 @@
     if (kind === "user") {
       const name = row.name || "";
       const display = row.displayName || name;
+      const email = row.emailAddress || "";
+      const label = row.label || (email ? `${display} · ${email}` : display);
       return {
         name,
         displayName: display,
-        label: row.label || `${display} (${name})`,
+        emailAddress: email,
+        label,
       };
     }
     const name = row.name || row.label || "";
@@ -794,7 +803,7 @@
     if (kind === "components") await prefetchJiraComponents();
     else if (optionKey) await prefetchJiraOptions(optionKey);
     const local = filterLookupCache(kind, needle);
-    if (!needle) return local;
+    if (!needle && kind !== "user") return local;
     if (optionKey) {
       try {
         const issueKind = ticketKind() === "change_request" ? "change_request" : "it_request";
@@ -1508,6 +1517,42 @@
     el.textContent = raw || "";
   }
 
+  const SELF_AS_LEAD = "Man darf sich nicht selbst auswählen. Bitte nach dem Vier-Augen-Prinzip.";
+
+  function samePerson(left, right) {
+    const a = String(left || "").trim().toLowerCase();
+    const b = String(right || "").trim().toLowerCase();
+    return a.length >= 2 && a === b;
+  }
+
+  function rejectsSelfLead(name, label) {
+    const actor = window.currentActor || {};
+    const authorBits = [values.author, labels.author]
+      .map((part) => String(part || "").trim().toLowerCase())
+      .filter((part) => part.length >= 2);
+    const actorBits = [
+      actor.displayName,
+      actor.jiraName,
+      actor.email,
+      window.currentActorName,
+    ]
+      .map((part) => String(part || "").trim().toLowerCase())
+      .filter((part) => part.length >= 2);
+    const actorIsAuthor =
+      !authorBits.length || authorBits.some((bit) => actorBits.includes(bit));
+    const forbidden = new Set(authorBits);
+    if (actorIsAuthor) actorBits.forEach((bit) => forbidden.add(bit));
+    return [name, label].some((part) => {
+      const text = String(part || "").trim().toLowerCase();
+      if (!text) return false;
+      if (forbidden.has(text)) return true;
+      const paren = text.match(/\(([^)]+)\)\s*$/);
+      if (paren && forbidden.has(paren[1].trim())) return true;
+      const head = text.replace(/\s*\([^)]+\)\s*$/, "").trim();
+      return Boolean(head && forbidden.has(head));
+    });
+  }
+
   function setLookupValue(key, name, label) {
     const id = String(name || "").trim();
     const shown = String(label || name || "").trim();
@@ -1601,6 +1646,17 @@
     const key = editingKey;
     editingKey = null;
     if (!valueEl) return;
+    if (key === "lead") {
+      const typed = readValue(valueEl);
+      if (typed && rejectsSelfLead(typed, typed)) {
+        writeFieldValue(valueEl, step, displayFor(key) || "");
+        valueEl.contentEditable = "false";
+        valueEl.classList.remove("is-editing");
+        clearFieldExtras(valueEl);
+        flash(SELF_AS_LEAD, true);
+        return;
+      }
+    }
     const parent = valueEl.parentElement;
     const cal = parent?.querySelector(".field-edit-cal");
     let text = "";
@@ -1759,6 +1815,9 @@
         hint.textContent = step.hint;
         wrap.appendChild(hint);
       }
+      const picked = document.createElement("div");
+      picked.className = "field-picked";
+      wrap.appendChild(picked);
       const search = document.createElement("input");
       search.type = "search";
       search.className = "field-lookup-search";
@@ -1778,6 +1837,33 @@
           .filter((part) => !isUnknownFieldValue(part));
       }
 
+      function chipLabel(part) {
+        const key = part.toLowerCase();
+        const hit = (lookupCache("user") || []).find((item) => {
+          const name = String(item.name || "").toLowerCase();
+          const label = String(item.label || "").toLowerCase();
+          const display = String(item.displayName || "").toLowerCase();
+          return name === key || display === key || label === key || label.startsWith(`${key} ·`);
+        });
+        return hit?.label || part;
+      }
+
+      function paintPicked() {
+        picked.replaceChildren();
+        selectedParts().forEach((part) => {
+          const chip = document.createElement("button");
+          chip.type = "button";
+          chip.className = "suggestion is-selected";
+          chip.textContent = chipLabel(part);
+          chip.onclick = (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            pick({ name: part, label: part });
+          };
+          picked.appendChild(chip);
+        });
+      }
+
       function pick(item) {
         const label = item.label || item.displayName || item.name || "";
         const name = item.name || label;
@@ -1795,6 +1881,7 @@
           delete labels[step.key];
           writeFieldValue(valueEl, step, "");
         }
+        paintPicked();
         void loadSuggestions(search.value || "").then((items) => {
           if (editingKey !== step.key) return;
           renderList(items);
@@ -1871,6 +1958,7 @@
         if (editingKey !== step.key) return;
         renderList(items);
       });
+      paintPicked();
       if (step.jiraLookup === "user") {
         window.setTimeout(() => search.focus(), 0);
       }
@@ -1939,6 +2027,10 @@
     function pick(item) {
       const label = item.label || item.displayName || item.name || "";
       const name = item.name || label;
+      if (step.key === "lead" && rejectsSelfLead(name, label)) {
+        flash(SELF_AS_LEAD, true);
+        return;
+      }
       setLookupValue(step.key, name, label);
       valueEl.textContent = label;
       valueEl.contentEditable = "false";
@@ -2759,8 +2851,12 @@
     const dummy = isDummyEffortSheet(effortSheetTemplateUrl) || isDummyEffortSheet(settingsUrl) || !settingsUrl;
     // Titel mitgeben, damit im Sheet steht, zu welchem Change es gehört.
     const forParam = encodeURIComponent(String(values.title || "").trim().slice(0, 90));
+    const keyParam = encodeURIComponent(
+      String(document.getElementById("ticket-jira-key")?.textContent || "").trim()
+    );
     const own = share ? `/effort-sheet?share=${share}` : "/effort-sheet?fresh=1";
-    const url = share || dummy ? (forParam ? `${own}&for=${forParam}` : own) : settingsUrl;
+    let url = share || dummy ? (forParam ? `${own}&for=${forParam}` : own) : settingsUrl;
+    if ((share || dummy) && keyParam && url) url += `&key=${keyParam}`;
     if (!url) {
       const hintEl = costHintEl();
       if (hintEl) {
@@ -4795,8 +4891,19 @@
     if (costSel) costSel.value = "";
   }
 
-  function applyRequest(detail, { animate = true, skipSyncFollow = false } = {}) {
+  function applyRequest(detail, { animate = true, skipSyncFollow = false, quiet = false } = {}) {
     if (isCreatingChange()) return;
+    if (quiet && detail?.id && detail.id === syncedRequestId && !editingKey) {
+      showFiles(detail);
+      renderComments(detail);
+      standUpdates = Array.isArray(detail.statusUpdates) ? detail.statusUpdates : standUpdates;
+      paintPhases(detail);
+      const sync = detail.sync || {};
+      const jiraKey = sync.externalKey || detail.externalKey || "";
+      const jiraUrl = sync.externalUrl || detail.externalUrl || detail.jiraUrl || "";
+      if (jiraKey) showJiraBadge(jiraKey, jiraUrl);
+      return;
+    }
     resetTicketState();
     syncedRequestId = detail.id || null;
     loadedTicket = Boolean(syncedRequestId);
@@ -4849,7 +4956,7 @@
         headline.classList.add("is-done");
       } else if (el) {
         writeFieldValue(el, step, shown || "");
-        el.classList.add("ticket-row-value-in");
+        if (animate) el.classList.add("ticket-row-value-in");
       }
       fieldCell(step)?.classList.add("is-done");
       armEdit(step);
@@ -4870,6 +4977,7 @@
     showFinishActions(jiraKey, jiraUrl, { newChange: false });
     showFiles(detail);
     renderComments(detail);
+    paintPhases(detail);
     standUpdates = Array.isArray(detail.statusUpdates) ? detail.statusUpdates : [];
     renderStandBoard();
     hydrateCostFields();
@@ -4970,11 +5078,164 @@
     );
   }
 
+  function actorNeedles() {
+    const user = window.currentActor || {};
+    return [user.displayName, user.email, user.jiraName, window.currentActorName]
+      .map((part) => String(part || "").trim().toLowerCase())
+      .filter((part) => part.length > 1);
+  }
+
+  function hubPersonBlob(item, keys) {
+    const bits = [];
+    for (const key of keys) {
+      const value = item?.[key];
+      if (Array.isArray(value)) bits.push(...value);
+      else if (value) bits.push(value);
+    }
+    return bits.join(" ").toLowerCase();
+  }
+
+  function refreshOwnerOptions() {
+    const sel = document.getElementById("hub-owner");
+    if (!sel) return;
+    const keep = sel.value;
+    const names = new Set();
+    for (const item of hubItems) {
+      for (const name of [item.changeLead, item.assignee]) {
+        const text = String(name || "").trim();
+        if (text) names.add(text);
+      }
+    }
+    sel.replaceChildren();
+    for (const [value, label] of [
+      ["", "Alle"],
+      ["mine", "Meine"],
+      ["assigned", "Mir zugewiesen"],
+    ]) {
+      const opt = document.createElement("option");
+      opt.value = value;
+      opt.textContent = label;
+      sel.appendChild(opt);
+    }
+    [...names]
+      .sort((a, b) => a.localeCompare(b, "de"))
+      .forEach((name) => {
+        const opt = document.createElement("option");
+        opt.value = `person:${name}`;
+        opt.textContent = name;
+        sel.appendChild(opt);
+      });
+    if ([...sel.options].some((opt) => opt.value === keep)) sel.value = keep;
+    syncOwnerMenu();
+  }
+
+  function syncOwnerMenu() {
+    const sel = document.getElementById("hub-owner");
+    const menu = document.getElementById("hub-owner-menu");
+    if (!sel || !menu) return;
+    menu.replaceChildren();
+    for (const opt of sel.options) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "hub-owner-option";
+      btn.setAttribute("role", "option");
+      btn.textContent = opt.textContent;
+      if (opt.value === sel.value) btn.classList.add("is-on");
+      btn.addEventListener("click", () => {
+        sel.value = opt.value;
+        sel.dispatchEvent(new Event("change"));
+        menu.hidden = true;
+        document.getElementById("hub-owner-btn")?.setAttribute("aria-expanded", "false");
+        syncOwnerMenu();
+      });
+      menu.appendChild(btn);
+    }
+  }
+
+  function paintPhases(detail) {
+    const box = document.getElementById("ticket-phases");
+    const list = document.getElementById("ticket-phase-list");
+    const select = document.getElementById("ticket-phase");
+    if (!box || !list || !select) return;
+    if (!detail?.id || isCreatingChange()) {
+      box.hidden = true;
+      return;
+    }
+    box.hidden = false;
+    const label = String(detail.phaseLabel || "");
+    if ([...select.options].some((opt) => opt.value === label || opt.textContent === label)) {
+      select.value = label;
+    } else if (label) {
+      const extra = document.createElement("option");
+      extra.value = label;
+      extra.textContent = label;
+      select.appendChild(extra);
+      select.value = label;
+    } else {
+      select.value = "";
+    }
+    list.replaceChildren();
+    const links = Array.isArray(detail.phaseLinks) ? detail.phaseLinks : [];
+    if (!links.length) {
+      const empty = document.createElement("li");
+      empty.className = "phase-empty";
+      empty.textContent = "Noch keine verknüpften Changes.";
+      list.appendChild(empty);
+      return;
+    }
+    links.forEach((link) => {
+      const li = document.createElement("li");
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "phase-open";
+      open.textContent = `${link.phase || "Verknüpft"} · ${link.title || link.reference || "Change"}`;
+      open.addEventListener("click", () => {
+        if (link.id) void openExisting(link.id, { animate: false });
+      });
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "phase-remove";
+      remove.textContent = "Lösen";
+      remove.addEventListener("click", () => {
+        void fetch(`/api/requests/${detail.id}/links/${encodeURIComponent(link.id)}`, {
+          method: "DELETE",
+        })
+          .then(async (r) => {
+            if (!r.ok) return;
+            applyRequest(await r.json(), { animate: false, quiet: true });
+          })
+          .catch(() => flash("Verknüpfung konnte nicht gelöst werden", true));
+      });
+      li.append(open, remove);
+      list.appendChild(li);
+    });
+  }
+
   function filteredHubItems() {
     const q = String(document.getElementById("hub-search")?.value || "")
       .trim()
       .toLowerCase();
+    const owner = String(document.getElementById("hub-owner")?.value || "");
     let list = hubItems.filter((item) => !isHubClosedItem(item));
+    if (owner === "mine" || owner === "assigned" || owner.startsWith("person:")) {
+      const needles = actorNeedles();
+      list = list.filter((item) => {
+        if (owner === "mine") {
+          if (!needles.length) return true;
+          return needles.some((needle) =>
+            hubPersonBlob(item, ["reporter", "createdBy"]).includes(needle)
+          );
+        }
+        if (owner === "assigned") {
+          if (!needles.length) return true;
+          return needles.some((needle) =>
+            hubPersonBlob(item, ["assignee", "changeLead"]).includes(needle)
+          );
+        }
+        const name = owner.slice("person:".length).toLowerCase();
+        return hubPersonBlob(item, ["assignee", "changeLead", "authorsText"]).includes(name);
+      });
+    }
     if (q) {
       list = list.filter((item) => {
         const authors = Array.isArray(item.authors)
@@ -5295,38 +5556,20 @@
     const users = [...thread.querySelectorAll(".hub-chat-bubble.is-user")];
     const lastAssistant = assistants.at(-1);
     const lastUser = users.at(-1);
-    for (const row of assistants) {
+    if (lastAssistant && !creating) {
       const tools = document.createElement("div");
       tools.className = "hub-chat-turn-tools";
-      const copy = document.createElement("button");
-      copy.type = "button";
-      copy.textContent = "Kopieren";
-      copy.addEventListener("click", async () => {
-        const raw = row.dataset.raw || "";
-        try {
-          await navigator.clipboard.writeText(raw);
-          copy.textContent = "Kopiert";
-          window.setTimeout(() => {
-            copy.textContent = "Kopieren";
-          }, 1200);
-        } catch (_) {
-          copy.textContent = "Nicht kopiert";
-        }
+      const again = document.createElement("button");
+      again.type = "button";
+      again.textContent = "Neu erzeugen";
+      again.addEventListener("click", () => {
+        const prompt = lastUser?.dataset.raw || "";
+        if (!prompt || hubChatBusy) return;
+        lastAssistant.remove();
+        void sendHubChat(prompt, { turn: "regenerate", keepUser: true });
       });
-      tools.appendChild(copy);
-      if (row === lastAssistant && !creating) {
-        const again = document.createElement("button");
-        again.type = "button";
-        again.textContent = "Neu erzeugen";
-        again.addEventListener("click", () => {
-          const prompt = lastUser?.dataset.raw || "";
-          if (!prompt || hubChatBusy) return;
-          row.remove();
-          void sendHubChat(prompt, { turn: "regenerate", keepUser: true });
-        });
-        tools.appendChild(again);
-      }
-      row.appendChild(tools);
+      tools.appendChild(again);
+      lastAssistant.appendChild(tools);
     }
     if (lastUser && !creating) {
       const tools = document.createElement("div");
@@ -5889,6 +6132,7 @@
     const board = document.getElementById("hub-board");
     const chat = document.getElementById("hub-chat");
     const listBtn = document.getElementById("hub-view-list");
+    const rowsBtn = document.getElementById("hub-view-rows");
     const boardBtn = document.getElementById("hub-view-board");
     const chatBtn = document.getElementById("hub-view-chat");
     const reportBtn = document.getElementById("hub-view-report");
@@ -5903,10 +6147,14 @@
     if (board) board.hidden = hubView !== "board";
     if (chat) chat.hidden = hubView !== "chat";
     if (report) report.hidden = hubView !== "report";
-    listBtn?.classList.toggle("is-active", hubView === "list");
+    const listFamily = hubView === "list" || hubView === "board" || hubView === "report";
+    listBtn?.classList.toggle("is-active", listFamily);
+    rowsBtn?.classList.toggle("is-active", hubView === "list");
     boardBtn?.classList.toggle("is-active", hubView === "board");
     chatBtn?.classList.toggle("is-active", hubView === "chat");
     reportBtn?.classList.toggle("is-active", hubView === "report");
+    const tools = document.getElementById("hub-view-tools");
+    if (tools) tools.hidden = !listFamily;
     if (persist) {
       try {
         localStorage.setItem(HUB_VIEW_KEY, hubView);
@@ -6235,10 +6483,7 @@
     if (!cols.length) {
       const empty = document.createElement("p");
       empty.className = "hub-col-empty";
-      empty.textContent =
-            hubItems.length
-              ? "Keine Treffer."
-              : "Keine Tickets in Jira.";
+      empty.textContent = hubItems.length ? "Keine Treffer." : "Noch keine Changes.";
       board.appendChild(empty);
       return;
     }
@@ -6309,6 +6554,7 @@
     const hub = document.getElementById("hub");
     if (!rows) return;
     if (Array.isArray(items)) hubItems = items;
+    refreshOwnerOptions();
     paintAccountInbox();
     const visible = filteredHubItems();
     const prevKey =
@@ -6353,7 +6599,7 @@
         ? ""
         : hubItems.length
           ? "Keine Treffer."
-          : "Keine Tickets in Jira.";
+          : "Noch keine Changes.";
     }
     if (count) {
       count.textContent = hubItems.length ? `${hubItems.length} Tickets` : "";
@@ -6465,7 +6711,7 @@
     }
   }
 
-  function softRefreshOpenTicket(requestId, delays = [1200, 3500, 8000]) {
+  function softRefreshOpenTicket(requestId, delays = [1600]) {
     if (!requestId) return;
     for (const ms of delays) {
       window.setTimeout(() => {
@@ -6475,8 +6721,7 @@
         void fetch(`/api/requests/${encodeURIComponent(requestId)}`)
           .then(async (r) => {
             if (!r.ok || syncedRequestId !== requestId || editingKey) return;
-            // Kein erneutes Sync-Polling — sonst starten mehrere Follows parallel.
-            applyRequest(await r.json(), { animate: false, skipSyncFollow: true });
+            applyRequest(await r.json(), { animate: false, skipSyncFollow: true, quiet: true });
           })
           .catch(() => {
             /* lokaler Stand bleibt */
@@ -6682,12 +6927,11 @@
           .then(async (r) => {
             if (!r.ok || syncedRequestId !== requestId) return;
             const body = await r.json();
-            if (!editingKey) applyRequest(body, { animate: false });
-            // Enrich (Kommentare/Anhänge) kommt verzögert — mehrfach nachladen.
+            if (!editingKey) applyRequest(body, { animate: false, quiet: true });
             softRefreshOpenTicket(requestId);
           })
           .catch(() => {
-            softRefreshOpenTicket(requestId, [2500, 7000]);
+            softRefreshOpenTicket(requestId, [2500]);
           });
       }
       return;
@@ -6704,7 +6948,7 @@
       } catch (_) {
         ticketOpenedFrom = "";
       }
-      void openExisting(slug);
+      void openExisting(slug, { animate: false });
       return;
     }
     void loadHub();
@@ -6824,14 +7068,17 @@
   document.getElementById("hub-view-list")?.addEventListener("click", () => {
     applyHubView("list");
   });
+  document.getElementById("hub-view-rows")?.addEventListener("click", () => {
+    applyHubView("list");
+  });
   document.getElementById("hub-view-board")?.addEventListener("click", () => {
-    applyHubView("board");
+    applyHubView(hubView === "board" ? "list" : "board");
   });
   document.getElementById("hub-view-chat")?.addEventListener("click", () => {
     applyHubView("chat");
   });
   document.getElementById("hub-view-report")?.addEventListener("click", () => {
-    applyHubView("report");
+    applyHubView(hubView === "report" ? "list" : "report");
   });
   document.getElementById("hub-report-owners")?.addEventListener("click", (event) => {
     const th = event.target.closest("th[data-sort]");
@@ -6929,6 +7176,119 @@
   } catch (_) {
     applyHubView("chat", { persist: false });
   }
+
+  document.getElementById("hub-owner")?.addEventListener("change", () => {
+    paintHubItems(hubItems, { keepFocus: false });
+  });
+  document.getElementById("hub-owner-btn")?.addEventListener("click", () => {
+    const menu = document.getElementById("hub-owner-menu");
+    const btn = document.getElementById("hub-owner-btn");
+    if (!menu || !btn) return;
+    syncOwnerMenu();
+    menu.hidden = !menu.hidden;
+    btn.setAttribute("aria-expanded", menu.hidden ? "false" : "true");
+  });
+  document.addEventListener("click", (event) => {
+    const menu = document.getElementById("hub-owner-menu");
+    const btn = document.getElementById("hub-owner-btn");
+    if (!menu || menu.hidden || !btn) return;
+    if (btn.contains(event.target) || menu.contains(event.target)) return;
+    menu.hidden = true;
+    btn.setAttribute("aria-expanded", "false");
+  });
+
+  document.getElementById("cancel-change")?.addEventListener("click", () => {
+    intakeStarted = false;
+    publishing = false;
+    autoFillBusy = false;
+    aiReviewPending = false;
+    resetTicketState();
+    document.body.classList.remove(
+      "ticket-creating",
+      "field-flow",
+      "ticket-active",
+      "ticket-open",
+      "ticket-ready"
+    );
+    ticket.hidden = true;
+    const hub = document.getElementById("hub");
+    if (hub) hub.hidden = false;
+    if (startChangeBtn) startChangeBtn.hidden = false;
+    syncTicketModeClass();
+    history.replaceState({}, "", "/workspace");
+    void loadHub();
+  });
+
+  document.getElementById("ticket-duplicate")?.addEventListener("click", async () => {
+    if (!syncedRequestId) return;
+    const response = await fetch(`/api/requests/${syncedRequestId}/duplicate`, { method: "POST" });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      flash(typeof body.detail === "string" ? body.detail : "Duplikat fehlgeschlagen", true);
+      return;
+    }
+    history.replaceState({}, "", `/workspace/${body.id}`);
+    applyRequest(body, { animate: false });
+    flash("Change dupliziert");
+  });
+
+  document.getElementById("ticket-phase")?.addEventListener("change", () => {
+    if (!syncedRequestId) return;
+    const phase = document.getElementById("ticket-phase")?.value || "";
+    void fetch(`/api/requests/${syncedRequestId}/phase`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phase }),
+    })
+      .then(async (r) => {
+        if (!r.ok || syncedRequestId == null) return;
+        const body = await r.json();
+        if (body?.id === syncedRequestId) paintPhases(body);
+      })
+      .catch(() => flash("Phase konnte nicht gespeichert werden", true));
+  });
+
+  document.getElementById("ticket-phase-search")?.addEventListener("input", () => {
+    const box = document.getElementById("ticket-phase-hits");
+    const q = String(document.getElementById("ticket-phase-search")?.value || "")
+      .trim()
+      .toLowerCase();
+    if (!box) return;
+    box.replaceChildren();
+    if (q.length < 2) return;
+    hubItems
+      .filter((item) => item.requestId && item.requestId !== syncedRequestId)
+      .filter((item) =>
+        [item.title, item.key, item.reference].join(" ").toLowerCase().includes(q)
+      )
+      .slice(0, 6)
+      .forEach((item) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "phase-hit";
+        btn.textContent = item.title || item.key;
+        btn.addEventListener("click", () => {
+          const phase = document.getElementById("ticket-phase")?.value || "Phase 2";
+          void fetch(`/api/requests/${syncedRequestId}/links`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ otherId: item.requestId, phase: phase || "Phase 2" }),
+          })
+            .then(async (r) => {
+              const body = await r.json().catch(() => ({}));
+              if (!r.ok) {
+                flash(typeof body.detail === "string" ? body.detail : "Verknüpfung fehlgeschlagen", true);
+                return;
+              }
+              document.getElementById("ticket-phase-search").value = "";
+              box.replaceChildren();
+              applyRequest(body, { animate: false, quiet: true });
+            })
+            .catch(() => flash("Verknüpfung fehlgeschlagen", true));
+        });
+        box.appendChild(btn);
+      });
+  });
 
   document.getElementById("hub-search")?.addEventListener("input", () => {
     if (hubView === "report") {

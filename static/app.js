@@ -46,6 +46,24 @@
     void refreshJiraSuggest();
   }
 
+  function appendMultiContinue(host, { allowEmpty = false, emptyLabel = "Ohne Tags weiter" } = {}) {
+    const go = document.createElement("button");
+    go.type = "button";
+    go.className = "suggestion go field-tags-go";
+    const has = multiPicks.length > 0;
+    go.textContent = has ? "Weiter" : emptyLabel;
+    go.disabled = !has && !allowEmpty;
+    go.title = has ? "Auswahl übernehmen" : allowEmpty ? "Ohne Auswahl weiter" : "Mindestens einen Tag wählen";
+    go.onclick = () => {
+      if (!multiPicks.length && !allowEmpty) return;
+      const joined = multiJoined();
+      multiPicks = [];
+      void submitAnswer(joined || "Keine", go);
+    };
+    host.appendChild(go);
+    return go;
+  }
+
   async function addMultiFromText(text) {
     const raw = String(text || "").trim();
     if (!raw) return;
@@ -393,17 +411,14 @@
               : "Keine Optionen aus Jira geladen"
             : "Keine Jira-Treffer";
       jiraSuggest.appendChild(empty);
-      if (multi && multiPicks.length) {
-        const go = document.createElement("button");
-        go.type = "button";
-        go.className = "suggestion go field-tags-go";
-        go.textContent = "Weiter";
-        go.onclick = () => {
-          const joined = multiJoined();
-          multiPicks = [];
-          void submitAnswer(joined, go);
-        };
-        jiraSuggest.appendChild(go);
+      if (multi) {
+        const actions = document.createElement("div");
+        actions.className = "field-tags-actions";
+        appendMultiContinue(actions, {
+          allowEmpty: kind === "components" || Boolean(step?.optional),
+          emptyLabel: kind === "components" ? "Ohne Tags weiter" : "Weiter",
+        });
+        jiraSuggest.appendChild(actions);
       }
       return;
     }
@@ -425,20 +440,12 @@
           renderJiraSuggest(items, query, kind);
         },
       });
-      const go = document.createElement("button");
-      go.type = "button";
-      go.className = "suggestion go field-tags-go";
-      go.textContent = "Weiter";
-      go.disabled = multiPicks.length === 0;
-      go.onclick = () => {
-        if (!multiPicks.length) return;
-        const joined = multiJoined();
-        multiPicks = [];
-        void submitAnswer(joined, go);
-      };
       const actions = document.createElement("div");
       actions.className = "field-tags-actions";
-      actions.appendChild(go);
+      appendMultiContinue(actions, {
+        allowEmpty: kind === "components" || Boolean(step?.optional),
+        emptyLabel: kind === "components" ? "Ohne Tags weiter" : "Weiter",
+      });
       body.append(host, actions);
       jiraSuggest.appendChild(body);
       return;
@@ -463,25 +470,14 @@
       chipHost.appendChild(chip);
     });
     if (multi) {
-      const go = document.createElement("button");
-      go.type = "button";
-      go.className = "suggestion go field-tags-go";
-      go.textContent = "Weiter";
-      go.disabled = multiPicks.length === 0;
-      go.title = multiPicks.length
-        ? "Auswahl übernehmen"
-        : "Mindestens ein Tag wählen";
-      go.onclick = () => {
-        if (!multiPicks.length) return;
-        const joined = multiJoined();
-        multiPicks = [];
-        void submitAnswer(joined, go);
-      };
       const body = document.createElement("div");
       body.className = "field-tags-body";
       const actions = document.createElement("div");
       actions.className = "field-tags-actions";
-      actions.appendChild(go);
+      appendMultiContinue(actions, {
+        allowEmpty: kind === "components" || Boolean(step?.optional),
+        emptyLabel: kind === "components" ? "Ohne Tags weiter" : "Weiter",
+      });
       body.append(chipHost, actions);
       jiraSuggest.appendChild(body);
     }
@@ -539,8 +535,8 @@
     }
     if (step.date) {
       form.classList.add("hidden");
-      if (choiceRow) choiceRow.hidden = true;
       syncEnhance(null);
+      renderChoices(step);
       if (dateWrap && dateCal) {
         dateWrap.hidden = false;
         mountCalendar(dateCal, {
@@ -656,6 +652,13 @@
     }
     const next = String(body.text || "").trim();
     if (!next) throw new Error("leere Aufbereitung");
+    if (key === "description") {
+      const note = "Dieser Change wurde mit KI aufgewertet.";
+      const lower = next.toLowerCase();
+      if (!lower.includes("mit ki aufgewertet") && !lower.includes("mithilfe von ki")) {
+        return `${next}\n\n${note}`;
+      }
+    }
     return next;
   }
 
@@ -706,7 +709,14 @@
     if (busy) return;
     const step = window.getTicketStep?.();
     if (!step || typeof window.prepareTicketField !== "function") return;
-    if (step.choices?.length && !step.keepForm && !step.choices.includes(text)) return;
+    if (
+      step.choices?.length &&
+      !step.keepForm &&
+      !step.date &&
+      !step.choices.includes(text)
+    ) {
+      return;
+    }
     if (step.number) {
       const raw = String(text || "").trim();
       const skip =
@@ -814,6 +824,10 @@
         const joined = multiJoined();
         multiPicks = [];
         void submitAnswer(joined, input);
+        return;
+      }
+      if (step.optional || step.jiraLookup === "components") {
+        void submitAnswer("Keine", input);
       }
       return;
     }

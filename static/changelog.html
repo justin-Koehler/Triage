@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Was neu ist — CRITR</title>
-    <link rel="stylesheet" href="/styles.css?v=v0-3-52" />
+    <link rel="stylesheet" href="/styles.css?v=v0-5-11" />
   </head>
   <body class="gated">
     <header class="chrome">
@@ -13,7 +13,7 @@
           <a class="brand" href="/">CRITR</a>
           <div class="app-version" id="app-version">
             <a class="app-version-label" id="app-version-info" href="/was-neu" aria-current="page" title="Was neu ist">
-              v0.3.52
+              v0.5.11
             </a>
           </div>
         </div>
@@ -21,17 +21,40 @@
       </div>
     </header>
 
-    <div class="shell shell-wide">
+    <div class="shell shell-wide log-shell">
       <article class="changelog">
         <p class="hub-kicker">Versionen</p>
         <h1 class="empty-title">Was neu ist</h1>
-        <p class="empty-sub">
-          Funktionsupdates und Qualitätsupdates getrennt. Oben die Übersicht, darunter der Inhalt jeder Version.
-        </p>
 
-        <div class="log-split">
+        <section class="log-highlights" id="highlights">
+          <p class="log-meta">Highlights</p>
+          <h2 class="log-title">Was gerade zählt</h2>
+          <ul class="log-highlight-list">
+            <li>Ein Change öffnet sich ohne Ruckler. Zurück scrollt mit, die Kommentare haben wieder ihren eigenen Bereich.</li>
+            <li>Die Liste filtert nach Person. Anlegen lässt sich abbrechen, ein Change lässt sich duplizieren und in Phasen verknüpfen.</li>
+            <li>Bei Personen steht die E-Mail. Gewählte Namen bleiben stehen, während weiter gesucht wird.</li>
+          </ul>
+        </section>
+
+        <div class="log-frame">
+          <aside class="log-side">
           <nav class="log-index" aria-label="Funktionsupdates">
             <p class="log-index-kicker">Funktionsupdates</p>
+            <p class="log-side-line"><a href="#linie-0-5">0.5</a></p>
+            <ol>
+              <li><a href="#v0-5-2">v0.5.2 <span>Ruhiger Onepager</span></a></li>
+              <li><a href="#v0-5-1">v0.5.1 <span>Onepager</span></a></li>
+              <li><a href="#v0-5-0">v0.5.0 <span>Changes im Alltag</span></a></li>
+            </ol>
+            <p class="log-side-line"><a href="#linie-0-4">0.4</a></p>
+            <ol>
+              <li><a href="#v0-4-10">v0.4.10 <span>Dollar</span></a></li>
+              <li><a href="#v0-4-9">v0.4.9 <span>Stunden</span></a></li>
+              <li><a href="#v0-4-8">v0.4.8 <span>Minuten</span></a></li>
+              <li><a href="#v0-4-6">v0.4.6 <span>Nur meine</span></a></li>
+              <li><a href="#v0-4-0">v0.4.0 <span>Versionen</span></a></li>
+            </ol>
+            <p class="log-side-line"><a href="#linie-0-3">0.3</a></p>
             <ol>
               <li><a href="#v0-3-52">v0.3.52 <span>Chat fragt nach</span></a></li>
               <li><a href="#v0-3-50">v0.3.50 <span>Chat wie ein Gespräch</span></a></li>
@@ -46,6 +69,9 @@
               <li><a href="#v0-3-2">v0.3.2 <span>Status-Tabellen</span></a></li>
               <li><a href="#v0-3-1">v0.3.1 <span>Plan/Ist Tabelle</span></a></li>
               <li><a href="#v0-3-0">v0.3.0 <span>Stand im Ticket</span></a></li>
+            </ol>
+            <p class="log-side-line"><a href="#linie-0-2">0.2</a></p>
+            <ol>
               <li><a href="#v0-2-96">v0.2.96 <span>Status-Freitext</span></a></li>
               <li><a href="#v0-2-95">v0.2.95 <span>Fragen bündeln</span></a></li>
               <li><a href="#v0-2-94">v0.2.94 <span>Ruhiger Chat</span></a></li>
@@ -89,7 +115,38 @@
           </nav>
           <nav class="log-index" aria-label="Qualitätsupdates">
             <p class="log-index-kicker">Qualitätsupdates</p>
+            <p class="log-side-line"><a href="#linie-0-5">0.5</a></p>
             <ol>
+              <li><a href="#v0-5-11">v0.5.11 <span>Ist wie Plan</span></a></li>
+              <li><a href="#v0-5-10">v0.5.10 <span>Abhängigkeiten</span></a></li>
+              <li><a href="#v0-5-9">v0.5.9 <span>Kosten ruhig</span></a></li>
+              <li><a href="#v0-5-8">v0.5.8 <span>Filtermenü</span></a></li>
+              <li><a href="#v0-5-7">v0.5.7 <span>Filterwort</span></a></li>
+              <li><a href="#v0-5-6">v0.5.6 <span>Filter</span></a></li>
+              <li><a href="#v0-5-5">v0.5.5 <span>Titel mittig</span></a></li>
+              <li><a href="#v0-5-4">v0.5.4 <span>Scrollen</span></a></li>
+              <li><a href="#v0-5-3">v0.5.3 <span>Titel</span></a></li>
+            </ol>
+            <p class="log-side-line"><a href="#linie-0-4">0.4</a></p>
+            <ol>
+              <li><a href="#v0-4-11">v0.4.11 <span>Anmeldung</span></a></li>
+              <li><a href="#v0-4-7">v0.4.7 <span>Ohne Person</span></a></li>
+              <li><a href="#v0-4-5">v0.4.5 <span>Reiter wie zuvor</span></a></li>
+              <li><a href="#v0-4-4">v0.4.4 <span>Ohne Karte</span></a></li>
+              <li><a href="#v0-4-3">v0.4.3 <span>Arbeitsfläche</span></a></li>
+              <li><a href="#v0-4-2">v0.4.2 <span>Chatfeld</span></a></li>
+              <li><a href="#v0-4-1">v0.4.1 <span>Changes</span></a></li>
+            </ol>
+            <p class="log-side-line"><a href="#linie-0-3">0.3</a></p>
+            <ol>
+              <li><a href="#v0-3-60">v0.3.60 <span>Chatfeld</span></a></li>
+              <li><a href="#v0-3-59">v0.3.59 <span>Ohne Kopieren</span></a></li>
+              <li><a href="#v0-3-58">v0.3.58 <span>Symbole bei der Liste</span></a></li>
+              <li><a href="#v0-3-57">v0.3.57 <span>Nummer auf den Blättern</span></a></li>
+              <li><a href="#v0-3-56">v0.3.56 <span>Ist rechts</span></a></li>
+              <li><a href="#v0-3-55">v0.3.55 <span>Knöpfe bleiben</span></a></li>
+              <li><a href="#v0-3-54">v0.3.54 <span>Vier Augen</span></a></li>
+              <li><a href="#v0-3-53">v0.3.53 <span>Sheet gewinnt</span></a></li>
               <li><a href="#v0-3-51">v0.3.51 <span>Jira öffnen</span></a></li>
               <li><a href="#v0-3-48">v0.3.48 <span>Mehr Luft in der Tabelle</span></a></li>
               <li><a href="#v0-3-41">v0.3.41 <span>Aufwand-Sync abgesichert</span></a></li>
@@ -124,7 +181,10 @@
               <li><a href="#v0-3-7">v0.3.7 <span>Seite erreichbar</span></a></li>
               <li><a href="#v0-3-4">v0.3.4 <span>Jira-Sync</span></a></li>
 
-<li><a href="#v0-2-100">v0.2.100 <span>Plan/Ist sichtbar</span></a></li>
+            </ol>
+            <p class="log-side-line"><a href="#linie-0-2">0.2</a></p>
+            <ol>
+              <li><a href="#v0-2-100">v0.2.100 <span>Plan/Ist sichtbar</span></a></li>
               <li><a href="#v0-2-99">v0.2.99 <span>Plan/Ist Lesbarkeit</span></a></li>
               <li><a href="#v0-2-98">v0.2.98 <span>Plan und Ist</span></a></li>
               <li><a href="#v0-2-97">v0.2.97 <span>KI-Hinweis</span></a></li>
@@ -187,14 +247,187 @@
               <li><a href="#v0-2-6">v0.2.6 <span>Liste</span></a></li>
             </ol>
           </nav>
-        </div>
+          </aside>
+          <div class="log-main">
+
+        <section class="log-line" id="linie-0-5">
+          <p class="log-meta">0.5</p>
+          <h2 class="log-title">Changes im Alltag</h2>
+          <p class="log-lead">
+            Ein Change öffnet sich ruhig, Zurück bleibt sichtbar, die Liste filtert nach Person. Anlegen lässt sich abbrechen, kopieren und in Phasen verknüpfen. Personen zeigen die E-Mail.
+          </p>
+        </section>
+
+        <section class="log-line" id="linie-0-4">
+          <p class="log-meta">0.4</p>
+          <h2 class="log-title">Kalkulation und Versionen</h2>
+          <p class="log-lead">
+            Aufwand rechnet in Personentagen, Stunden, Minuten und Dollar. Die Versionsseite zeigt Highlights und die Linien 0.3 und 0.2.
+          </p>
+        </section>
+
+        <section class="log-line" id="linie-0-3">
+          <p class="log-meta">0.3</p>
+          <h2 class="log-title">Chat, Stand und Auswertung</h2>
+          <p class="log-lead">
+            Ein Change entsteht im Chat, mit Nachfragen bis Zielgruppe, Änderung, Nutzen und Zeitraum stehen. Liste, Board und Auswertung sitzen zusammen, die Auswertung liest die IT-Personentage auch aus Jira. Der Stand zeigt Plan und Ist. Aufwand und Kosten folgen dem Sheet, die Projektleitung ist eine andere Person.
+          </p>
+        </section>
+
+        <section class="log-line" id="linie-0-2">
+          <p class="log-meta">0.2</p>
+          <h2 class="log-title">Workspace, Chat und Status</h2>
+          <p class="log-lead">
+            Der Chat kommt in den Hub, das Status update merkt sich den Verlauf, die Kalkulation hängt am Change. Liste und Board, die Jira-Links und der Stand am Ticket kommen in dieser Linie dazu.
+          </p>
+        </section>
 
         <div class="log-lane">
           <h2 class="log-lane-title">Funktionsupdates</h2>
           <p class="log-lane-lead">Was neu dazugekommen ist.</p>
 
-          <section class="log-release is-current" id="v0-3-52">
-            <p class="log-meta">v0.3.52 · Aktuell</p>
+          <section class="log-release" id="v0-5-2">
+            <p class="log-meta">v0.5.2</p>
+            <h2 class="log-title">Status sieht aus wie der Change</h2>
+            <p class="log-lead">
+              Das Status update hat keine Karten mehr. Überschrift, Abschnitte und Felder sitzen wie im Change.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Der Titel steht in der Mitte. Die Abschnitte haben die schwarze Linie. Eingaben sind Zeilen, keine Kästen. Plan, Ist und Risiko stehen in einer Spalte.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-5-1">
+            <p class="log-meta">v0.5.1</p>
+            <h2 class="log-title">Status auf einen Blick</h2>
+            <p class="log-lead">
+              Das Status update zeigt den Change als Onepager. Ziel und Beteiligte kommen aus dem Change. Abhängigkeiten, Zeitplan und Blocker schreibst du dazu.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Aus dem Change</h3>
+                <p>Oben stehen Name, Status und Quartal. Zielsetzung und die sechs Rollen kommen aus dem Steckbrief. Plan und Risiko bei den Kosten rechnen mit.</p>
+              </div>
+              <div>
+                <h3>Zum Schreiben</h3>
+                <p>Abhängigkeiten, die Meilensteine, Ist-Zahlen, Entscheidung, Risikomaßnahme und Entscheidungsbedarf bleiben Felder.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-5-0">
+            <p class="log-meta">v0.5.0</p>
+            <h2 class="log-title">Changes im Alltag</h2>
+            <p class="log-lead">
+              Die Detailansicht bleibt ruhig und lesbar. In der Liste findest du deine Changes, beim Anlegen kannst du verwerfen, kopieren und Phasen verbinden.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Öffnen und Scrollen</h3>
+                <p>Ein Change erscheint ohne nachziehendes Neuzeichnen.</p>
+              </div>
+              <div>
+                <h3>Zurück und Kopf</h3>
+                <p>Die Überschriften im Change sind größer und klar vom Text getrennt.</p>
+              </div>
+              <div>
+                <h3>Filter</h3>
+                <p>Über der Liste filterst du nach Meine, Mir zugewiesen oder einer Person.</p>
+              </div>
+              <div>
+                <h3>Abbrechen, Duplikat, Phasen</h3>
+                <p>Beim neuen Change verwirft Abbrechen die Eingabe. Im Change duplizierst du ihn und verknüpfst Phase 1, 2 und 3.</p>
+              </div>
+              <div>
+                <h3>Personen</h3>
+                <p>SCS und CIT stehen zuerst. Neben dem Namen steht die E-Mail. Gewählte Namen bei „Wer unterstützt“ bleiben sichtbar, während du weiter suchst.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-4-10">
+            <p class="log-meta">v0.4.10</p>
+            <h2 class="log-title">Euro oder Dollar</h2>
+            <p class="log-lead">
+              Beim Preis der Sach- und Lizenzkosten steht € oder $. Ohne Wahl sind es Euro. Dollar werden beim Verlassen in Euro umgerechnet.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Kalkulation</h3>
+                <p>Der Kurs kommt von der EZB. Die Summe und die gespeicherte Kalkulation bleiben in Euro.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-4-9">
+            <p class="log-meta">v0.4.9</p>
+            <h2 class="log-title">Stunden in der Kalkulation</h2>
+            <p class="log-lead">
+              Neben PT und min steht jetzt h. Stunden werden beim Verlassen in Personentage umgerechnet.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Kalkulation</h3>
+                <p>1 PT sind 8 Stunden. 4 Stunden werden zu 0,5 PT. Ohne Wahl sind es Personentage.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-4-8">
+            <p class="log-meta">v0.4.8</p>
+            <h2 class="log-title">Personentage oder Minuten</h2>
+            <p class="log-lead">
+              In der Kalkulation steht neben der Menge PT oder min. Ohne Wahl sind es Personentage. Minuten werden beim Verlassen in PT umgerechnet.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Kalkulation</h3>
+                <p>1 PT sind 8 Stunden. 96 Minuten werden zu 0,2 PT. Die Summe rechnet danach mit Personentagen.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-4-6">
+            <p class="log-meta">v0.4.6</p>
+            <h2 class="log-title">Nur die eigenen Changes</h2>
+            <p class="log-lead">
+              Kurz lag bei Changes ein Personensymbol neben der Auswertung. Es ist wieder entfernt.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Changes</h3>
+                <p>Das Symbol filterte Liste und Board. Es ist wieder weg.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-4-0">
+            <p class="log-meta">v0.4.0</p>
+            <h2 class="log-title">Die Versionen stehen an der Seite</h2>
+            <p class="log-lead">
+              Die Liste sitzt links neben dem Text. Oben stehen die Highlights, jede Linie wie 0.3 und 0.2 hat eine Zusammenfassung.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Liste</h3>
+                <p>Funktionsupdates und Qualitätsupdates bleiben getrennt und sind nach 0.4, 0.3 und 0.2 gruppiert.</p>
+              </div>
+              <div>
+                <h3>Linie</h3>
+                <p>0.3 fasst Chat, Stand und Auswertung. 0.2 fasst Workspace, Chat und Status.</p>
+              </div>
+              <div>
+                <h3>Highlights</h3>
+                <p>Ganz oben stehen die Punkte, die gerade zählen.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-52">
+            <p class="log-meta">v0.3.52</p>
             <h2 class="log-title">Der Chat fragt nach, bis der Change trägt</h2>
             <p class="log-lead">
               Beim Anlegen hakt der Chat nach: für wen das Problem gilt, was sich ändert, welcher Nutzen entsteht, wann es startet und bis wann es fertig ist.
@@ -816,6 +1049,362 @@
         <div class="log-lane">
           <h2 class="log-lane-title">Qualitätsupdates</h2>
           <p class="log-lane-lead">Was ruhiger, klarer oder zuverlässiger geworden ist.</p>
+
+          <section class="log-release is-current" id="v0-5-11">
+            <p class="log-meta">v0.5.11 · Aktuell</p>
+            <h2 class="log-title">Ist steht wie Plan</h2>
+            <p class="log-lead">
+              In der Gesamtsicht sind die Ist-Zahlen rechtsbündig, ohne Unterstreichung. Personentage und Euro sehen aus wie in der Plan-Spalte.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Kosten</h3>
+                <p>FB und IT zeigen PT, Sachkosten den Euro-Betrag. Die Zeile bleibt eingebbar.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-5-10">
+            <p class="log-meta">v0.5.10</p>
+            <h2 class="log-title">Abhängigkeiten wie die anderen Abschnitte</h2>
+            <p class="log-lead">
+              In der Gesamtsicht hat Abhängigkeiten dieselbe Überschrift mit schwarzer Linie wie Ziel, Zeitplan und Kosten.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Gesamtsicht</h3>
+                <p>Das Feld sitzt nicht mehr als eigene Zeile dazwischen.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-5-9">
+            <p class="log-meta">v0.5.9</p>
+            <h2 class="log-title">Kosten bleiben stehen</h2>
+            <p class="log-lead">
+              IT-Kosten und Gesamtsumme werden nicht mehr im Hintergrund nach Jira geschrieben. Sie ändern sich, wenn du das Aufwand-Sheet speicherst.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Sync</h3>
+                <p>Der regelmäßige Abgleich lässt Kosten und IT-Kosten in Ruhe.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-5-8">
+            <p class="log-meta">v0.5.8</p>
+            <h2 class="log-title">Das Filtermenü sitzt sauber</h2>
+            <p class="log-lead">
+              Die Auswahl unter Filter ist eine kleine Liste mit Abstand. Die aktive Zeile ist hinterlegt.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Liste</h3>
+                <p>Filter öffnet ein Menü wie die anderen. Lange Personenlisten scrollen darin.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-5-7">
+            <p class="log-meta">v0.5.7</p>
+            <h2 class="log-title">Filter ist das Menü</h2>
+            <p class="log-lead">
+              Das Wort Filter über der Liste ist selbst die Auswahl. Ein Tippen öffnet Alle, Meine, Mir zugewiesen und die Personen.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Liste</h3>
+                <p>Neben dem Wort steht kein zweites Feld. Die gewählte Zeile ist fett.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-5-6">
+            <p class="log-meta">v0.5.6</p>
+            <h2 class="log-title">Der Filter ist eine Zeile</h2>
+            <p class="log-lead">
+              Über der Liste steht Filter ohne Rahmen. Daneben siehst du Alle, Meine oder Mir zugewiesen.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Liste</h3>
+                <p>Das Wort Filter steht davor. Die Auswahl hat keinen Kasten, nur den kleinen Pfeil.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-5-5">
+            <p class="log-meta">v0.5.5</p>
+            <h2 class="log-title">Titel bleiben in der Mitte</h2>
+            <p class="log-lead">
+              Der Name des Changes steht mittig, im Change und in der Gesamtsicht. Ein langer Titel bricht in der Mitte um.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Überschrift</h3>
+                <p>Kurze und lange Titel sitzen auf derselben Mitte. Die Gesamtsicht darüber auch.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-5-4">
+            <p class="log-meta">v0.5.4</p>
+            <h2 class="log-title">Scrollen und Legende wie zuvor</h2>
+            <p class="log-lead">
+              Zurück klebt nicht mehr oben. Die Kommentare scrollen wieder in ihrem Bereich. Die Farblegende über der Liste ist weg.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Change</h3>
+                <p>Die Seite des Changes scrollt für sich. Zurück wandert mit nach oben. Die Kommentare haben wieder eine eigene Leiste.</p>
+              </div>
+              <div>
+                <h3>Liste</h3>
+                <p>Über der Liste steht keine Farberklärung mehr.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-5-3">
+            <p class="log-meta">v0.5.3</p>
+            <h2 class="log-title">Der Titel steht allein</h2>
+            <p class="log-lead">
+              Oben steht die Gesamtsicht klein und der Change-Titel groß. Status, Stand und Jira-Schlüssel sitzen neben dem Verlauf.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Status update</h3>
+                <p>Der Kopf zeigt nur noch die Gesamtsicht und den Namen. Ampel, Quartal und Ticketnummer stehen in der Spalte neben dem Verlauf.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-4-11">
+            <p class="log-meta">v0.4.11</p>
+            <h2 class="log-title">Anmeldung kommt zurück</h2>
+            <p class="log-lead">
+              Nach Cidaas öffnet sich CRITR wieder. Läuft die Anmeldung ab, zeigt die Anmeldeseite einen klaren Hinweis.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Anmeldung</h3>
+                <p>Der Start bleibt gespeichert, bevor Cidaas öffnet. Danach kannst du es erneut versuchen.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-4-7">
+            <p class="log-meta">v0.4.7</p>
+            <h2 class="log-title">Das Personensymbol ist weg</h2>
+            <p class="log-lead">
+              Neben Liste, Board und Auswertung liegt kein Symbol mehr für die eigenen Changes.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Changes</h3>
+                <p>Liste und Board zeigen wieder alle offenen Changes.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-4-5">
+            <p class="log-meta">v0.4.5</p>
+            <h2 class="log-title">Suche und Reiter sind wieder wie zuvor</h2>
+            <p class="log-lead">
+              Die Suche ist wieder die schmale Zeile mit „Suche“. Chat und Changes stehen wieder in der kleinen Schrift.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Leiste</h3>
+                <p>Kein graues Suchfeld. Die Reiter sind wieder klein und in Großbuchstaben.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-4-4">
+            <p class="log-meta">v0.4.4</p>
+            <h2 class="log-title">Die weiße Fläche ist weg</h2>
+            <p class="log-lead">
+              Chat und Changes liegen wieder direkt auf dem Grund, ohne Karte darum.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Arbeitsfläche</h3>
+                <p>Rahmen, Ecken und der weiße Kasten sind entfernt. Reiter und Suche bleiben.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-4-3">
+            <p class="log-meta">v0.4.3</p>
+            <h2 class="log-title">Die Arbeitsfläche ist klarer</h2>
+            <p class="log-lead">
+              Zeilen reagieren auf die Maus. Der leere Chat sitzt oben.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Chat</h3>
+                <p>Das leere Gespräch sitzt oben unter den Reitern, nicht mehr in der Mitte der Seite.</p>
+              </div>
+              <div>
+                <h3>Liste</h3>
+                <p>Eine Zeile wird beim Darüberfahren grau. Ohne Changes steht „Noch keine Changes.“</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-4-2">
+            <p class="log-meta">v0.4.2</p>
+            <h2 class="log-title">Das Chatfeld ist als Eingabe erkennbar</h2>
+            <p class="log-lead">
+              Das Feld ist grau umrandet und sagt „Hier eine Nachricht schreiben…“. Beim Tippen wird es weiß.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Chat</h3>
+                <p>Der Hinweis steht im Feld. Enter sendet weiterhin.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-4-1">
+            <p class="log-meta">v0.4.1</p>
+            <h2 class="log-title">Der Reiter heißt Changes</h2>
+            <p class="log-lead">
+              Neben Chat steht Changes. Ist Changes gewählt, liegt das Listensymbol bei Board und Auswertung.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Leiste</h3>
+                <p>Changes bleibt unterstrichen, ob Liste, Board oder Auswertung offen ist. Das Listensymbol zeigt die Tabelle.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-60">
+            <p class="log-meta">v0.3.60</p>
+            <h2 class="log-title">Verlauf und Neu sitzen am Chatfeld</h2>
+            <p class="log-lead">
+              Verlauf und Neu stehen auf einer Linie über dem Feld. Der weiße Rahmen darum ist weg, darunter steht ein kurzer Hinweis.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Chat</h3>
+                <p>Die beiden Wörter schließen links und rechts mit dem Feld ab. Unter dem Feld steht, dass Enter sendet.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-59">
+            <p class="log-meta">v0.3.59</p>
+            <h2 class="log-title">Im Chat gibt es kein Kopieren mehr</h2>
+            <p class="log-lead">
+              Unter den Antworten steht Kopieren nicht mehr. Neu erzeugen bleibt an der letzten Antwort.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Chat</h3>
+                <p>Der Knopf unter der Antwort ist weg.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-58">
+            <p class="log-meta">v0.3.58</p>
+            <h2 class="log-title">Board und Auswertung sitzen bei der Liste</h2>
+            <p class="log-lead">
+              Die Leiste hat nur noch Chat und Liste. Board und Auswertung sind Symbole, sobald Liste gewählt ist.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Leiste</h3>
+                <p>Das Wort Changes steht nicht mehr neben den Reitern.</p>
+              </div>
+              <div>
+                <h3>Symbole</h3>
+                <p>Bei Liste schaltet ein Spalten-Symbol aufs Board und ein Balken-Symbol auf die Auswertung. Ein zweiter Klick kehrt zur Liste zurück.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-57">
+            <p class="log-meta">v0.3.57</p>
+            <h2 class="log-title">Die SCSCM-Nummer steht auf den Blättern</h2>
+            <p class="log-lead">
+              Aufwand-Sheet und Status update zeigen oben die Ticketnummer, neben der Art des Blatts.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Kopf</h3>
+                <p>Die Nummer steht vor Kostenkalkulation bzw. Status update und öffnet das Ticket in Jira.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-56">
+            <p class="log-meta">v0.3.56</p>
+            <h2 class="log-title">Ist steht rechts</h2>
+            <p class="log-lead">
+              In der Status-update-Tabelle schließt die Spalte Ist rechts ab, Kopf und Werte.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Tabelle</h3>
+                <p>Bei Terminen und Kosten steht Ist am rechten Rand der Spalte.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-55">
+            <p class="log-meta">v0.3.55</p>
+            <h2 class="log-title">Speichern und Zurück bleiben oben</h2>
+            <p class="log-lead">
+              Im Effort Sheet bleiben die beiden Knöpfe rechts oben, auch wenn die Kalkulation lang wird.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Kopfzeile</h3>
+                <p>Speichern und Zurück kleben an der rechten oberen Ecke. Der Rest der Seite scrollt darunter durch.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-54">
+            <p class="log-meta">v0.3.54</p>
+            <h2 class="log-title">Projektleitung ist eine andere Person</h2>
+            <p class="log-lead">
+              Wer den Change anlegt, kann sich nicht selbst als Projektleitung eintragen.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Auswahl</h3>
+                <p>Der eigene Name wird nicht übernommen. Es erscheint der Hinweis, sich nicht selbst auszuwählen.</p>
+              </div>
+              <div>
+                <h3>Vier-Augen-Prinzip</h3>
+                <p>Die Projektleitung muss eine andere Person sein. Speichern und Anlegen in Jira übernehmen die eigene Person nicht.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="log-release" id="v0-3-53">
+            <p class="log-meta">v0.3.53</p>
+            <h2 class="log-title">Aufwand und Kosten folgen dem Sheet</h2>
+            <p class="log-lead">
+              Wer Personentage oder Kosten in Jira ändert, sieht beim nächsten Abgleich wieder die Werte aus dem Effort Sheet.
+            </p>
+            <div class="log-blocks">
+              <div>
+                <h3>Aufwand</h3>
+                <p>Die Plan-Personentage im Ticket bleiben die aus dem Sheet. Ein anderer Eintrag in Jira wird ersetzt.</p>
+              </div>
+              <div>
+                <h3>Kosten</h3>
+                <p>IT-Kosten und Gesamtsumme kommen aus dem Sheet. Leeren oder Überschreiben in Jira hält nicht.</p>
+              </div>
+            </div>
+          </section>
 
           <section class="log-release" id="v0-3-51">
             <p class="log-meta">v0.3.51</p>
@@ -2463,6 +3052,8 @@
             </div>
           </div>
         </section>
+          </div>
+        </div>
       </article>
     </div>
     <script src="/auth.js?v=v0-3-33"></script>

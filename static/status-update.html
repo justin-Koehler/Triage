@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Status update — CRITR</title>
+    <link rel="stylesheet" href="/styles.css?v=v0-5-11" />
+  </head>
+  <body class="status-update-page">
+    <header class="status-update-chrome">
+      <a class="brand" href="/workspace">CRITR</a>
+      <div class="status-update-chrome-actions">
+        <button type="button" class="btn btn-primary" id="su-save">Speichern</button>
+        <button type="button" class="status-update-save" id="su-back">Zurück</button>
+      </div>
+    </header>
+    <main class="status-update-main">
+      <div class="ticket-hero su-hero">
+        <p class="su-kicker">Gesamtsicht</p>
+        <h1 class="ticket-headline" id="su-for">Change</h1>
+      </div>
+      <select id="su-health" hidden aria-hidden="true">
+        <option value="green">Im Plan</option>
+        <option value="blue">Im Blick behalten</option>
+        <option value="yellow">Kritisch</option>
+        <option value="red">Überzogen</option>
+        <option value="white">On hold</option>
+        <option value="done">Done</option>
+      </select>
+      <p class="status-update-frozen" id="su-frozen" hidden></p>
+      <p class="status-update-error" id="su-error" hidden>Nicht gespeichert.</p>
+      <div class="status-update-layout">
+        <div class="status-update-sheet">
+          <section class="status-update-board su-onepager" id="su-board">
+            <section class="su-card" id="su-goal"></section>
+            <section class="su-card" id="su-people"></section>
+            <section class="su-card su-wide">
+              <h2>Abhängigkeiten</h2>
+              <textarea id="su-deps" data-su-key="deps" rows="2" maxlength="4000" placeholder="Andere Projekte, die dieser Change braucht"></textarea>
+            </section>
+            <section class="su-card" id="su-plan"></section>
+            <section class="su-card su-write">
+              <h2>Blocker und Risiko</h2>
+              <label>
+                Entscheidung
+                <textarea id="su-decisions" rows="2" maxlength="4000" placeholder="Welche Entscheidung aussteht"></textarea>
+              </label>
+              <label>
+                Risikomaßnahme
+                <textarea id="su-risks" rows="2" maxlength="4000" placeholder="Was das Risiko abfedert"></textarea>
+              </label>
+              <label>
+                Entscheidungsbedarf
+                <textarea id="su-next" rows="3" maxlength="4000" placeholder="Eine Zeile pro Punkt"></textarea>
+              </label>
+            </section>
+          </section>
+          <textarea id="su-summary" hidden></textarea>
+        </div>
+        <aside class="status-update-side">
+          <div class="su-meta">
+            <p class="su-meta-key" id="su-key" hidden>
+              <a class="ticket-jira-key" id="su-key-link" target="_blank" rel="noopener"></a>
+            </p>
+            <p class="su-hero-status">
+              <span class="stand-pill is-green" id="su-status-pill">Im Plan</span>
+              <span class="su-stand" id="su-stand">Stand</span>
+            </p>
+          </div>
+          <div class="status-update-snapshots" id="su-snapshots" aria-label="Snapshots"></div>
+        </aside>
+      </div>
+    </main>
+    <script src="/status-update.js?v=v0-5-11"></script>
+  </body>
+</html>
