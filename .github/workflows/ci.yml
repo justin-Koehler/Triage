@@ -42,14 +42,14 @@ jobs:
           test "$user" != "root"
           test "$user" != "0"
       - name: Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ steps.meta.outputs.tag }}
           exit-code: "1"
           severity: CRITICAL
           ignore-unfixed: true
       - name: SBOM
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: image
           image-ref: ${{ steps.meta.outputs.tag }}
